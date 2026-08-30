@@ -34,12 +34,16 @@ def build_scenarios(eng):
     scenarios = []
 
     for k in keys:
+        scenarios.append({"op": "rate", "stage": k})
         for c in COUNTS:
             scenarios.append({"op": "project_hires", "stage": k, "count": c})
             scenarios.append({"op": "fill_from", "stage": k, "count": c})
             scenarios.append({"op": "timeline", "stage": k, "count": c})
         for t in TARGETS:
             scenarios.append({"op": "required_for_target", "stage": k, "target": t})
+
+    for t in TARGETS:
+        scenarios.append({"op": "required_funnel", "target": t})
 
     for a in keys:
         for b in keys:
@@ -56,6 +60,19 @@ def build_scenarios(eng):
                 scenarios.append({"op": "gap_analysis",
                                   "counts": dict(counts), "target": target})
 
+    # מקרי גבול של סף האיזון: בדיוק הכמות הנדרשת, ומעט סביבה
+    for a in with_data:
+        for b in with_data:
+            if a == b:
+                continue
+            needed = eng.convert(b, 300, a)
+            for delta in (-0.06, -0.01, 0, 0.01, 0.06):
+                counts = {k: None for k in keys}
+                counts[b] = 300
+                counts[a] = max(0, round(needed * (1 + delta)))
+                scenarios.append({"op": "gap_analysis",
+                                  "counts": dict(counts), "target": None})
+
     counts_all = {k: (500 if eng.has_rate(k) else None) for k in keys}
     for target in (None, 1, 120, 5000):
         scenarios.append({"op": "gap_analysis", "counts": dict(counts_all), "target": target})
@@ -64,23 +81,20 @@ def build_scenarios(eng):
 
 
 def python_result(eng, sc):
+    if sc["op"] == "rate":
+        return eng.rate(sc["stage"])
     if sc["op"] == "project_hires":
-        r = eng.project_hires(sc["stage"], sc["count"])
-        return r.as_dict() if r else None
+        return eng.project_hires(sc["stage"], sc["count"])
     if sc["op"] == "required_for_target":
-        r = eng.required_for_target(sc["stage"], sc["target"])
-        return r.as_dict() if r else None
+        return eng.required_for_target(sc["stage"], sc["target"])
     if sc["op"] == "convert":
-        r = eng.convert(sc["from"], sc["count"], sc["to"])
-        return r.as_dict() if r else None
+        return eng.convert(sc["from"], sc["count"], sc["to"])
     if sc["op"] == "fill_from":
         return eng.fill_from(sc["stage"], sc["count"])
+    if sc["op"] == "required_funnel":
+        return eng.required_funnel(sc["target"])
     if sc["op"] == "timeline":
-        rows = eng.timeline(sc["stage"], sc["count"])
-        if rows is None:
-            return None
-        return [{"key": r["key"], "label": r["label"], "share": r["share"],
-                 "hires": r["hires"].as_dict() if r["hires"] else None} for r in rows]
+        return eng.timeline(sc["stage"], sc["count"])
     if sc["op"] == "gap_analysis":
         return eng.gap_analysis(sc["counts"], sc["target"])
     raise AssertionError("פעולה לא מוכרת: " + sc["op"])

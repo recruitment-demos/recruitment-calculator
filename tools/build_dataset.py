@@ -229,6 +229,7 @@ def main():
     hires_without_activity = int(len(hired_ids - set(act["candidate"])))
 
     dataset = {
+        "gap_tolerance": cfg["gap_tolerance"],
         "meta": {
             "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "activities_file": cfg["sources"]["activities"]["file"],
@@ -262,7 +263,8 @@ def main():
             continue
         r = s["hire_rate"]
         d = s["days_to_hire"]
-        print(f"  {s['label']:<20} יחס גיוס {r['low']*100:5.1f}%-{r['high']*100:5.1f}%   "
+        print(f"  {s['label']:<20} יחס גיוס {r['mid']*100:5.1f}%   "
+              f"(נמדד {r['low']*100:.1f}% ו-{r['high']*100:.1f}%)   "
               f"חציון {d['median']:.0f} ימים (n={d['n']:,})")
     if unmapped:
         print(f"  סוגי פעילות שלא מופו: {', '.join(unmapped)}")

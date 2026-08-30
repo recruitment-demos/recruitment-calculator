@@ -33,29 +33,23 @@ const results = [];
 
 for (const sc of scenarios) {
   if (sc.op === "project_hires") {
-    results.push(Engine.asDict(Engine.projectHires(sc.stage, sc.count)));
+    results.push(Engine.projectHires(sc.stage, sc.count));
   } else if (sc.op === "required_for_target") {
-    results.push(Engine.asDict(Engine.requiredForTarget(sc.stage, sc.target)));
+    results.push(Engine.requiredForTarget(sc.stage, sc.target));
   } else if (sc.op === "convert") {
-    results.push(Engine.asDict(Engine.convert(sc.from, sc.count, sc.to)));
+    results.push(Engine.convert(sc.from, sc.count, sc.to));
   } else if (sc.op === "fill_from") {
     results.push(Engine.fillFrom(sc.stage, sc.count));
+  } else if (sc.op === "required_funnel") {
+    results.push(Engine.requiredFunnel(sc.target));
   } else if (sc.op === "timeline") {
-    const rows = Engine.timeline(sc.stage, sc.count);
-    results.push(
-      rows === null
-        ? null
-        : rows.map(r => ({
-            key: r.key,
-            label: r.label,
-            share: r.share,
-            hires: Engine.asDict(r.hires)
-          }))
-    );
+    results.push(Engine.timeline(sc.stage, sc.count));
   } else if (sc.op === "gap_analysis") {
     results.push(Engine.gapAnalysis(sc.counts, sc.target));
+  } else if (sc.op === "rate") {
+    results.push(Engine.rate(sc.stage));
   } else {
-    console.error("פעולה לא מוכרת: " + sc.op);
+    console.error("\u05e4\u05e2\u05d5\u05dc\u05d4 \u05dc\u05d0 \u05de\u05d5\u05db\u05e8\u05ea: " + sc.op);
     process.exit(1);
   }
 }

@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from recruit_calc.engine import Range, load_engine  # noqa: E402
+from recruit_calc.engine import load_engine, round_half_up  # noqa: E402
 
 
 class TestDataset(unittest.TestCase):
@@ -36,9 +36,9 @@ class TestDataset(unittest.TestCase):
                 self.assertTrue(s["note"], s["key"])
 
     def test_submissions_stage_has_no_invented_data(self):
-        sub = self.eng.stage("submissions")
-        self.assertFalse(sub["has_data"])
+        self.assertFalse(self.eng.stage("submissions")["has_data"])
         self.assertFalse(self.eng.has_rate("submissions"))
+        self.assertIsNone(self.eng.rate("submissions"))
 
     def test_rates_are_valid_probabilities(self):
         for s in self.data["stages"]:
@@ -49,8 +49,8 @@ class TestDataset(unittest.TestCase):
             self.assertLessEqual(r["high"], 1, s["key"])
             self.assertLessEqual(r["low"], r["high"], s["key"])
 
-    def test_rate_bounds_come_from_the_two_bases(self):
-        """הטווח חייב להיות בדיוק שני בסיסי החישוב, לא ערך מוחלק."""
+    def test_rate_in_use_is_the_average_of_the_two_bases(self):
+        """הערך שבשימוש חייב להיות בדיוק הממוצע, לא ערך שנבחר ידנית."""
         for s in self.data["stages"]:
             if not s["has_data"]:
                 continue
@@ -58,6 +58,8 @@ class TestDataset(unittest.TestCase):
                             s["basis"]["mature"]["rate"]])
             self.assertAlmostEqual(s["hire_rate"]["low"], rates[0], places=5, msg=s["key"])
             self.assertAlmostEqual(s["hire_rate"]["high"], rates[1], places=5, msg=s["key"])
+            self.assertAlmostEqual(self.eng.rate(s["key"]),
+                                   (rates[0] + rates[1]) / 2, places=5, msg=s["key"])
 
     def test_basis_counts_are_consistent(self):
         for s in self.data["stages"]:
@@ -84,12 +86,10 @@ class TestDataset(unittest.TestCase):
             self.assertEqual(nxt["min_days"], prev["max_days"] + 1)
 
     def test_later_stages_convert_better(self):
-        """ככל שהשלב מתקדם יותר, יחס הגיוס אמור לעלות."""
-        ordered = [s for s in self.data["stages"] if s["has_data"]]
-        rates = [s["hire_rate"]["mid"] for s in ordered]
+        ordered = [s["key"] for s in self.data["stages"] if s["has_data"]]
+        rates = [self.eng.rate(k) for k in ordered]
         # מרכז הערכה הוא שלב סלקטיבי שלא כולם עוברים בו, ולכן לא נדרשת
-        # מונוטוניות מוחלטת - נדרש רק שהשלב הראשון יהיה הנמוך ביותר
-        # והאחרון הגבוה ביותר.
+        # מונוטוניות מוחלטת - נדרש רק שהראשון יהיה הנמוך והאחרון הגבוה.
         self.assertEqual(min(rates), rates[0])
         self.assertEqual(max(rates), rates[-1])
 
@@ -103,17 +103,22 @@ class TestDataset(unittest.TestCase):
         self.assertLess(m["activity_first"], m["activity_last"])
         self.assertLess(m["hire_first"], m["hire_last"])
 
+    def test_gap_tolerance_present(self):
+        tol = self.data["gap_tolerance"]
+        self.assertGreater(tol["pct"], 0)
+        self.assertGreaterEqual(tol["min_candidates"], 1)
 
-class TestRange(unittest.TestCase):
-    def test_orders_bounds(self):
-        r = Range(9, 2)
-        self.assertEqual((r.low, r.high), (2, 9))
 
-    def test_rounding_widens_outwards(self):
-        self.assertEqual(Range(2.1, 5.9).rounded(), (2, 6))
+class TestRounding(unittest.TestCase):
+    def test_half_rounds_up_not_to_even(self):
+        # round() המובנה היה מחזיר 2 עבור 2.5, בניגוד ל-Math.round ב-JS
+        self.assertEqual(round_half_up(2.5), 3)
+        self.assertEqual(round_half_up(3.5), 4)
 
-    def test_exact_integers_stay_put(self):
-        self.assertEqual(Range(4.0, 4.0).rounded(), (4, 4))
+    def test_ordinary_rounding(self):
+        self.assertEqual(round_half_up(2.4), 2)
+        self.assertEqual(round_half_up(2.6), 3)
+        self.assertEqual(round_half_up(0), 0)
 
 
 class TestEngine(unittest.TestCase):
@@ -121,40 +126,42 @@ class TestEngine(unittest.TestCase):
     def setUpClass(cls):
         cls.eng = load_engine()
 
+    def test_results_are_single_numbers_not_ranges(self):
+        """אין טווחים בשום מוצא של המנוע."""
+        self.assertIsInstance(self.eng.project_hires("online_day", 100), float)
+        self.assertIsInstance(self.eng.required_for_target("online_day", 30), float)
+        self.assertIsInstance(self.eng.convert("file_check", 100, "yachbam"), float)
+        filled = self.eng.fill_from("online_day", 100)
+        self.assertIsInstance(filled["hires"], int)
+        self.assertIsInstance(filled["file_check"]["value"], int)
+        for row in self.eng.timeline("online_day", 100):
+            self.assertIsInstance(row["hires"], int)
+
     def test_project_hires_scales_linearly(self):
         a = self.eng.project_hires("online_day", 100)
         b = self.eng.project_hires("online_day", 200)
-        self.assertAlmostEqual(b.low, a.low * 2, places=6)
-        self.assertAlmostEqual(b.high, a.high * 2, places=6)
+        self.assertAlmostEqual(b, a * 2, places=6)
 
     def test_project_and_require_are_inverse(self):
         for key in self.eng.stage_keys(with_data_only=True):
             hires = self.eng.project_hires(key, 1000)
-            back_low = self.eng.required_for_target(key, hires.low)
-            back_high = self.eng.required_for_target(key, hires.high)
-            # הגבול התחתון של הגיוסים מגיע מהיחס הנמוך, ולכן חוזר לגבול העליון
-            self.assertAlmostEqual(back_low.high, 1000, places=6, msg=key)
-            self.assertAlmostEqual(back_high.low, 1000, places=6, msg=key)
+            self.assertAlmostEqual(self.eng.required_for_target(key, hires),
+                                   1000, places=6, msg=key)
 
     def test_convert_to_self_is_identity(self):
-        r = self.eng.convert("yachbam", 77, "yachbam")
-        self.assertEqual((r.low, r.high), (77, 77))
+        self.assertEqual(self.eng.convert("yachbam", 77, "yachbam"), 77)
 
-    def test_convert_widens_never_narrows(self):
-        """מעבר הלוך ושוב בין שלבים לא יכול לצמצם את אי-הוודאות."""
+    def test_convert_round_trip_returns_to_start(self):
         there = self.eng.convert("file_check", 1000, "yachbam")
-        back_low = self.eng.convert("yachbam", there.low, "file_check")
-        back_high = self.eng.convert("yachbam", there.high, "file_check")
-        self.assertLessEqual(back_low.low, 1000 + 1e-9)
-        self.assertGreaterEqual(back_high.high, 1000 - 1e-9)
+        back = self.eng.convert("yachbam", there, "file_check")
+        self.assertAlmostEqual(back, 1000, places=6)
 
-    def test_convert_through_hires_is_transitive(self):
+    def test_convert_is_transitive(self):
         direct = self.eng.convert("file_check", 5000, "yachbam")
         via = self.eng.convert("online_day",
-                               self.eng.convert("file_check", 5000, "online_day").low,
+                               self.eng.convert("file_check", 5000, "online_day"),
                                "yachbam")
-        # המסלול העקיף חייב להיות מוכל בטווח הישיר או רחב ממנו, לא לחרוג ממנו כלפי מטה
-        self.assertLessEqual(via.low, direct.high)
+        self.assertAlmostEqual(direct, via, places=6)
 
     def test_no_result_for_stage_without_data(self):
         self.assertIsNone(self.eng.project_hires("submissions", 500))
@@ -165,22 +172,30 @@ class TestEngine(unittest.TestCase):
 
     def test_fill_from_marks_the_input_stage(self):
         filled = self.eng.fill_from("screening_day", 300)
-        self.assertEqual(filled["screening_day"]["source"], "input")
-        self.assertEqual(filled["screening_day"]["low"], 300)
-        self.assertEqual(filled["screening_day"]["high"], 300)
+        self.assertEqual(filled["screening_day"], {"value": 300, "source": "input"})
         self.assertEqual(filled["file_check"]["source"], "derived")
         self.assertIsNone(filled["submissions"])
 
     def test_fill_from_earlier_stages_are_larger(self):
         filled = self.eng.fill_from("yachbam", 100)
-        self.assertGreater(filled["file_check"]["low"], filled["yachbam"]["high"])
+        self.assertGreater(filled["file_check"]["value"], filled["yachbam"]["value"])
 
-    def test_timeline_shares_sum_to_projected_hires(self):
+    def test_required_funnel_hits_the_target(self):
+        target = 400
+        funnel = self.eng.required_funnel(target)
+        self.assertEqual(funnel["hires"], target)
+        for key in self.eng.stage_keys(with_data_only=True):
+            back = self.eng.project_hires(key, funnel[key]["value"])
+            self.assertAlmostEqual(back, target, delta=1, msg=key)
+        self.assertIsNone(funnel["submissions"])
+
+    def test_timeline_sums_to_projected_hires(self):
         count = 1000
         rows = self.eng.timeline("online_day", count)
         hires = self.eng.project_hires("online_day", count)
-        self.assertAlmostEqual(sum(r["hires"].low for r in rows), hires.low, places=3)
-        self.assertAlmostEqual(sum(r["hires"].high for r in rows), hires.high, places=3)
+        # סכום הדליים המעוגלים חייב להיות צמוד לסך המגויסים
+        self.assertAlmostEqual(sum(r["hires"] for r in rows), hires,
+                               delta=len(rows) / 2)
 
     def test_timeline_has_a_row_per_bucket(self):
         rows = self.eng.timeline("file_check", 500)
@@ -188,30 +203,49 @@ class TestEngine(unittest.TestCase):
                          [b["key"] for b in self.eng.buckets])
 
     def test_gap_analysis_reports_deficit(self):
-        # מעט מאוד בדיקות קבצים מול הרבה יחב"מ - חייב לצאת חוסר
         msgs = self.eng.gap_analysis({"file_check": 10, "yachbam": 500})
-        kinds = {m["kind"] for m in msgs}
-        self.assertIn("deficit", kinds)
+        pair = [m for m in msgs if m["stage"] == "file_check"][0]
+        self.assertEqual(pair["kind"], "deficit")
+        self.assertGreater(pair["gap"], 0)
 
     def test_gap_analysis_reports_surplus(self):
         msgs = self.eng.gap_analysis({"file_check": 500000, "yachbam": 10})
-        kinds = {m["kind"] for m in msgs}
-        self.assertIn("surplus", kinds)
+        pair = [m for m in msgs if m["stage"] == "file_check"][0]
+        self.assertEqual(pair["kind"], "surplus")
+        self.assertGreater(pair["gap"], 0)
 
-    def test_gap_analysis_balanced_when_consistent(self):
+    def test_gap_analysis_balanced_when_exactly_consistent(self):
         needed = self.eng.convert("yachbam", 100, "file_check")
-        msgs = self.eng.gap_analysis({"file_check": int(needed.mid), "yachbam": 100})
-        pair = [m for m in msgs if m["against"] == "yachbam"]
-        self.assertEqual(pair[0]["kind"], "balanced")
+        msgs = self.eng.gap_analysis({"file_check": round(needed), "yachbam": 100})
+        pair = [m for m in msgs if m["against"] == "yachbam"][0]
+        self.assertEqual(pair["kind"], "balanced")
+        self.assertEqual(pair["gap"], 0)
+
+    def test_gap_tolerance_absorbs_small_differences(self):
+        """הפרש של מועמד אחד לא נחשב פער."""
+        needed = self.eng.convert("yachbam", 100, "file_check")
+        msgs = self.eng.gap_analysis({"file_check": round(needed) + 1, "yachbam": 100})
+        pair = [m for m in msgs if m["against"] == "yachbam"][0]
+        self.assertEqual(pair["kind"], "balanced")
+
+    def test_gap_tolerance_does_not_absorb_large_differences(self):
+        needed = self.eng.convert("yachbam", 100, "file_check")
+        msgs = self.eng.gap_analysis({"file_check": round(needed * 1.5), "yachbam": 100})
+        pair = [m for m in msgs if m["against"] == "yachbam"][0]
+        self.assertEqual(pair["kind"], "surplus")
 
     def test_gap_analysis_target_verdicts(self):
         low = self.eng.gap_analysis({"yachbam": 100}, target=500)
         self.assertEqual(low[-1]["kind"], "target_miss")
+        self.assertGreater(low[-1]["gap"], 0)
+
         high = self.eng.gap_analysis({"yachbam": 100}, target=1)
         self.assertEqual(high[-1]["kind"], "target_over")
-        projected = self.eng.project_hires("yachbam", 100)
-        ok = self.eng.gap_analysis({"yachbam": 100}, target=int(projected.mid))
+
+        exact = round_half_up(self.eng.project_hires("yachbam", 100))
+        ok = self.eng.gap_analysis({"yachbam": 100}, target=exact)
         self.assertEqual(ok[-1]["kind"], "target_ok")
+        self.assertEqual(ok[-1]["gap"], 0)
 
     def test_gap_analysis_ignores_stages_without_data(self):
         msgs = self.eng.gap_analysis({"submissions": 9999, "yachbam": 100})

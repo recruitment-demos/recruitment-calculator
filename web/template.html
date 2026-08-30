@@ -6,19 +6,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
   :root {
-    --bg: #eef1f6;
+    --bg: #eff2f7;
     --card: #ffffff;
     --ink: #0b2540;
     --muted: #5b7089;
-    --line: #dde3ef;
+    --faint: #8a99ad;
+    --line: #dfe5f0;
     --brand: #0052cc;
-    --brand-soft: #e8f1ff;
+    --brand-2: #3d8bff;
+    --brand-soft: #e9f1ff;
     --good: #0a7a52;
-    --good-soft: #e3f6ee;
+    --good-soft: #e4f7ef;
     --bad: #c13737;
-    --bad-soft: #ffeceb;
+    --bad-soft: #ffedec;
     --warn: #8a5a00;
     --warn-soft: #fff4e0;
+    --shadow: 0 6px 20px rgba(9, 30, 66, .09);
   }
 
   * { box-sizing: border-box; }
@@ -31,105 +34,191 @@
     line-height: 1.55;
   }
 
-  .wrap { max-width: 1080px; margin: 0 auto; padding: 22px 16px 56px; }
+  .wrap { max-width: 1020px; margin: 0 auto; padding: 24px 16px 64px; }
 
   .card {
     background: var(--card);
     border: 1px solid var(--line);
-    border-radius: 14px;
-    box-shadow: 0 6px 20px rgba(9, 30, 66, 0.09);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
     padding: 20px 22px 22px;
-    margin-bottom: 18px;
+    margin-bottom: 16px;
   }
 
-  h1 { font-size: 22px; margin: 0 0 4px; }
-  h2 { font-size: 16px; margin: 0 0 12px; }
+  h1 { font-size: 23px; margin: 0 0 4px; letter-spacing: -.2px; }
+  h2 { font-size: 15px; margin: 0 0 14px; color: var(--ink); }
 
   .sub { font-size: 13px; color: var(--muted); margin: 0 0 4px; }
 
   .stamp {
-    font-size: 12px;
-    color: var(--muted);
-    background: #f5f7fb;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 7px 10px;
-    margin-top: 12px;
+    font-size: 12px; color: var(--muted);
+    background: #f5f7fb; border: 1px solid var(--line);
+    border-radius: 9px; padding: 8px 11px; margin-top: 12px;
   }
 
+  /* ---------- קלט ---------- */
   .grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 12px 14px;
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 14px;
   }
   @media (max-width: 860px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
   .field { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; }
   .field label { color: var(--muted); font-weight: 500; }
   .field input {
-    border: 1px solid #c8d0e0;
-    border-radius: 9px;
-    padding: 9px 10px;
-    font-size: 14px;
-    text-align: center;
-    background: #fafbfd;
-    color: var(--ink);
-    outline: none;
-    font-family: inherit;
+    border: 1px solid #ccd5e4; border-radius: 10px; padding: 10px;
+    font-size: 15px; text-align: center; background: #fafbfd;
+    color: var(--ink); outline: none; font-family: inherit;
+    transition: border-color .15s, box-shadow .15s, background .15s;
   }
-  .field input:focus { border-color: var(--brand); background: #fff; box-shadow: 0 0 0 3px rgba(0,82,204,.12); }
+  .field input:focus {
+    border-color: var(--brand); background: #fff;
+    box-shadow: 0 0 0 3px rgba(0, 82, 204, .13);
+  }
   .field.no-data label { color: var(--warn); }
   .field.no-data input { background: #fffaf0; border-color: #e8d3a8; }
   .field.target label { color: var(--bad); font-weight: 700; }
   .field.target input { border-color: #f0b6b6; background: #fff7f7; }
-
   .hint { font-size: 11px; color: var(--warn); }
 
-  .row { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+  .row { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
   button {
-    border: none; border-radius: 9px; padding: 9px 20px;
-    font-size: 14px; cursor: pointer; font-family: inherit; font-weight: 600;
+    border: none; border-radius: 10px; padding: 11px 26px;
+    font-size: 14.5px; cursor: pointer; font-family: inherit; font-weight: 600;
+    transition: transform .12s, background .15s, box-shadow .15s;
   }
-  .primary { background: var(--brand); color: #fff; }
-  .primary:hover { background: #0043a8; }
-  .ghost { background: #f1f3f8; color: var(--muted); border: 1px solid var(--line); font-weight: 500; }
-  .ghost:hover { background: #e7eaf2; }
-
-  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-  th, td { padding: 9px 10px; text-align: right; border-bottom: 1px solid var(--line); }
-  th { font-size: 12px; color: var(--muted); font-weight: 600; background: #f7f9fc; }
-  tbody tr:last-child td { border-bottom: none; }
-  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
-  tr.is-input td { background: var(--brand-soft); font-weight: 700; }
-  tr.is-hires td { background: #f4f7fb; font-weight: 700; border-top: 2px solid var(--line); }
-  tr.is-missing td { color: var(--warn); background: var(--warn-soft); }
-  .tag {
-    font-size: 11px; padding: 2px 7px; border-radius: 999px;
-    background: #eef1f6; color: var(--muted); font-weight: 600;
+  button:active { transform: scale(.97); }
+  .primary {
+    background: linear-gradient(135deg, var(--brand), var(--brand-2));
+    color: #fff; box-shadow: 0 4px 14px rgba(0, 82, 204, .3);
   }
-  .tag.input { background: var(--brand); color: #fff; }
+  .primary:hover { box-shadow: 0 6px 18px rgba(0, 82, 204, .4); }
+  .ghost {
+    background: #f1f4f9; color: var(--muted);
+    border: 1px solid var(--line); font-weight: 500;
+  }
+  .ghost:hover { background: #e7ecf4; }
 
-  .msg { padding: 9px 12px; border-radius: 9px; font-size: 13.5px; margin-bottom: 7px; }
+  /* ---------- הופעת התוצאות ---------- */
+  .reveal {
+    opacity: 0; transform: translateY(14px);
+    transition: opacity .5s ease, transform .5s cubic-bezier(.2, .7, .3, 1);
+  }
+  .reveal.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { transition: none; opacity: 1; transform: none; }
+  }
+
+  /* ---------- כרטיס התוצאה הראשי ---------- */
+  .hero {
+    background: linear-gradient(135deg, #06326e, #0a58c2 55%, #2f7ff0);
+    color: #fff; border: none; text-align: center;
+    padding: 26px 22px 24px;
+    box-shadow: 0 10px 30px rgba(6, 50, 110, .32);
+  }
+  .hero .cap {
+    font-size: 12.5px; letter-spacing: .06em; text-transform: none;
+    opacity: .82; margin-bottom: 2px;
+  }
+  .hero .big {
+    font-size: 60px; font-weight: 800; line-height: 1.05;
+    font-variant-numeric: tabular-nums; letter-spacing: -1.5px;
+  }
+  @media (max-width: 520px) { .hero .big { font-size: 46px; } }
+  .hero .note { font-size: 13px; opacity: .88; margin-top: 6px; }
+
+  /* ---------- המשפך ---------- */
+  .funnel { display: flex; flex-direction: column; gap: 3px; }
+  .fstage {
+    display: grid; grid-template-columns: 132px 1fr 74px 66px;
+    align-items: center; gap: 12px;
+    padding: 7px 0; font-size: 13.5px;
+    border-bottom: 1px solid #f0f3f8;
+  }
+  .fstage:last-child { border-bottom: none; }
+  @media (max-width: 640px) {
+    .fstage { grid-template-columns: 96px 1fr 58px 52px; gap: 8px; font-size: 12px; }
+  }
+  .fname { color: var(--ink); font-weight: 500; }
+  .ftrack { background: #eff2f7; border-radius: 8px; height: 26px; overflow: hidden; }
+  .fbar {
+    height: 100%; width: 0; border-radius: 8px;
+    background: linear-gradient(90deg, var(--brand), var(--brand-2));
+    transition: width .75s cubic-bezier(.2, .7, .3, 1);
+  }
+  @media (prefers-reduced-motion: reduce) { .fbar { transition: none; } }
+  .fval {
+    text-align: left; font-variant-numeric: tabular-nums;
+    font-weight: 700; font-size: 15px;
+  }
+  .frate { text-align: left; font-variant-numeric: tabular-nums; color: var(--faint); font-size: 12px; }
+
+  .fstage.anchor .fname { font-weight: 800; color: var(--brand); }
+  .fstage.anchor .fval { color: var(--brand); }
+  .fstage.hires { border-top: 2px solid var(--line); margin-top: 6px; padding-top: 12px; }
+  .fstage.hires .fname, .fstage.hires .fval { font-weight: 800; }
+  .fstage.hires .fbar { background: linear-gradient(90deg, #0a7a52, #24b581); }
+  .fstage.nodata .fname { color: var(--warn); }
+  .fstage.nodata .fval { color: var(--warn); font-size: 12px; font-weight: 500; }
+
+  .chip {
+    display: inline-block; font-size: 10.5px; font-weight: 700;
+    background: var(--brand); color: #fff;
+    border-radius: 999px; padding: 1px 7px; margin-inline-start: 6px;
+    vertical-align: middle;
+  }
+
+  /* ---------- הודעות ---------- */
+  .msg {
+    padding: 10px 13px; border-radius: 10px;
+    font-size: 13.5px; margin-bottom: 7px;
+  }
+  .msg:last-child { margin-bottom: 0; }
   .msg.good { background: var(--good-soft); color: var(--good); }
   .msg.bad { background: var(--bad-soft); color: var(--bad); }
-  .msg.flat { background: #f2f4f8; color: var(--muted); }
+  .msg.flat { background: #f2f5f9; color: var(--muted); }
   .msg.warn { background: var(--warn-soft); color: var(--warn); }
 
-  .bars { display: flex; flex-direction: column; gap: 8px; }
-  .bar-row { display: grid; grid-template-columns: 150px 1fr 92px; align-items: center; gap: 10px; font-size: 13px; }
-  @media (max-width: 620px) { .bar-row { grid-template-columns: 116px 1fr 78px; font-size: 12px; } }
-  .bar-track { background: #eef1f6; border-radius: 999px; height: 20px; overflow: hidden; }
-  .bar-fill { background: linear-gradient(90deg, #0052cc, #3d8bff); height: 100%; border-radius: 999px; }
-  .bar-val { text-align: left; font-variant-numeric: tabular-nums; color: var(--muted); }
+  /* ---------- ציר הזמן ---------- */
+  .bars { display: flex; flex-direction: column; gap: 9px; }
+  .bar-row {
+    display: grid; grid-template-columns: 152px 1fr 70px;
+    align-items: center; gap: 11px; font-size: 13px;
+  }
+  @media (max-width: 640px) {
+    .bar-row { grid-template-columns: 108px 1fr 54px; gap: 8px; font-size: 12px; }
+  }
+  .bar-track { background: #eff2f7; border-radius: 999px; height: 22px; overflow: hidden; }
+  .bar-fill {
+    background: linear-gradient(90deg, #0a58c2, #4d9bff);
+    height: 100%; width: 0; border-radius: 999px;
+    transition: width .75s cubic-bezier(.2, .7, .3, 1);
+  }
+  @media (prefers-reduced-motion: reduce) { .bar-fill { transition: none; } }
+  .bar-val {
+    text-align: left; font-variant-numeric: tabular-nums;
+    font-weight: 700; color: var(--ink);
+  }
 
-  details { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; background: #fafbfd; }
+  /* ---------- בסיס הנתונים ---------- */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 8px 9px; text-align: right; border-bottom: 1px solid var(--line); }
+  th { font-size: 11.5px; color: var(--muted); font-weight: 600; background: #f7f9fc; }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr.nodata td { color: var(--warn); background: var(--warn-soft); }
+  .scroller { overflow-x: auto; }
+
+  details {
+    border: 1px solid var(--line); border-radius: 11px;
+    padding: 11px 15px; background: #fafbfd;
+  }
   details + details { margin-top: 10px; }
   summary { cursor: pointer; font-weight: 600; font-size: 13.5px; }
   details p, details li { font-size: 13px; color: var(--muted); }
   details ul { padding-inline-start: 18px; margin: 8px 0; }
 
   .hidden { display: none; }
-  .foot { font-size: 12px; color: var(--muted); text-align: center; margin-top: 8px; }
+  .foot { font-size: 12px; color: var(--muted); text-align: center; margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -150,52 +239,48 @@
     </div>
   </div>
 
-  <div class="card hidden" id="funnelCard">
-    <h2>המשפך המלא</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>שלב</th>
-          <th>מועמדים</th>
-          <th>מקור</th>
-          <th>יחס גיוס נמדד</th>
-        </tr>
-      </thead>
-      <tbody id="funnelBody"></tbody>
-    </table>
-  </div>
+  <div id="results" class="hidden">
+    <div class="card hero reveal" id="heroCard">
+      <div class="cap" id="heroCap"></div>
+      <div class="big" id="heroValue">0</div>
+      <div class="note" id="heroNote"></div>
+    </div>
 
-  <div class="card hidden" id="gapCard">
-    <h2>ניתוח פערים</h2>
-    <div id="gapBody"></div>
-  </div>
+    <div class="card reveal" id="funnelCard">
+      <h2>המשפך המלא</h2>
+      <div class="funnel" id="funnelBody"></div>
+    </div>
 
-  <div class="card hidden" id="timelineCard">
-    <h2>פריסת מועדי הגיוס הצפויים</h2>
-    <p class="sub" id="timelineSub"></p>
-    <div class="bars" id="timelineBody"></div>
+    <div class="card reveal" id="gapCard">
+      <h2>ניתוח פערים</h2>
+      <div id="gapBody"></div>
+    </div>
+
+    <div class="card reveal" id="timelineCard">
+      <h2>פריסת מועדי הגיוס הצפויים</h2>
+      <p class="sub" id="timelineSub"></p>
+      <div class="bars" id="timelineBody"></div>
+    </div>
   </div>
 
   <div class="card">
     <h2>בסיס הנתונים ושיטת החישוב</h2>
     <details>
       <summary>מאיפה מגיעים המספרים</summary>
-      <div id="basisBody"></div>
+      <div class="scroller" id="basisBody"></div>
     </details>
     <details>
-      <summary>למה כל תוצאה היא טווח ולא מספר יחיד</summary>
+      <summary>איך נמדד יחס הגיוס</summary>
       <p>
         הנתונים קטועים מימין: מועמד שביצע פעילות סמוך לסוף התקופה עדיין לא הספיק
         להתגייס, ובקובץ הוא נראה כמי שלא התגייס. ככל שמתקרבים לסוף התקופה, יחס
         הגיוס הנמדד נמוך יותר - לא מפני שהאיכות ירדה, אלא מפני שלא עבר מספיק זמן.
       </p>
-      <ul>
-        <li><strong>הגבול התחתון</strong> - כל המועמדים עד תאריך החיתוך הקבוע, מול הגיוסים שלהם לאורך כל הקובץ. חלק מהם עדיין בתהליך, ולכן היחס נוטה כלפי מטה.</li>
-        <li><strong>הגבול העליון</strong> - רק קוהורטים שהספיקו להבשיל. תאריך החיתוך נקבע לכל שלב בנפרד: תאריך הגיוס האחרון בקובץ, פחות האחוזון ה-90 של זמן הגיוס באותו שלב.</li>
-      </ul>
       <p>
-        התוצאה האמיתית נמצאת בין השניים. המחשבון מציג את הטווח במקום לבחור מספר
-        אחד ולהציג אותו כוודאות.
+        לכן כל יחס נמדד בשני בסיסים: אחד על חלון זמן קבוע, ואחד על קוהורטים
+        שהספיקו להבשיל, שתאריך החיתוך שלהם נקבע לכל שלב בנפרד לפי האחוזון ה-90
+        של זמן הגיוס באותו שלב. היחס שבשימוש הוא הממוצע בין השניים, ושני
+        הבסיסים מוצגים בטבלה שלמעלה.
       </p>
     </details>
     <details>
@@ -222,6 +307,10 @@ const DATA = /*__DATA__*/null/*__DATA__*/;
 const Engine = (() => {
   const byKey = {};
   DATA.stages.forEach(s => { byKey[s.key] = s; });
+  const TOL = DATA.gap_tolerance;
+
+  // עיגול שמתנהג זהה בפייתון וב-JS. כל הערכים אינם שליליים.
+  const roundHalfUp = x => Math.floor(x + 0.5);
 
   const stage = k => {
     if (!(k in byKey)) throw new Error("שלב לא מוכר: " + k);
@@ -233,39 +322,27 @@ const Engine = (() => {
     return s.has_data && s.hire_rate !== null;
   };
 
+  // יחס הגיוס שבשימוש: ממוצע שני בסיסי המדידה.
+  const rate = k => hasRate(k) ? stage(k).hire_rate.mid : null;
+
   const stageKeys = (withDataOnly) =>
     DATA.stages.filter(s => !withDataOnly || (s.has_data && s.hire_rate)).map(s => s.key);
 
-  // טווח: low תמיד קטן מ-high, עיגול תחתון כלפי מטה ועליון כלפי מעלה.
-  const range = (a, b) => {
-    const low = Math.min(a, b), high = Math.max(a, b);
-    return { low, high, rounded: () => [Math.floor(low), Math.ceil(high)] };
-  };
-
-  const asDict = r => {
-    if (r === null) return null;
-    const [low, high] = r.rounded();
-    return { low, high };
-  };
-
   const projectHires = (k, count) => {
     if (count === null || !hasRate(k)) return null;
-    const r = stage(k).hire_rate;
-    return range(count * r.low, count * r.high);
+    return count * rate(k);
   };
 
   const requiredForTarget = (k, target) => {
     if (target === null || !hasRate(k)) return null;
-    const r = stage(k).hire_rate;
-    return range(target / r.high, target / r.low);
+    return target / rate(k);
   };
 
   const convert = (fromKey, count, toKey) => {
     if (count === null) return null;
-    if (fromKey === toKey) return range(count, count);
+    if (fromKey === toKey) return count;
     if (!(hasRate(fromKey) && hasRate(toKey))) return null;
-    const a = stage(fromKey).hire_rate, b = stage(toKey).hire_rate;
-    return range(count * a.low / b.high, count * a.high / b.low);
+    return count * rate(fromKey) / rate(toKey);
   };
 
   const timeline = (k, count) => {
@@ -273,13 +350,17 @@ const Engine = (() => {
     if (hires === null) return null;
     const s = stage(k);
     if (!s.buckets) return null;
-    return s.buckets.map(b => {
-      if (b.share === null) return { key: b.key, label: b.label, share: null, hires: null };
-      return {
-        key: b.key, label: b.label, share: b.share,
-        hires: range(hires.low * b.share, hires.high * b.share)
-      };
-    });
+    return s.buckets.map(b => ({
+      key: b.key,
+      label: b.label,
+      share: b.share,
+      hires: b.share === null ? null : roundHalfUp(hires * b.share)
+    }));
+  };
+
+  const isBalanced = (actual, needed) => {
+    const allowed = Math.max(TOL.min_candidates, needed * TOL.pct);
+    return Math.abs(actual - needed) <= allowed;
   };
 
   const gapAnalysis = (counts, target) => {
@@ -294,37 +375,24 @@ const Engine = (() => {
         const actual = counts[early];
         const needed = convert(late, counts[late], early);
         if (needed === null) continue;
-        const [lo, hi] = needed.rounded();
-        if (actual < lo) {
-          messages.push({
-            kind: "deficit", stage: early, against: late,
-            shortfall: asDict(range(lo - actual, hi - actual)),
-            needed: { low: lo, high: hi }, actual
-          });
-        } else if (actual > hi) {
-          messages.push({
-            kind: "surplus", stage: early, against: late,
-            surplus: asDict(range(actual - hi, actual - lo)),
-            needed: { low: lo, high: hi }, actual
-          });
-        } else {
-          messages.push({
-            kind: "balanced", stage: early, against: late,
-            needed: { low: lo, high: hi }, actual
-          });
-        }
+        const neededR = roundHalfUp(needed);
+        let kind, gap;
+        if (isBalanced(actual, needed)) { kind = "balanced"; gap = 0; }
+        else if (actual < needed) { kind = "deficit"; gap = neededR - actual; }
+        else { kind = "surplus"; gap = actual - neededR; }
+        messages.push({ kind, stage: early, against: late, gap, needed: neededR, actual });
       }
     }
 
     if (target !== null && target !== undefined && entered.length) {
       const deepest = entered[entered.length - 1];
       const projected = projectHires(deepest, counts[deepest]);
-      const [lo, hi] = projected.rounded();
-      let kind;
-      if (hi < target) kind = "target_miss";
-      else if (lo > target) kind = "target_over";
-      else kind = "target_ok";
-      messages.push({ kind, stage: deepest, target, projected: { low: lo, high: hi } });
+      const projectedR = roundHalfUp(projected);
+      let kind, gap;
+      if (isBalanced(projected, target)) { kind = "target_ok"; gap = 0; }
+      else if (projected < target) { kind = "target_miss"; gap = target - projectedR; }
+      else { kind = "target_over"; gap = projectedR - target; }
+      messages.push({ kind, stage: deepest, target, gap, projected: projectedR });
     }
 
     return messages;
@@ -333,20 +401,28 @@ const Engine = (() => {
   const fillFrom = (k, count) => {
     const out = {};
     stageKeys().forEach(other => {
-      if (other === k) { out[other] = { low: count, high: count, source: "input" }; return; }
+      if (other === k) { out[other] = { value: count, source: "input" }; return; }
       const conv = convert(k, count, other);
-      if (conv === null) { out[other] = null; return; }
-      const d = asDict(conv);
-      d.source = "derived";
-      out[other] = d;
+      out[other] = conv === null ? null : { value: roundHalfUp(conv), source: "derived" };
     });
     const hires = projectHires(k, count);
-    out.hires = hires ? asDict(hires) : null;
+    out.hires = hires === null ? null : roundHalfUp(hires);
     return out;
   };
 
-  return { stage, hasRate, stageKeys, range, asDict, projectHires,
-           requiredForTarget, convert, timeline, gapAnalysis, fillFrom };
+  const requiredFunnel = (target) => {
+    const out = {};
+    stageKeys().forEach(k => {
+      const req = requiredForTarget(k, target);
+      out[k] = req === null ? null : { value: roundHalfUp(req), source: "derived" };
+    });
+    out.hires = target;
+    return out;
+  };
+
+  return { stage, hasRate, rate, stageKeys, roundHalfUp, projectHires,
+           requiredForTarget, convert, timeline, gapAnalysis, fillFrom,
+           requiredFunnel };
 })();
 /* __ENGINE_END__ */
 
@@ -358,10 +434,29 @@ const nf = n => n.toLocaleString("he-IL");
 const pct = x => (x * 100).toFixed(1) + "%";
 const label = k => Engine.stage(k).label;
 
-const rangeText = d => {
-  if (d === null || d === undefined) return "—";
-  return d.low === d.high ? nf(d.low) : nf(d.low) + " – " + nf(d.high);
-};
+const REDUCED = typeof matchMedia === "function" &&
+                matchMedia("(prefers-reduced-motion: reduce)").matches;
+const CAN_ANIMATE = !REDUCED && typeof requestAnimationFrame === "function";
+
+/* ספירה עולה של מספר. בלי תמיכה באנימציה - הערך נכתב מיד. */
+function countUp(el, to, duration) {
+  if (!CAN_ANIMATE) { el.textContent = nf(to); return; }
+  const start = performance.now();
+  const step = now => {
+    const t = Math.min(1, (now - start) / duration);
+    const eased = 1 - Math.pow(1 - t, 3);
+    el.textContent = nf(Math.round(to * eased));
+    if (t < 1) requestAnimationFrame(step);
+    else el.textContent = nf(to);
+  };
+  requestAnimationFrame(step);
+}
+
+/* מילוי רוחב של פס. בלי אנימציה - נקבע מיד. */
+function growBar(el, widthPct, delay) {
+  if (!CAN_ANIMATE) { el.style.width = widthPct + "%"; return; }
+  setTimeout(() => { el.style.width = widthPct + "%"; }, delay);
+}
 
 /* --- בניית שדות הקלט --- */
 function makeField(key, labelText, extraClass, hintText) {
@@ -413,49 +508,86 @@ function readInputs() {
   return { counts, target: Number.isFinite(t) ? t : null };
 }
 
-/* --- טבלת המשפך --- */
-function renderFunnel(filled, anchor, manualOnly) {
+/* --- כרטיס התוצאה הראשי --- */
+function renderHero(cap, value, note) {
+  $("heroCap").textContent = cap;
+  $("heroNote").textContent = note;
+  countUp($("heroValue"), value, 900);
+}
+
+/* --- המשפך --- */
+function renderFunnel(filled, anchor, manual) {
   const body = $("funnelBody");
   body.innerHTML = "";
 
+  const values = DATA.stages
+    .map(s => filled[s.key] ? filled[s.key].value : 0)
+    .concat([filled.hires || 0]);
+  const max = Math.max.apply(null, values.concat([1]));
+
+  let i = 0;
   DATA.stages.forEach(s => {
-    const tr = document.createElement("tr");
     const cell = filled[s.key];
+    const row = document.createElement("div");
+    row.className = "fstage" +
+      (s.key === anchor ? " anchor" : "") +
+      (s.has_data ? "" : " nodata");
 
-    let valueText, sourceTag, rateText;
-
-    if (!s.has_data) {
-      tr.className = "is-missing";
-      valueText = manualOnly[s.key] !== null ? nf(manualOnly[s.key]) : "—";
-      sourceTag = manualOnly[s.key] !== null ? "הוזן ידנית" : "אין מקור נתונים";
-      rateText = "לא נמדד";
-    } else {
-      const isInput = s.key === anchor;
-      if (isInput) tr.className = "is-input";
-      valueText = rangeText(cell);
-      sourceTag = isInput ? "הוזן" : "נגזר";
-      const r = s.hire_rate;
-      rateText = pct(r.low) + " – " + pct(r.high);
+    const name = document.createElement("div");
+    name.className = "fname";
+    name.textContent = s.label;
+    if (s.key === anchor) {
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.textContent = "הוזן";
+      name.append(chip);
     }
 
-    tr.innerHTML =
-      "<td>" + s.label + "</td>" +
-      '<td class="num">' + valueText + "</td>" +
-      '<td><span class="tag' + (s.key === anchor ? " input" : "") + '">' + sourceTag + "</span></td>" +
-      '<td class="num">' + rateText + "</td>";
-    body.append(tr);
+    const track = document.createElement("div");
+    track.className = "ftrack";
+    const bar = document.createElement("div");
+    bar.className = "fbar";
+    track.append(bar);
+
+    const val = document.createElement("div");
+    val.className = "fval";
+
+    const rateCell = document.createElement("div");
+    rateCell.className = "frate";
+
+    if (!s.has_data) {
+      val.textContent = manual[s.key] !== null ? nf(manual[s.key]) : "—";
+      rateCell.textContent = "—";
+    } else {
+      countUp(val, cell.value, 800);
+      growBar(bar, (cell.value / max) * 100, 60 + i * 55);
+      rateCell.textContent = pct(Engine.rate(s.key));
+    }
+
+    row.append(name, track, val, rateCell);
+    body.append(row);
+    i++;
   });
 
-  const tr = document.createElement("tr");
-  tr.className = "is-hires";
-  tr.innerHTML =
-    "<td>מגויסים צפויים</td>" +
-    '<td class="num">' + rangeText(filled.hires) + "</td>" +
-    '<td><span class="tag">נגזר</span></td>' +
-    '<td class="num">—</td>';
-  body.append(tr);
-
-  $("funnelCard").classList.remove("hidden");
+  const row = document.createElement("div");
+  row.className = "fstage hires";
+  const name = document.createElement("div");
+  name.className = "fname";
+  name.textContent = "מגויסים";
+  const track = document.createElement("div");
+  track.className = "ftrack";
+  const bar = document.createElement("div");
+  bar.className = "fbar";
+  track.append(bar);
+  const val = document.createElement("div");
+  val.className = "fval";
+  countUp(val, filled.hires, 800);
+  growBar(bar, (filled.hires / max) * 100, 60 + i * 55);
+  const rateCell = document.createElement("div");
+  rateCell.className = "frate";
+  rateCell.textContent = "100%";
+  row.append(name, track, val, rateCell);
+  body.append(row);
 }
 
 /* --- הודעות פערים --- */
@@ -474,30 +606,32 @@ function renderGaps(messages, extraNotes) {
     const d = document.createElement("div");
     if (m.kind === "deficit") {
       d.className = "msg bad";
-      d.textContent = "חסרים " + rangeText(m.shortfall) + " מועמדים בשלב «" + label(m.stage) +
+      d.textContent = "חסרים " + nf(m.gap) + " מועמדים בשלב «" + label(m.stage) +
         "» כדי לתמוך בנתון שהוזן בשלב «" + label(m.against) + "». נדרשים " +
-        rangeText(m.needed) + ", בפועל " + nf(m.actual) + ".";
+        nf(m.needed) + ", בפועל " + nf(m.actual) + ".";
     } else if (m.kind === "surplus") {
       d.className = "msg good";
-      d.textContent = "עודף של " + rangeText(m.surplus) + " מועמדים בשלב «" + label(m.stage) +
-        "» ביחס לנדרש עבור שלב «" + label(m.against) + "». נדרשים " + rangeText(m.needed) +
-        ", בפועל " + nf(m.actual) + ".";
+      d.textContent = "עודף של " + nf(m.gap) + " מועמדים בשלב «" + label(m.stage) +
+        "» ביחס לנדרש עבור שלב «" + label(m.against) + "». נדרשים " +
+        nf(m.needed) + ", בפועל " + nf(m.actual) + ".";
     } else if (m.kind === "balanced") {
       d.className = "msg flat";
       d.textContent = "שלב «" + label(m.stage) + "» מאוזן מול שלב «" + label(m.against) +
-        "»: נדרשים " + rangeText(m.needed) + ", בפועל " + nf(m.actual) + ".";
+        "»: נדרשים " + nf(m.needed) + ", בפועל " + nf(m.actual) + ".";
     } else if (m.kind === "target_miss") {
       d.className = "msg bad";
       d.textContent = "מתחת ליעד: מהנתון בשלב «" + label(m.stage) + "» צפויים " +
-        rangeText(m.projected) + " מגויסים, מול יעד של " + nf(m.target) + ".";
+        nf(m.projected) + " מגויסים, מול יעד של " + nf(m.target) +
+        ". חסרים " + nf(m.gap) + ".";
     } else if (m.kind === "target_over") {
       d.className = "msg good";
       d.textContent = "מעל היעד: מהנתון בשלב «" + label(m.stage) + "» צפויים " +
-        rangeText(m.projected) + " מגויסים, מול יעד של " + nf(m.target) + ".";
+        nf(m.projected) + " מגויסים, מול יעד של " + nf(m.target) +
+        ". עודף של " + nf(m.gap) + ".";
     } else if (m.kind === "target_ok") {
       d.className = "msg flat";
-      d.textContent = "היעד בתוך הטווח: מהנתון בשלב «" + label(m.stage) + "» צפויים " +
-        rangeText(m.projected) + " מגויסים, והיעד הוא " + nf(m.target) + ".";
+      d.textContent = "היעד מושג: מהנתון בשלב «" + label(m.stage) + "» צפויים " +
+        nf(m.projected) + " מגויסים, והיעד הוא " + nf(m.target) + ".";
     }
     body.append(d);
   });
@@ -508,8 +642,6 @@ function renderGaps(messages, extraNotes) {
     d.textContent = "אין פערים להצגה. להשוואה בין שלבים יש להזין מספרים בשני שלבים או יותר.";
     body.append(d);
   }
-
-  $("gapCard").classList.remove("hidden");
 }
 
 /* --- פריסת מועדי הגיוס --- */
@@ -517,7 +649,8 @@ function renderTimeline(anchor, count) {
   const rows = Engine.timeline(anchor, count);
   const body = $("timelineBody");
   body.innerHTML = "";
-  if (!rows) { $("timelineCard").classList.add("hidden"); return; }
+  if (!rows) { $("timelineCard").classList.add("hidden"); return false; }
+  $("timelineCard").classList.remove("hidden");
 
   const st = Engine.stage(anchor);
   const d = st.days_to_hire;
@@ -526,19 +659,47 @@ function renderTimeline(anchor, count) {
     "», נמדד מיום הפעילות בשלב. חציון " + d.median + " ימים, ממוצע " + d.mean +
     " ימים, על " + nf(d.n) + " מועמדים שהתגייסו בפועל.";
 
-  const maxShare = Math.max(...rows.map(r => r.share || 0));
-  rows.forEach(r => {
+  const maxShare = Math.max.apply(null, rows.map(r => r.share || 0).concat([0.0001]));
+
+  rows.forEach((r, i) => {
     const row = document.createElement("div");
     row.className = "bar-row";
-    const w = maxShare > 0 ? (r.share / maxShare) * 100 : 0;
-    row.innerHTML =
-      "<div>" + r.label + "</div>" +
-      '<div class="bar-track"><div class="bar-fill" style="width:' + w.toFixed(1) + '%"></div></div>' +
-      '<div class="bar-val">' + rangeText(Engine.asDict(r.hires)) + "</div>";
+
+    const name = document.createElement("div");
+    name.textContent = r.label;
+
+    const track = document.createElement("div");
+    track.className = "bar-track";
+    const fill = document.createElement("div");
+    fill.className = "bar-fill";
+    track.append(fill);
+    growBar(fill, (r.share / maxShare) * 100, 80 + i * 60);
+
+    const val = document.createElement("div");
+    val.className = "bar-val";
+    countUp(val, r.hires, 800);
+
+    row.append(name, track, val);
     body.append(row);
   });
+  return true;
+}
 
-  $("timelineCard").classList.remove("hidden");
+/* --- הופעת כרטיסי התוצאה בזה אחר זה --- */
+function revealResults(cards) {
+  $("results").classList.remove("hidden");
+  cards.forEach(id => $(id).classList.remove("in"));
+
+  if (!CAN_ANIMATE) {
+    cards.forEach(id => $(id).classList.add("in"));
+    return;
+  }
+  cards.forEach((id, i) => setTimeout(() => $(id).classList.add("in"), 40 + i * 110));
+
+  const hero = $("heroCard");
+  if (hero && typeof hero.scrollIntoView === "function") {
+    setTimeout(() => hero.scrollIntoView({ behavior: "smooth", block: "nearest" }), 60);
+  }
 }
 
 /* --- ההרצה הראשית --- */
@@ -554,47 +715,48 @@ function calculate() {
     }
   });
 
-  let anchor = null, anchorCount = null;
+  const manual = {};
+  DATA.stages.forEach(s => { manual[s.key] = counts[s.key]; });
 
-  if (withData.length) {
-    // עוגן: השלב המתקדם ביותר שהוזן - הקרוב ביותר לגיוס, ולכן המדויק ביותר.
-    anchor = withData[withData.length - 1];
-    anchorCount = counts[anchor];
-  } else if (target !== null) {
-    // רק יעד הוזן - חישוב לאחור: כמה נדרשים בכל שלב.
-    const filled = {};
-    Engine.stageKeys().forEach(k => {
-      filled[k] = Engine.asDict(Engine.requiredForTarget(k, target));
-      if (filled[k]) filled[k].source = "derived";
-    });
-    filled.hires = { low: target, high: target };
-    const manual = {};
-    DATA.stages.forEach(s => { manual[s.key] = counts[s.key]; });
-    renderFunnel(filled, null, manual);
-    notes.unshift("חישוב לאחור מיעד של " + nf(target) +
-                  " מגויסים: כמה מועמדים נדרשים בכל שלב כדי להגיע אליו.");
-    renderGaps([], notes);
-    $("timelineCard").classList.add("hidden");
-    return;
-  } else {
-    renderGaps([], ["יש להזין מספר מועמדים באחד השלבים, או יעד גיוס."]);
-    $("funnelCard").classList.add("hidden");
-    $("timelineCard").classList.add("hidden");
+  if (!withData.length && target === null) {
+    $("results").classList.add("hidden");
     return;
   }
 
+  if (!withData.length) {
+    // רק יעד הוזן - חישוב לאחור.
+    const filled = Engine.requiredFunnel(target);
+    renderHero("יעד גיוס", target, "כמה מועמדים נדרשים בכל שלב כדי להגיע ליעד הזה");
+    renderFunnel(filled, null, manual);
+    notes.unshift("חישוב לאחור מיעד של " + nf(target) + " מגויסים.");
+    renderGaps([], notes);
+    $("timelineCard").classList.add("hidden");
+    revealResults(["heroCard", "funnelCard", "gapCard"]);
+    return;
+  }
+
+  // עוגן: השלב המתקדם ביותר שהוזן - הקרוב ביותר לגיוס, ולכן המדויק ביותר.
+  const anchor = withData[withData.length - 1];
+  const anchorCount = counts[anchor];
   const filled = Engine.fillFrom(anchor, anchorCount);
-  const manual = {};
-  DATA.stages.forEach(s => { manual[s.key] = counts[s.key]; });
+
+  renderHero("מגויסים צפויים", filled.hires,
+             "מתוך " + nf(anchorCount) + " מועמדים בשלב «" + label(anchor) + "»");
   renderFunnel(filled, anchor, manual);
   renderGaps(Engine.gapAnalysis(counts, target), notes);
-  renderTimeline(anchor, anchorCount);
+  const hasTimeline = renderTimeline(anchor, anchorCount);
+
+  const cards = ["heroCard", "funnelCard", "gapCard"];
+  if (hasTimeline) cards.push("timelineCard");
+  revealResults(cards);
 }
 
 function reset() {
   DATA.stages.forEach(s => { $("in_" + s.key).value = ""; });
   $("in_target").value = "";
-  ["funnelCard", "gapCard", "timelineCard"].forEach(id => $(id).classList.add("hidden"));
+  $("results").classList.add("hidden");
+  ["heroCard", "funnelCard", "gapCard", "timelineCard"]
+    .forEach(id => $(id).classList.remove("in"));
 }
 
 /* --- פאנל בסיס הנתונים --- */
@@ -609,10 +771,11 @@ function renderBasis() {
 
   let html = "<table><thead><tr><th>שלב</th><th>סוג פעילות במקור</th>" +
              "<th>קוהורט בשל</th><th>מתוכם גויסו</th><th>יחס גיוס</th>" +
-             "<th>חציון ימים</th><th>אחוזון 90</th></tr></thead><tbody>";
+             "<th>שני הבסיסים</th><th>חציון ימים</th><th>אחוזון 90</th>" +
+             "</tr></thead><tbody>";
   DATA.stages.forEach(s => {
     if (!s.has_data) {
-      html += "<tr class='is-missing'><td>" + s.label + "</td><td colspan='6'>" +
+      html += "<tr class='nodata'><td>" + s.label + "</td><td colspan='7'>" +
               s.note + "</td></tr>";
       return;
     }
@@ -620,7 +783,8 @@ function renderBasis() {
     html += "<tr><td>" + s.label + "</td><td>" + s.activity_type + "</td>" +
             "<td class='num'>" + nf(b.candidates) + "</td>" +
             "<td class='num'>" + nf(b.hired) + "</td>" +
-            "<td class='num'>" + pct(r.low) + " – " + pct(r.high) + "</td>" +
+            "<td class='num'><strong>" + pct(r.mid) + "</strong></td>" +
+            "<td class='num'>" + pct(r.low) + " / " + pct(r.high) + "</td>" +
             "<td class='num'>" + d.median + "</td>" +
             "<td class='num'>" + d.p90 + "</td></tr>";
   });
@@ -629,7 +793,7 @@ function renderBasis() {
 
   const limits = [
     "השלב «הגשות» אינו קיים בקבצי המקור. לא נגזר עבורו יחס המרה, והוא אינו משתתף בחישוב.",
-    "המשפך אינו סדרתי מלא: לא כל מועמד עובר דרך כל השלבים. יחס הגיוס של כל שלב נמדד מול הגיוסים בפועל, ולא כשרשרת של אחוזי מעבר.",
+    "המשפך אינו סדרתי: לא כל מועמד עובר דרך כל השלבים. יחס הגיוס של כל שלב נמדד מול הגיוסים בפועל, ולא כשרשרת של אחוזי מעבר.",
     "מרכז הערכה הוא שלב סלקטיבי שרק חלק מהמועמדים עוברים בו, ולכן מספר המועמדים בו קטן ממספר הגיוסים באותה תקופה.",
     "זמני הגיוס נמדדים מהפעילות הראשונה של המועמד בשלב ועד לגיוסו הראשון, ורק עבור מי שהתגייס בפועל. מועמדים שעדיין בתהליך אינם נספרים.",
     "הנתונים מכסים " + m.activity_first + " עד " + m.hire_last +

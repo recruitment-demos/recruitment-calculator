@@ -75,6 +75,12 @@
     "mature_iterations": 6
   },
 
+  "gap_tolerance": {
+    "_comment": "שלב נחשב מאוזן מול שלב אחר כשהפער בינו לבין הנדרש קטן מהסף. בלי סף, כל הפרש של מועמד אחד היה מוצג כחוסר.",
+    "pct": 0.02,
+    "min_candidates": 1
+  },
+
   "time_buckets": [
     { "key": "w1",   "label": "עד שבוע",             "min_days": 0,  "max_days": 7 },
     { "key": "w2",   "label": "שבוע עד שבועיים",     "min_days": 8,  "max_days": 14 },
