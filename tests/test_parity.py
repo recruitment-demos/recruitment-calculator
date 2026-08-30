@@ -16,8 +16,8 @@ sys.path.insert(0, str(ROOT))
 
 from recruit_calc.engine import load_engine  # noqa: E402
 
-COUNTS = [1, 3, 25, 100, 407, 1000, 12345]
-TARGETS = [1, 12, 250, 900]
+COUNTS = [1, 3, 7, 25, 100, 407, 999, 1000, 12345, 50000]
+TARGETS = [1, 12, 250, 900, 4321]
 
 
 def node_available():
@@ -31,73 +31,87 @@ def node_available():
 def build_scenarios(eng):
     keys = eng.stage_keys()
     with_data = [k for k in keys if eng.has_rate(k)]
+    hire = eng.hire_key
     scenarios = []
 
+    for k in keys + [hire]:
+        scenarios.append({"op": "label", "stage": k})
     for k in keys:
         scenarios.append({"op": "rate", "stage": k})
+        scenarios.append({"op": "forward", "stage": k})
         for c in COUNTS:
-            scenarios.append({"op": "project_hires", "stage": k, "count": c})
-            scenarios.append({"op": "fill_from", "stage": k, "count": c})
+            scenarios.append({"op": "project_cohort", "stage": k, "count": c})
             scenarios.append({"op": "timeline", "stage": k, "count": c})
         for t in TARGETS:
             scenarios.append({"op": "required_for_target", "stage": k, "target": t})
 
     for t in TARGETS:
         scenarios.append({"op": "required_funnel", "target": t})
+        for projected in (0, t - 1, t, t + 1, t * 3):
+            scenarios.append({"op": "target_verdict", "projected": projected, "target": t})
 
-    for a in keys:
-        for b in keys:
-            for c in COUNTS:
-                scenarios.append({"op": "convert", "from": a, "count": c, "to": b})
+    # קבוצה אחת בכל שלב
+    for k in with_data:
+        for c in COUNTS:
+            counts = {x: None for x in keys}
+            counts[k] = c
+            scenarios.append({"op": "combine", "counts": dict(counts)})
+            scenarios.append({"op": "cross_check", "counts": dict(counts)})
 
-    # ניתוח פערים: תת-קבוצות של שלבים עם וללא יעד
+    # כמה קבוצות יחד
     for i in range(len(with_data)):
-        for j in range(i, len(with_data)):
-            counts = {k: None for k in keys}
-            counts[with_data[i]] = 900
-            counts[with_data[j]] = 300
-            for target in (None, 50, 400):
-                scenarios.append({"op": "gap_analysis",
-                                  "counts": dict(counts), "target": target})
+        for j in range(i + 1, len(with_data)):
+            for a, b in ((900, 300), (50, 700), (5000, 12)):
+                counts = {x: None for x in keys}
+                counts[with_data[i]] = a
+                counts[with_data[j]] = b
+                scenarios.append({"op": "combine", "counts": dict(counts)})
+                scenarios.append({"op": "cross_check", "counts": dict(counts)})
 
-    # מקרי גבול של סף האיזון: בדיוק הכמות הנדרשת, ומעט סביבה
+    # מקרי גבול של סף העקביות: בדיוק הכמות הצפויה ומעט סביבה
     for a in with_data:
-        for b in with_data:
-            if a == b:
+        proj = eng.project_cohort(a, 1000)
+        for step in proj["steps"]:
+            if step["is_source"] or step["is_hire"]:
                 continue
-            needed = eng.convert(b, 300, a)
             for delta in (-0.06, -0.01, 0, 0.01, 0.06):
-                counts = {k: None for k in keys}
-                counts[b] = 300
-                counts[a] = max(0, round(needed * (1 + delta)))
-                scenarios.append({"op": "gap_analysis",
-                                  "counts": dict(counts), "target": None})
+                counts = {x: None for x in keys}
+                counts[a] = 1000
+                counts[step["key"]] = max(0, round(step["count"] * (1 + delta)))
+                scenarios.append({"op": "cross_check", "counts": dict(counts)})
+                scenarios.append({"op": "combine", "counts": dict(counts)})
 
-    counts_all = {k: (500 if eng.has_rate(k) else None) for k in keys}
-    for target in (None, 1, 120, 5000):
-        scenarios.append({"op": "gap_analysis", "counts": dict(counts_all), "target": target})
+    # כל השלבים יחד, וגם שלב ללא נתונים
+    counts_all = {k: (500 if eng.has_rate(k) else 999) for k in keys}
+    scenarios.append({"op": "combine", "counts": dict(counts_all)})
+    scenarios.append({"op": "cross_check", "counts": dict(counts_all)})
 
     return scenarios
 
 
 def python_result(eng, sc):
-    if sc["op"] == "rate":
+    op = sc["op"]
+    if op == "label":
+        return eng.label(sc["stage"])
+    if op == "rate":
         return eng.rate(sc["stage"])
-    if sc["op"] == "project_hires":
-        return eng.project_hires(sc["stage"], sc["count"])
-    if sc["op"] == "required_for_target":
-        return eng.required_for_target(sc["stage"], sc["target"])
-    if sc["op"] == "convert":
-        return eng.convert(sc["from"], sc["count"], sc["to"])
-    if sc["op"] == "fill_from":
-        return eng.fill_from(sc["stage"], sc["count"])
-    if sc["op"] == "required_funnel":
-        return eng.required_funnel(sc["target"])
-    if sc["op"] == "timeline":
+    if op == "forward":
+        return eng.forward(sc["stage"])
+    if op == "project_cohort":
+        return eng.project_cohort(sc["stage"], sc["count"])
+    if op == "timeline":
         return eng.timeline(sc["stage"], sc["count"])
-    if sc["op"] == "gap_analysis":
-        return eng.gap_analysis(sc["counts"], sc["target"])
-    raise AssertionError("פעולה לא מוכרת: " + sc["op"])
+    if op == "combine":
+        return eng.combine(sc["counts"])
+    if op == "cross_check":
+        return eng.cross_check(sc["counts"])
+    if op == "required_for_target":
+        return eng.required_for_target(sc["stage"], sc["target"])
+    if op == "required_funnel":
+        return eng.required_funnel(sc["target"])
+    if op == "target_verdict":
+        return eng.target_verdict(sc["projected"], sc["target"])
+    raise AssertionError("פעולה לא מוכרת: " + op)
 
 
 @unittest.skipUnless(node_available(), "node אינו מותקן")

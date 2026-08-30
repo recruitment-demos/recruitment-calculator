@@ -28,55 +28,109 @@ class TestDataset(unittest.TestCase):
             self.assertIn("has_data", s, s["key"])
             if s["has_data"]:
                 self.assertIsNotNone(s["hire_rate"], s["key"])
-                self.assertIsNotNone(s["days_to_hire"], s["key"])
+                self.assertIsNotNone(s["forward"], s["key"])
             else:
-                # שלב ללא מקור נתונים אסור שיקבל יחס משוער
+                # שלב ללא מקור נתונים אסור שיקבל שיעור משוער
                 self.assertIsNone(s["hire_rate"], s["key"])
                 self.assertIsNone(s["days_to_hire"], s["key"])
+                self.assertIsNone(s["forward"], s["key"])
                 self.assertTrue(s["note"], s["key"])
 
     def test_submissions_stage_has_no_invented_data(self):
         self.assertFalse(self.eng.stage("submissions")["has_data"])
         self.assertFalse(self.eng.has_rate("submissions"))
         self.assertIsNone(self.eng.rate("submissions"))
+        self.assertIsNone(self.eng.forward("submissions"))
 
-    def test_rates_are_valid_probabilities(self):
+    def test_forward_only_contains_later_stages(self):
+        """שלב לא יכול להוביל אל עצמו או אל שלב שקדם לו."""
+        order = [s["key"] for s in self.data["stages"]]
         for s in self.data["stages"]:
             if not s["has_data"]:
                 continue
-            r = s["hire_rate"]
-            self.assertGreater(r["low"], 0, s["key"])
-            self.assertLessEqual(r["high"], 1, s["key"])
-            self.assertLessEqual(r["low"], r["high"], s["key"])
+            i = order.index(s["key"])
+            for f in s["forward"]:
+                if f["key"] == self.eng.hire_key:
+                    continue
+                self.assertGreater(order.index(f["key"]), i,
+                                   f"{s['key']} -> {f['key']} אינו קדימה")
+
+    def test_forward_ends_with_hire(self):
+        for s in self.data["stages"]:
+            if not s["has_data"]:
+                continue
+            self.assertEqual(s["forward"][-1]["key"], self.eng.hire_key, s["key"])
+
+    def test_forward_sorted_by_days(self):
+        for s in self.data["stages"]:
+            if not s["has_data"]:
+                continue
+            days = [f["days"]["median"] for f in s["forward"]]
+            self.assertEqual(days, sorted(days), s["key"])
+
+    def test_all_reach_rates_are_valid_probabilities(self):
+        for s in self.data["stages"]:
+            if not s["has_data"]:
+                continue
+            for f in s["forward"]:
+                r = f["reach"]
+                self.assertGreater(r["low"], 0, f"{s['key']}->{f['key']}")
+                self.assertLessEqual(r["high"], 1, f"{s['key']}->{f['key']}")
+                self.assertLessEqual(r["low"], r["high"], f"{s['key']}->{f['key']}")
 
     def test_rate_in_use_is_the_average_of_the_two_bases(self):
-        """הערך שבשימוש חייב להיות בדיוק הממוצע, לא ערך שנבחר ידנית."""
         for s in self.data["stages"]:
             if not s["has_data"]:
                 continue
-            rates = sorted([s["basis"]["conservative"]["rate"],
-                            s["basis"]["mature"]["rate"]])
-            self.assertAlmostEqual(s["hire_rate"]["low"], rates[0], places=5, msg=s["key"])
-            self.assertAlmostEqual(s["hire_rate"]["high"], rates[1], places=5, msg=s["key"])
-            self.assertAlmostEqual(self.eng.rate(s["key"]),
-                                   (rates[0] + rates[1]) / 2, places=5, msg=s["key"])
+            for f in s["forward"]:
+                rates = sorted([f["basis"]["conservative"]["rate"],
+                                f["basis"]["mature"]["rate"]])
+                self.assertAlmostEqual(f["reach"]["low"], rates[0], places=5)
+                self.assertAlmostEqual(f["reach"]["high"], rates[1], places=5)
+                self.assertAlmostEqual(f["reach"]["mid"], (rates[0] + rates[1]) / 2,
+                                       places=5)
 
     def test_basis_counts_are_consistent(self):
         for s in self.data["stages"]:
             if not s["has_data"]:
                 continue
-            for name in ("conservative", "mature"):
-                b = s["basis"][name]
-                self.assertLessEqual(b["hired"], b["candidates"], f"{s['key']}/{name}")
-                self.assertAlmostEqual(b["rate"], b["hired"] / b["candidates"],
-                                       places=5, msg=f"{s['key']}/{name}")
+            for f in s["forward"]:
+                for name in ("conservative", "mature"):
+                    b = f["basis"][name]
+                    self.assertLessEqual(b["reached"], b["candidates"])
+                    self.assertAlmostEqual(b["rate"], b["reached"] / b["candidates"],
+                                           places=5)
+
+    def test_transitions_have_enough_samples(self):
+        with (ROOT / "config" / "params.json").open(encoding="utf-8") as fh:
+            min_n = json.load(fh)["min_transition_n"]
+        for s in self.data["stages"]:
+            if not s["has_data"]:
+                continue
+            for f in s["forward"]:
+                self.assertGreaterEqual(f["days"]["n"], min_n,
+                                        f"{s['key']}->{f['key']}")
+
+    def test_transition_days_are_positive(self):
+        """מעבר קדימה חייב לקחת זמן. חציון 0 היה סימן לכיוון הפוך."""
+        for s in self.data["stages"]:
+            if not s["has_data"]:
+                continue
+            for f in s["forward"]:
+                self.assertGreater(f["days"]["median"], 0, f"{s['key']}->{f['key']}")
+
+    def test_hire_rate_matches_last_forward_entry(self):
+        for s in self.data["stages"]:
+            if not s["has_data"]:
+                continue
+            self.assertEqual(s["hire_rate"], s["forward"][-1]["reach"], s["key"])
 
     def test_buckets_sum_to_one(self):
         for s in self.data["stages"]:
             if not s["has_data"]:
                 continue
-            total = sum(b["share"] for b in s["buckets"])
-            self.assertAlmostEqual(total, 1.0, places=4, msg=s["key"])
+            self.assertAlmostEqual(sum(b["share"] for b in s["buckets"]), 1.0,
+                                   places=4, msg=s["key"])
 
     def test_buckets_cover_all_days_without_gaps(self):
         buckets = self.data["time_buckets"]
@@ -88,12 +142,10 @@ class TestDataset(unittest.TestCase):
     def test_later_stages_convert_better(self):
         ordered = [s["key"] for s in self.data["stages"] if s["has_data"]]
         rates = [self.eng.rate(k) for k in ordered]
-        # מרכז הערכה הוא שלב סלקטיבי שלא כולם עוברים בו, ולכן לא נדרשת
-        # מונוטוניות מוחלטת - נדרש רק שהראשון יהיה הנמוך והאחרון הגבוה.
         self.assertEqual(min(rates), rates[0])
         self.assertEqual(max(rates), rates[-1])
 
-    def test_median_days_shrink_towards_the_end(self):
+    def test_time_to_hire_shrinks_towards_the_end(self):
         ordered = [s for s in self.data["stages"] if s["has_data"]]
         self.assertLess(ordered[-1]["days_to_hire"]["median"],
                         ordered[0]["days_to_hire"]["median"])
@@ -103,15 +155,9 @@ class TestDataset(unittest.TestCase):
         self.assertLess(m["activity_first"], m["activity_last"])
         self.assertLess(m["hire_first"], m["hire_last"])
 
-    def test_gap_tolerance_present(self):
-        tol = self.data["gap_tolerance"]
-        self.assertGreater(tol["pct"], 0)
-        self.assertGreaterEqual(tol["min_candidates"], 1)
-
 
 class TestRounding(unittest.TestCase):
     def test_half_rounds_up_not_to_even(self):
-        # round() המובנה היה מחזיר 2 עבור 2.5, בניגוד ל-Math.round ב-JS
         self.assertEqual(round_half_up(2.5), 3)
         self.assertEqual(round_half_up(3.5), 4)
 
@@ -121,79 +167,64 @@ class TestRounding(unittest.TestCase):
         self.assertEqual(round_half_up(0), 0)
 
 
-class TestEngine(unittest.TestCase):
+class TestProjection(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.eng = load_engine()
 
     def test_results_are_single_numbers_not_ranges(self):
-        """אין טווחים בשום מוצא של המנוע."""
-        self.assertIsInstance(self.eng.project_hires("online_day", 100), float)
-        self.assertIsInstance(self.eng.required_for_target("online_day", 30), float)
-        self.assertIsInstance(self.eng.convert("file_check", 100, "yachbam"), float)
-        filled = self.eng.fill_from("online_day", 100)
-        self.assertIsInstance(filled["hires"], int)
-        self.assertIsInstance(filled["file_check"]["value"], int)
-        for row in self.eng.timeline("online_day", 100):
+        proj = self.eng.project_cohort("file_check", 5000)
+        for step in proj["steps"]:
+            self.assertIsInstance(step["count"], int)
+        self.assertIsInstance(proj["hires"], int)
+        for row in self.eng.timeline("file_check", 5000):
             self.assertIsInstance(row["hires"], int)
 
-    def test_project_hires_scales_linearly(self):
-        a = self.eng.project_hires("online_day", 100)
-        b = self.eng.project_hires("online_day", 200)
-        self.assertAlmostEqual(b, a * 2, places=6)
+    def test_cohort_starts_with_the_entered_stage_at_day_zero(self):
+        proj = self.eng.project_cohort("online_day", 400)
+        first = proj["steps"][0]
+        self.assertTrue(first["is_source"])
+        self.assertEqual(first["key"], "online_day")
+        self.assertEqual(first["count"], 400)
+        self.assertEqual(first["days_median"], 0)
 
-    def test_project_and_require_are_inverse(self):
+    def test_cohort_never_derives_earlier_stages(self):
+        """הדרישה המרכזית: גזירה קדימה בלבד."""
+        order = [s["key"] for s in self.eng.stages]
         for key in self.eng.stage_keys(with_data_only=True):
-            hires = self.eng.project_hires(key, 1000)
-            self.assertAlmostEqual(self.eng.required_for_target(key, hires),
-                                   1000, places=6, msg=key)
+            proj = self.eng.project_cohort(key, 1000)
+            for step in proj["steps"]:
+                if step["is_hire"] or step["is_source"]:
+                    continue
+                self.assertGreater(order.index(step["key"]), order.index(key),
+                                   f"{key} גזר לאחור אל {step['key']}")
 
-    def test_convert_to_self_is_identity(self):
-        self.assertEqual(self.eng.convert("yachbam", 77, "yachbam"), 77)
+    def test_cohort_counts_never_exceed_the_entered_amount(self):
+        for key in self.eng.stage_keys(with_data_only=True):
+            proj = self.eng.project_cohort(key, 1000)
+            for step in proj["steps"]:
+                self.assertLessEqual(step["count"], 1000, f"{key}/{step['key']}")
 
-    def test_convert_round_trip_returns_to_start(self):
-        there = self.eng.convert("file_check", 1000, "yachbam")
-        back = self.eng.convert("yachbam", there, "file_check")
-        self.assertAlmostEqual(back, 1000, places=6)
+    def test_cohort_scales_linearly(self):
+        a = self.eng.project_cohort("file_check", 1000)
+        b = self.eng.project_cohort("file_check", 2000)
+        for sa, sb in zip(a["steps"], b["steps"]):
+            self.assertAlmostEqual(sb["count"], sa["count"] * 2, delta=1)
 
-    def test_convert_is_transitive(self):
-        direct = self.eng.convert("file_check", 5000, "yachbam")
-        via = self.eng.convert("online_day",
-                               self.eng.convert("file_check", 5000, "online_day"),
-                               "yachbam")
-        self.assertAlmostEqual(direct, via, places=6)
+    def test_hires_equal_count_times_hire_rate(self):
+        for key in self.eng.stage_keys(with_data_only=True):
+            proj = self.eng.project_cohort(key, 3000)
+            self.assertEqual(proj["hires"],
+                             round_half_up(3000 * self.eng.rate(key)), key)
 
-    def test_no_result_for_stage_without_data(self):
-        self.assertIsNone(self.eng.project_hires("submissions", 500))
-        self.assertIsNone(self.eng.required_for_target("submissions", 50))
-        self.assertIsNone(self.eng.convert("submissions", 500, "file_check"))
-        self.assertIsNone(self.eng.convert("file_check", 500, "submissions"))
+    def test_no_projection_for_stage_without_data(self):
+        self.assertIsNone(self.eng.project_cohort("submissions", 500))
         self.assertIsNone(self.eng.timeline("submissions", 500))
-
-    def test_fill_from_marks_the_input_stage(self):
-        filled = self.eng.fill_from("screening_day", 300)
-        self.assertEqual(filled["screening_day"], {"value": 300, "source": "input"})
-        self.assertEqual(filled["file_check"]["source"], "derived")
-        self.assertIsNone(filled["submissions"])
-
-    def test_fill_from_earlier_stages_are_larger(self):
-        filled = self.eng.fill_from("yachbam", 100)
-        self.assertGreater(filled["file_check"]["value"], filled["yachbam"]["value"])
-
-    def test_required_funnel_hits_the_target(self):
-        target = 400
-        funnel = self.eng.required_funnel(target)
-        self.assertEqual(funnel["hires"], target)
-        for key in self.eng.stage_keys(with_data_only=True):
-            back = self.eng.project_hires(key, funnel[key]["value"])
-            self.assertAlmostEqual(back, target, delta=1, msg=key)
-        self.assertIsNone(funnel["submissions"])
+        self.assertIsNone(self.eng.required_for_target("submissions", 50))
 
     def test_timeline_sums_to_projected_hires(self):
-        count = 1000
-        rows = self.eng.timeline("online_day", count)
-        hires = self.eng.project_hires("online_day", count)
-        # סכום הדליים המעוגלים חייב להיות צמוד לסך המגויסים
+        rows = self.eng.timeline("online_day", 1000)
+        hires = self.eng.project_cohort("online_day", 1000)["hires"]
         self.assertAlmostEqual(sum(r["hires"] for r in rows), hires,
                                delta=len(rows) / 2)
 
@@ -202,59 +233,143 @@ class TestEngine(unittest.TestCase):
         self.assertEqual([r["key"] for r in rows],
                          [b["key"] for b in self.eng.buckets])
 
-    def test_gap_analysis_reports_deficit(self):
-        msgs = self.eng.gap_analysis({"file_check": 10, "yachbam": 500})
-        pair = [m for m in msgs if m["stage"] == "file_check"][0]
-        self.assertEqual(pair["kind"], "deficit")
-        self.assertGreater(pair["gap"], 0)
 
-    def test_gap_analysis_reports_surplus(self):
-        msgs = self.eng.gap_analysis({"file_check": 500000, "yachbam": 10})
-        pair = [m for m in msgs if m["stage"] == "file_check"][0]
-        self.assertEqual(pair["kind"], "surplus")
-        self.assertGreater(pair["gap"], 0)
+class TestCombine(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.eng = load_engine()
 
-    def test_gap_analysis_balanced_when_exactly_consistent(self):
-        needed = self.eng.convert("yachbam", 100, "file_check")
-        msgs = self.eng.gap_analysis({"file_check": round(needed), "yachbam": 100})
-        pair = [m for m in msgs if m["against"] == "yachbam"][0]
-        self.assertEqual(pair["kind"], "balanced")
-        self.assertEqual(pair["gap"], 0)
+    def none_counts(self):
+        return {k: None for k in self.eng.stage_keys()}
 
-    def test_gap_tolerance_absorbs_small_differences(self):
-        """הפרש של מועמד אחד לא נחשב פער."""
-        needed = self.eng.convert("yachbam", 100, "file_check")
-        msgs = self.eng.gap_analysis({"file_check": round(needed) + 1, "yachbam": 100})
-        pair = [m for m in msgs if m["against"] == "yachbam"][0]
-        self.assertEqual(pair["kind"], "balanced")
+    def test_single_cohort_totals_match_the_projection(self):
+        counts = self.none_counts()
+        counts["file_check"] = 5000
+        result = self.eng.combine(counts)
+        proj = self.eng.project_cohort("file_check", 5000)
+        self.assertEqual(len(result["cohorts"]), 1)
+        self.assertEqual(result["hires"], proj["hires"])
+        self.assertFalse(result["overlap_warning"])
 
-    def test_gap_tolerance_does_not_absorb_large_differences(self):
-        needed = self.eng.convert("yachbam", 100, "file_check")
-        msgs = self.eng.gap_analysis({"file_check": round(needed * 1.5), "yachbam": 100})
-        pair = [m for m in msgs if m["against"] == "yachbam"][0]
-        self.assertEqual(pair["kind"], "surplus")
+    def test_every_total_equals_the_sum_of_its_sources(self):
+        """הפירוט חייב להסתכם בדיוק לסך המוצג."""
+        counts = self.none_counts()
+        counts["file_check"] = 5000
+        counts["yachbam"] = 300
+        result = self.eng.combine(counts)
+        for entry in result["per_stage"]:
+            self.assertEqual(entry["total"],
+                             sum(s["count"] for s in entry["sources"]), entry["key"])
 
-    def test_gap_analysis_target_verdicts(self):
-        low = self.eng.gap_analysis({"yachbam": 100}, target=500)
-        self.assertEqual(low[-1]["kind"], "target_miss")
-        self.assertGreater(low[-1]["gap"], 0)
+    def test_every_number_records_where_it_came_from(self):
+        counts = self.none_counts()
+        counts["online_day"] = 800
+        result = self.eng.combine(counts)
+        for entry in result["per_stage"]:
+            self.assertTrue(entry["sources"], entry["key"])
+            for s in entry["sources"]:
+                self.assertEqual(s["from"], "online_day")
+                self.assertEqual(s["from_count"], 800)
 
-        high = self.eng.gap_analysis({"yachbam": 100}, target=1)
-        self.assertEqual(high[-1]["kind"], "target_over")
+    def test_multiple_cohorts_sum_and_warn(self):
+        counts = self.none_counts()
+        counts["file_check"] = 5000
+        counts["yachbam"] = 300
+        result = self.eng.combine(counts)
+        self.assertEqual(len(result["cohorts"]), 2)
+        self.assertTrue(result["overlap_warning"])
+        expected = (self.eng.project_cohort("file_check", 5000)["hires"] +
+                    self.eng.project_cohort("yachbam", 300)["hires"])
+        self.assertEqual(result["hires"], expected)
 
-        exact = round_half_up(self.eng.project_hires("yachbam", 100))
-        ok = self.eng.gap_analysis({"yachbam": 100}, target=exact)
-        self.assertEqual(ok[-1]["kind"], "target_ok")
-        self.assertEqual(ok[-1]["gap"], 0)
+    def test_stage_without_data_is_ignored(self):
+        counts = self.none_counts()
+        counts["submissions"] = 9999
+        counts["yachbam"] = 100
+        result = self.eng.combine(counts)
+        self.assertEqual(len(result["cohorts"]), 1)
+        for entry in result["per_stage"]:
+            self.assertNotEqual(entry["key"], "submissions")
 
-    def test_gap_analysis_ignores_stages_without_data(self):
-        msgs = self.eng.gap_analysis({"submissions": 9999, "yachbam": 100})
-        for m in msgs:
-            self.assertNotIn("submissions", (m.get("stage"), m.get("against")))
+    def test_empty_input_produces_nothing(self):
+        result = self.eng.combine(self.none_counts())
+        self.assertEqual(result["cohorts"], [])
+        self.assertEqual(result["hires"], 0)
+        self.assertFalse(result["overlap_warning"])
 
-    def test_gap_analysis_target_uses_deepest_entered_stage(self):
-        msgs = self.eng.gap_analysis({"file_check": 5000, "yachbam": 100}, target=50)
-        self.assertEqual(msgs[-1]["stage"], "yachbam")
+
+class TestCrossCheck(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.eng = load_engine()
+
+    def none_counts(self):
+        return {k: None for k in self.eng.stage_keys()}
+
+    def test_matches_when_the_later_stage_equals_the_projection(self):
+        expected = next(s["count"] for s in
+                        self.eng.project_cohort("file_check", 5000)["steps"]
+                        if s["key"] == "yachbam")
+        counts = self.none_counts()
+        counts["file_check"] = 5000
+        counts["yachbam"] = expected
+        checks = self.eng.cross_check(counts)
+        self.assertEqual(checks[0]["verdict"], "matches")
+        self.assertEqual(checks[0]["gap"], 0)
+
+    def test_reports_fewer_and_more(self):
+        expected = next(s["count"] for s in
+                        self.eng.project_cohort("file_check", 5000)["steps"]
+                        if s["key"] == "yachbam")
+        counts = self.none_counts()
+        counts["file_check"] = 5000
+        counts["yachbam"] = round(expected * 0.5)
+        self.assertEqual(self.eng.cross_check(counts)[0]["verdict"], "fewer")
+        counts["yachbam"] = round(expected * 2)
+        self.assertEqual(self.eng.cross_check(counts)[0]["verdict"], "more")
+
+    def test_single_stage_has_nothing_to_check(self):
+        counts = self.none_counts()
+        counts["file_check"] = 5000
+        self.assertEqual(self.eng.cross_check(counts), [])
+
+    def test_never_checks_backwards(self):
+        counts = self.none_counts()
+        counts["file_check"] = 5000
+        counts["yachbam"] = 300
+        for cc in self.eng.cross_check(counts):
+            self.assertEqual(cc["early"], "file_check")
+            self.assertEqual(cc["late"], "yachbam")
+
+
+class TestTarget(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.eng = load_engine()
+
+    def test_required_funnel_hits_the_target(self):
+        target = 400
+        funnel = self.eng.required_funnel(target)
+        self.assertEqual(funnel["hires"], target)
+        for key in self.eng.stage_keys(with_data_only=True):
+            got = self.eng.project_cohort(key, funnel[key]["value"])["hires"]
+            self.assertAlmostEqual(got, target, delta=1, msg=key)
+        self.assertIsNone(funnel["submissions"])
+
+    def test_verdicts(self):
+        self.assertEqual(self.eng.target_verdict(100, 500)["kind"], "target_miss")
+        self.assertEqual(self.eng.target_verdict(500, 100)["kind"], "target_over")
+        self.assertEqual(self.eng.target_verdict(100, 100)["kind"], "target_ok")
+
+    def test_tolerance_absorbs_a_single_candidate(self):
+        self.assertEqual(self.eng.target_verdict(101, 100)["kind"], "target_ok")
+
+    def test_gap_is_reported(self):
+        v = self.eng.target_verdict(100, 500)
+        self.assertEqual(v["gap"], 400)
+
+    def test_no_target_means_no_verdict(self):
+        self.assertIsNone(self.eng.target_verdict(100, None))
 
     def test_unknown_stage_raises(self):
         with self.assertRaises(KeyError):

@@ -26,15 +26,18 @@
 
   * { box-sizing: border-box; }
 
+  html { -webkit-text-size-adjust: 100%; }
+
   body {
     margin: 0;
     font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
     background: var(--bg);
     color: var(--ink);
     line-height: 1.55;
+    overflow-x: hidden;
   }
 
-  .wrap { max-width: 1020px; margin: 0 auto; padding: 24px 16px 64px; }
+  .wrap { max-width: 1020px; margin: 0 auto; padding: 22px 15px 64px; }
 
   .card {
     background: var(--card);
@@ -42,11 +45,12 @@
     border-radius: 16px;
     box-shadow: var(--shadow);
     padding: 20px 22px 22px;
-    margin-bottom: 16px;
+    margin-bottom: 15px;
   }
 
   h1 { font-size: 23px; margin: 0 0 4px; letter-spacing: -.2px; }
-  h2 { font-size: 15px; margin: 0 0 14px; color: var(--ink); }
+  h2 { font-size: 15px; margin: 0 0 4px; }
+  .cardsub { font-size: 12.5px; color: var(--muted); margin: 0 0 14px; }
 
   .sub { font-size: 13px; color: var(--muted); margin: 0 0 4px; }
 
@@ -57,16 +61,13 @@
   }
 
   /* ---------- קלט ---------- */
-  .grid {
-    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 14px;
-  }
-  @media (max-width: 860px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-
-  .field { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; }
+  .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 14px; }
+  .field { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; min-width: 0; }
   .field label { color: var(--muted); font-weight: 500; }
   .field input {
-    border: 1px solid #ccd5e4; border-radius: 10px; padding: 10px;
-    font-size: 15px; text-align: center; background: #fafbfd;
+    width: 100%;
+    border: 1px solid #ccd5e4; border-radius: 10px; padding: 10px 8px;
+    font-size: 16px; text-align: center; background: #fafbfd;
     color: var(--ink); outline: none; font-family: inherit;
     transition: border-color .15s, box-shadow .15s, background .15s;
   }
@@ -78,12 +79,12 @@
   .field.no-data input { background: #fffaf0; border-color: #e8d3a8; }
   .field.target label { color: var(--bad); font-weight: 700; }
   .field.target input { border-color: #f0b6b6; background: #fff7f7; }
-  .hint { font-size: 11px; color: var(--warn); }
+  .hint { font-size: 11px; color: var(--warn); line-height: 1.35; }
 
   .row { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
   button {
     border: none; border-radius: 10px; padding: 11px 26px;
-    font-size: 14.5px; cursor: pointer; font-family: inherit; font-weight: 600;
+    font-size: 15px; cursor: pointer; font-family: inherit; font-weight: 600;
     transition: transform .12s, background .15s, box-shadow .15s;
   }
   button:active { transform: scale(.97); }
@@ -91,12 +92,7 @@
     background: linear-gradient(135deg, var(--brand), var(--brand-2));
     color: #fff; box-shadow: 0 4px 14px rgba(0, 82, 204, .3);
   }
-  .primary:hover { box-shadow: 0 6px 18px rgba(0, 82, 204, .4); }
-  .ghost {
-    background: #f1f4f9; color: var(--muted);
-    border: 1px solid var(--line); font-weight: 500;
-  }
-  .ghost:hover { background: #e7ecf4; }
+  .ghost { background: #f1f4f9; color: var(--muted); border: 1px solid var(--line); font-weight: 500; }
 
   /* ---------- הופעת התוצאות ---------- */
   .reveal {
@@ -104,114 +100,153 @@
     transition: opacity .5s ease, transform .5s cubic-bezier(.2, .7, .3, 1);
   }
   .reveal.in { opacity: 1; transform: none; }
-  @media (prefers-reduced-motion: reduce) {
-    .reveal { transition: none; opacity: 1; transform: none; }
-  }
 
   /* ---------- כרטיס התוצאה הראשי ---------- */
   .hero {
     background: linear-gradient(135deg, #06326e, #0a58c2 55%, #2f7ff0);
     color: #fff; border: none; text-align: center;
-    padding: 26px 22px 24px;
+    padding: 24px 20px 22px;
     box-shadow: 0 10px 30px rgba(6, 50, 110, .32);
   }
-  .hero .cap {
-    font-size: 12.5px; letter-spacing: .06em; text-transform: none;
-    opacity: .82; margin-bottom: 2px;
-  }
+  .hero .cap { font-size: 12.5px; opacity: .82; }
   .hero .big {
-    font-size: 60px; font-weight: 800; line-height: 1.05;
+    font-size: 58px; font-weight: 800; line-height: 1.05;
     font-variant-numeric: tabular-nums; letter-spacing: -1.5px;
   }
-  @media (max-width: 520px) { .hero .big { font-size: 46px; } }
-  .hero .note { font-size: 13px; opacity: .88; margin-top: 6px; }
+  .hero .note { font-size: 13px; opacity: .9; margin-top: 6px; }
+  .hero .from {
+    font-size: 12px; opacity: .8; margin-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, .22); padding-top: 8px;
+  }
 
-  /* ---------- המשפך ---------- */
-  .funnel { display: flex; flex-direction: column; gap: 3px; }
+  /* סרגל דביק - מספר הגיוסים נשאר גלוי גם כשגוללים לגרפים */
+  .sticky {
+    position: sticky; top: 0; z-index: 20;
+    background: linear-gradient(135deg, #06326e, #0a58c2);
+    color: #fff; border-radius: 0 0 13px 13px;
+    padding: 9px 16px; margin: 0 -15px 15px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    box-shadow: 0 4px 14px rgba(6, 50, 110, .3);
+    font-size: 13px;
+    transform: translateY(-100%); opacity: 0; pointer-events: none;
+    transition: transform .3s ease, opacity .3s ease;
+  }
+  .sticky.show { transform: none; opacity: 1; pointer-events: auto; }
+  .sticky .n { font-size: 21px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .sticky .lbl { opacity: .85; }
+
+  /* ---------- גרף 1: כמה בכל שלב ---------- */
+  .funnel { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
   .fstage {
-    display: grid; grid-template-columns: 132px 1fr 74px 66px;
-    align-items: center; gap: 12px;
-    padding: 7px 0; font-size: 13.5px;
-    border-bottom: 1px solid #f0f3f8;
+    display: grid; grid-template-columns: 148px 1fr 78px;
+    align-items: center; gap: 6px 12px;
   }
-  .fstage:last-child { border-bottom: none; }
-  @media (max-width: 640px) {
-    .fstage { grid-template-columns: 96px 1fr 58px 52px; gap: 8px; font-size: 12px; }
-  }
-  .fname { color: var(--ink); font-weight: 500; }
-  .ftrack { background: #eff2f7; border-radius: 8px; height: 26px; overflow: hidden; }
+  .fhead { display: flex; align-items: baseline; gap: 7px; min-width: 0; }
+  .fname { font-weight: 600; font-size: 13.5px; }
+  .fpct { font-size: 11.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
+  .ftrack { background: #eef1f6; border-radius: 8px; height: 28px; overflow: hidden; }
   .fbar {
     height: 100%; width: 0; border-radius: 8px;
     background: linear-gradient(90deg, var(--brand), var(--brand-2));
-    transition: width .75s cubic-bezier(.2, .7, .3, 1);
+    transition: width .8s cubic-bezier(.2, .7, .3, 1);
   }
-  @media (prefers-reduced-motion: reduce) { .fbar { transition: none; } }
-  .fval {
-    text-align: left; font-variant-numeric: tabular-nums;
-    font-weight: 700; font-size: 15px;
+  .fval { text-align: left; font-variant-numeric: tabular-nums; font-weight: 700; font-size: 16px; }
+  .fsrc {
+    grid-column: 1 / -1; font-size: 11.5px; color: var(--faint);
+    margin-top: -2px;
   }
-  .frate { text-align: left; font-variant-numeric: tabular-nums; color: var(--faint); font-size: 12px; }
-
-  .fstage.anchor .fname { font-weight: 800; color: var(--brand); }
-  .fstage.anchor .fval { color: var(--brand); }
-  .fstage.hires { border-top: 2px solid var(--line); margin-top: 6px; padding-top: 12px; }
-  .fstage.hires .fname, .fstage.hires .fval { font-weight: 800; }
-  .fstage.hires .fbar { background: linear-gradient(90deg, #0a7a52, #24b581); }
+  .fstage.source .fname { color: var(--brand); }
+  .fstage.source .fbar { background: linear-gradient(90deg, #4a5b73, #8a99ad); }
+  .fstage.hire .fname, .fstage.hire .fval { color: var(--good); }
+  .fstage.hire .fbar { background: linear-gradient(90deg, #0a7a52, #24b581); }
   .fstage.nodata .fname { color: var(--warn); }
-  .fstage.nodata .fval { color: var(--warn); font-size: 12px; font-weight: 500; }
-
   .chip {
-    display: inline-block; font-size: 10.5px; font-weight: 700;
-    background: var(--brand); color: #fff;
-    border-radius: 999px; padding: 1px 7px; margin-inline-start: 6px;
-    vertical-align: middle;
+    font-size: 10.5px; font-weight: 700; background: var(--brand); color: #fff;
+    border-radius: 999px; padding: 1px 7px;
+  }
+
+  /* ---------- גרף 2: מתי בכל שלב ---------- */
+  .tl { margin-top: 14px; }
+  .tlrow {
+    display: grid; grid-template-columns: 148px 1fr 78px;
+    align-items: center; gap: 6px 12px; margin-bottom: 11px;
+  }
+  .tltrack {
+    position: relative; height: 28px;
+    background: linear-gradient(to left, #eef1f6, #f6f8fb);
+    border-radius: 8px;
+  }
+  /* הזמן זורם מימין לשמאל, בכיוון הקריאה */
+  .tlfill {
+    position: absolute; inset-block: 0; inset-inline-start: 0;
+    width: 0; border-radius: 8px;
+    background: linear-gradient(to left, rgba(0, 82, 204, .13), rgba(61, 139, 255, .30));
+    transition: width .8s cubic-bezier(.2, .7, .3, 1);
+  }
+  .tldot {
+    position: absolute; top: 50%; inset-inline-start: 0;
+    width: 15px; height: 15px; border-radius: 50%;
+    background: var(--brand); border: 3px solid #fff;
+    box-shadow: 0 1px 5px rgba(9, 30, 66, .35);
+    transform: translate(50%, -50%) scale(0);
+    transition: transform .4s cubic-bezier(.3, 1.4, .5, 1), inset-inline-start .8s cubic-bezier(.2, .7, .3, 1);
+  }
+  .tldot.on { transform: translate(50%, -50%) scale(1); }
+  .tlrow.hire .tldot { background: var(--good); }
+  .tlrow.hire .tlfill { background: linear-gradient(to left, rgba(10,122,82,.13), rgba(36,181,129,.3)); }
+  .tlrow.hire .tlname { color: var(--good); }
+  .tlname { font-weight: 600; font-size: 13.5px; }
+  .tlcount { font-size: 11.5px; color: var(--faint); }
+  .tlday { text-align: left; font-variant-numeric: tabular-nums; font-weight: 700; font-size: 13.5px; }
+  .tlday small { display: block; font-weight: 500; font-size: 10.5px; color: var(--faint); }
+  .tlaxis {
+    display: flex; justify-content: space-between;
+    font-size: 11px; color: var(--faint);
+    border-top: 1px dashed var(--line); padding-top: 5px;
+    margin-top: 2px;
+  }
+  .tlaxis-wrap { display: grid; grid-template-columns: 148px 1fr 78px; gap: 12px; }
+  .tlaxis-wrap > :first-child, .tlaxis-wrap > :last-child { min-height: 1px; }
+
+  /* ---------- גרף 3: התפלגות מועדי גיוס ---------- */
+  .bars { display: flex; flex-direction: column; gap: 9px; margin-top: 12px; }
+  .bar-row {
+    display: grid; grid-template-columns: 148px 1fr 62px;
+    align-items: center; gap: 12px; font-size: 13px;
+  }
+  .bar-track { background: #eef1f6; border-radius: 999px; height: 22px; overflow: hidden; }
+  .bar-fill {
+    background: linear-gradient(90deg, #0a58c2, #4d9bff);
+    height: 100%; width: 0; border-radius: 999px;
+    transition: width .8s cubic-bezier(.2, .7, .3, 1);
+  }
+  .bar-val { text-align: left; font-variant-numeric: tabular-nums; font-weight: 700; }
+
+  .cohort { margin-bottom: 22px; }
+  .cohort:last-child { margin-bottom: 0; }
+  .cohort-title {
+    font-size: 13px; font-weight: 700; color: var(--brand);
+    background: var(--brand-soft); border-radius: 8px;
+    padding: 6px 11px; margin-bottom: 4px;
   }
 
   /* ---------- הודעות ---------- */
-  .msg {
-    padding: 10px 13px; border-radius: 10px;
-    font-size: 13.5px; margin-bottom: 7px;
-  }
+  .msg { padding: 10px 13px; border-radius: 10px; font-size: 13.5px; margin-bottom: 7px; }
   .msg:last-child { margin-bottom: 0; }
   .msg.good { background: var(--good-soft); color: var(--good); }
   .msg.bad { background: var(--bad-soft); color: var(--bad); }
   .msg.flat { background: #f2f5f9; color: var(--muted); }
   .msg.warn { background: var(--warn-soft); color: var(--warn); }
 
-  /* ---------- ציר הזמן ---------- */
-  .bars { display: flex; flex-direction: column; gap: 9px; }
-  .bar-row {
-    display: grid; grid-template-columns: 152px 1fr 70px;
-    align-items: center; gap: 11px; font-size: 13px;
-  }
-  @media (max-width: 640px) {
-    .bar-row { grid-template-columns: 108px 1fr 54px; gap: 8px; font-size: 12px; }
-  }
-  .bar-track { background: #eff2f7; border-radius: 999px; height: 22px; overflow: hidden; }
-  .bar-fill {
-    background: linear-gradient(90deg, #0a58c2, #4d9bff);
-    height: 100%; width: 0; border-radius: 999px;
-    transition: width .75s cubic-bezier(.2, .7, .3, 1);
-  }
-  @media (prefers-reduced-motion: reduce) { .bar-fill { transition: none; } }
-  .bar-val {
-    text-align: left; font-variant-numeric: tabular-nums;
-    font-weight: 700; color: var(--ink);
-  }
-
   /* ---------- בסיס הנתונים ---------- */
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { padding: 8px 9px; text-align: right; border-bottom: 1px solid var(--line); }
+  th, td { padding: 8px 9px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
   th { font-size: 11.5px; color: var(--muted); font-weight: 600; background: #f7f9fc; }
-  tbody tr:last-child td { border-bottom: none; }
-  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
-  tr.nodata td { color: var(--warn); background: var(--warn-soft); }
-  .scroller { overflow-x: auto; }
+  td.num { font-variant-numeric: tabular-nums; }
+  tr.nodata td { color: var(--warn); background: var(--warn-soft); white-space: normal; }
+  .scroller { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
-  details {
-    border: 1px solid var(--line); border-radius: 11px;
-    padding: 11px 15px; background: #fafbfd;
-  }
+  details { border: 1px solid var(--line); border-radius: 11px; padding: 11px 14px; background: #fafbfd; }
   details + details { margin-top: 10px; }
   summary { cursor: pointer; font-weight: 600; font-size: 13.5px; }
   details p, details li { font-size: 13px; color: var(--muted); }
@@ -219,19 +254,66 @@
 
   .hidden { display: none; }
   .foot { font-size: 12px; color: var(--muted); text-align: center; margin-top: 10px; }
+
+  /* ---------- נייד ---------- */
+  @media (max-width: 900px) {
+    .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  @media (max-width: 680px) {
+    .wrap { padding: 14px 11px 48px; }
+    .card { padding: 16px 14px 18px; border-radius: 14px; margin-bottom: 12px; }
+    h1 { font-size: 20px; }
+    .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .row { margin-top: 14px; }
+    button { flex: 1; padding: 12px 16px; }
+
+    .hero { padding: 20px 14px 18px; }
+    .hero .big { font-size: 46px; }
+    .sticky { margin: 0 -11px 12px; padding: 8px 13px; }
+    .sticky .n { font-size: 19px; }
+
+    /* השם עובר לשורה נפרדת, הפס והמספר נשארים יחד */
+    .fstage, .tlrow, .bar-row, .tlaxis-wrap { grid-template-columns: 1fr 64px; gap: 4px 9px; }
+    .fhead, .tlhead { grid-column: 1 / -1; }
+    .tlaxis-wrap > :first-child { display: none; }
+    .fval, .tlday, .bar-val { font-size: 14px; }
+    .bar-row > :first-child { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
+    .ftrack, .tltrack { height: 24px; }
+    .fsrc { font-size: 11px; }
+  }
+  @media (max-width: 360px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal, .fbar, .tlfill, .tldot, .bar-fill, .sticky { transition: none; }
+    .reveal { opacity: 1; transform: none; }
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
 
+  <div class="sticky" id="stickyBar">
+    <span class="lbl">מגויסים צפויים</span>
+    <span class="n" id="stickyValue">0</span>
+  </div>
+
   <div class="card">
     <h1>מחשבון גיוס</h1>
-    <p class="sub">הזנת מספר מועמדים באחד השלבים או יעד גיוס, וקבלת השלמה של כל המשפך, ניתוח פערים ופריסת מועדי הקליטה הצפויים.</p>
+    <p class="sub">
+      מזינים כמה מועמדים נמצאים עכשיו בשלב מסוים, ומקבלים כמה מהם יגיעו לכל
+      שלב בהמשך, מתי, וכמה מהם יגויסו. כל מספר מסומן במפורש ממה הוא נגזר.
+    </p>
     <div class="stamp" id="stamp"></div>
   </div>
 
   <div class="card">
-    <h2>נתוני קלט</h2>
+    <h2>כמה מועמדים יש עכשיו בכל שלב</h2>
+    <p class="cardsub">
+      אפשר להזין שלב אחד או כמה. כל מספר נחשב לקבוצה שנמצאת עכשיו באותו שלב,
+      והגזירה היא קדימה בלבד - אל השלבים שאחריו.
+    </p>
     <div class="grid" id="inputGrid"></div>
     <div class="row">
       <button class="primary" id="calcBtn">חשב</button>
@@ -244,42 +326,55 @@
       <div class="cap" id="heroCap"></div>
       <div class="big" id="heroValue">0</div>
       <div class="note" id="heroNote"></div>
+      <div class="from" id="heroFrom"></div>
     </div>
 
     <div class="card reveal" id="funnelCard">
-      <h2>המשפך המלא</h2>
+      <h2>כמה צפויים להגיע לכל שלב</h2>
+      <p class="cardsub" id="funnelSub"></p>
       <div class="funnel" id="funnelBody"></div>
     </div>
 
-    <div class="card reveal" id="gapCard">
-      <h2>ניתוח פערים</h2>
-      <div id="gapBody"></div>
+    <div class="card reveal" id="whenCard">
+      <h2>מתי הם צפויים להגיע לכל שלב</h2>
+      <p class="cardsub">
+        הזמן זורם מימין לשמאל. כל נקודה היא חציון הימים מהשלב שהוזן ועד
+        ההגעה לאותו שלב, נמדד על מועמדים שעברו את המסלול בפועל.
+      </p>
+      <div id="whenBody"></div>
     </div>
 
     <div class="card reveal" id="timelineCard">
-      <h2>פריסת מועדי הגיוס הצפויים</h2>
-      <p class="sub" id="timelineSub"></p>
-      <div class="bars" id="timelineBody"></div>
+      <h2>מתי הם צפויים להתגייס</h2>
+      <p class="cardsub">התפלגות מועדי הגיוס של המגויסים הצפויים.</p>
+      <div id="timelineBody"></div>
+    </div>
+
+    <div class="card reveal" id="gapCard">
+      <h2>הערות ובדיקות</h2>
+      <div id="gapBody"></div>
     </div>
   </div>
 
   <div class="card">
     <h2>בסיס הנתונים ושיטת החישוב</h2>
+    <p class="cardsub">כל מספר במחשבון נמדד מקובצי המקור. כאן אפשר לראות בדיוק ממה.</p>
     <details>
-      <summary>מאיפה מגיעים המספרים</summary>
+      <summary>שיעורי ההגעה בין השלבים</summary>
       <div class="scroller" id="basisBody"></div>
     </details>
     <details>
-      <summary>איך נמדד יחס הגיוס</summary>
+      <summary>איך נמדד כל שיעור</summary>
       <p>
-        הנתונים קטועים מימין: מועמד שביצע פעילות סמוך לסוף התקופה עדיין לא הספיק
-        להתגייס, ובקובץ הוא נראה כמי שלא התגייס. ככל שמתקרבים לסוף התקופה, יחס
-        הגיוס הנמדד נמוך יותר - לא מפני שהאיכות ירדה, אלא מפני שלא עבר מספיק זמן.
+        לכל זוג שלבים נמדד ישירות מהנתונים איזה חלק מהמועמדים שהיו בשלב הראשון
+        הגיעו בפועל לשלב השני אחר כך, וכמה ימים זה לקח. זו מדידה ישירה של הזוג,
+        ולא מכפלה של אחוזי מעבר.
       </p>
       <p>
-        לכן כל יחס נמדד בשני בסיסים: אחד על חלון זמן קבוע, ואחד על קוהורטים
-        שהספיקו להבשיל, שתאריך החיתוך שלהם נקבע לכל שלב בנפרד לפי האחוזון ה-90
-        של זמן הגיוס באותו שלב. היחס שבשימוש הוא הממוצע בין השניים, ושני
+        הנתונים קטועים מימין: מועמד שביצע פעילות סמוך לסוף התקופה עדיין לא הספיק
+        להתקדם, ובקובץ הוא נראה כמי שנעצר. לכן כל שיעור נמדד בשני בסיסים - אחד על
+        חלון זמן קבוע, ואחד על קוהורטים שהספיקו להבשיל, שתאריך החיתוך שלהם נקבע
+        לפי האחוזון ה-90 של זמן ההגעה. השיעור שבשימוש הוא הממוצע בין השניים, ושני
         הבסיסים מוצגים בטבלה שלמעלה.
       </p>
     </details>
@@ -308,6 +403,7 @@ const Engine = (() => {
   const byKey = {};
   DATA.stages.forEach(s => { byKey[s.key] = s; });
   const TOL = DATA.gap_tolerance;
+  const HIRE = DATA.hire_key;
 
   // עיגול שמתנהג זהה בפייתון וב-JS. כל הערכים אינם שליליים.
   const roundHalfUp = x => Math.floor(x + 0.5);
@@ -322,92 +418,115 @@ const Engine = (() => {
     return s.has_data && s.hire_rate !== null;
   };
 
-  // יחס הגיוס שבשימוש: ממוצע שני בסיסי המדידה.
   const rate = k => hasRate(k) ? stage(k).hire_rate.mid : null;
+
+  const label = k => k === HIRE ? DATA.hire_label : stage(k).label;
 
   const stageKeys = (withDataOnly) =>
     DATA.stages.filter(s => !withDataOnly || (s.has_data && s.hire_rate)).map(s => s.key);
 
-  const projectHires = (k, count) => {
+  const forward = k => hasRate(k) ? stage(k).forward : null;
+
+  const projectCohort = (k, count) => {
     if (count === null || !hasRate(k)) return null;
-    return count * rate(k);
+
+    const steps = [{
+      key: k, label: stage(k).label, count: count, reach: 1.0,
+      days_median: 0.0, days_mean: 0.0, is_source: true, is_hire: false
+    }];
+
+    forward(k).forEach(f => {
+      steps.push({
+        key: f.key, label: f.label,
+        count: roundHalfUp(count * f.reach.mid),
+        reach: f.reach.mid,
+        days_median: f.days.median, days_mean: f.days.mean,
+        is_source: false, is_hire: f.key === HIRE
+      });
+    });
+
+    return {
+      stage: k, label: stage(k).label, count: count, steps: steps,
+      hires: steps.find(s => s.is_hire).count
+    };
+  };
+
+  const timeline = (k, count) => {
+    if (count === null || !hasRate(k)) return null;
+    const s = stage(k);
+    if (!s.buckets) return null;
+    const hires = count * rate(k);
+    return s.buckets.map(b => ({
+      key: b.key, label: b.label, share: b.share,
+      hires: b.share === null ? null : roundHalfUp(hires * b.share)
+    }));
+  };
+
+  const combine = (counts) => {
+    const cohorts = [];
+    stageKeys().forEach(k => {
+      const n = counts[k];
+      if (n === undefined || n === null || !hasRate(k)) return;
+      cohorts.push(projectCohort(k, n));
+    });
+
+    const perStage = {};
+    const order = [];
+    cohorts.forEach(c => {
+      c.steps.forEach(step => {
+        if (!(step.key in perStage)) {
+          perStage[step.key] = { key: step.key, label: step.label, total: 0, sources: [] };
+          order.push(step.key);
+        }
+        const entry = perStage[step.key];
+        entry.total += step.count;
+        entry.sources.push({
+          from: c.stage, from_label: c.label, from_count: c.count,
+          count: step.count, days_median: step.days_median
+        });
+      });
+    });
+
+    return {
+      cohorts: cohorts,
+      per_stage: order.map(k => perStage[k]),
+      hires: (perStage[HIRE] || { total: 0 }).total,
+      overlap_warning: cohorts.length > 1
+    };
+  };
+
+  const crossCheck = (counts) => {
+    const entered = stageKeys().filter(
+      k => counts[k] !== undefined && counts[k] !== null && hasRate(k));
+    const out = [];
+    for (let i = 0; i < entered.length; i++) {
+      const early = entered[i];
+      const projection = projectCohort(early, counts[early]);
+      const byStep = {};
+      projection.steps.forEach(s => { byStep[s.key] = s; });
+      for (let j = i + 1; j < entered.length; j++) {
+        const late = entered[j];
+        if (!(late in byStep)) continue;
+        const expected = byStep[late].count;
+        const actual = counts[late];
+        const allowed = Math.max(TOL.min_candidates, expected * TOL.pct);
+        let verdict;
+        if (Math.abs(actual - expected) <= allowed) verdict = "matches";
+        else if (actual < expected) verdict = "fewer";
+        else verdict = "more";
+        out.push({
+          early: early, late: late, early_count: counts[early],
+          expected: expected, actual: actual,
+          gap: Math.abs(actual - expected), verdict: verdict
+        });
+      }
+    }
+    return out;
   };
 
   const requiredForTarget = (k, target) => {
     if (target === null || !hasRate(k)) return null;
     return target / rate(k);
-  };
-
-  const convert = (fromKey, count, toKey) => {
-    if (count === null) return null;
-    if (fromKey === toKey) return count;
-    if (!(hasRate(fromKey) && hasRate(toKey))) return null;
-    return count * rate(fromKey) / rate(toKey);
-  };
-
-  const timeline = (k, count) => {
-    const hires = projectHires(k, count);
-    if (hires === null) return null;
-    const s = stage(k);
-    if (!s.buckets) return null;
-    return s.buckets.map(b => ({
-      key: b.key,
-      label: b.label,
-      share: b.share,
-      hires: b.share === null ? null : roundHalfUp(hires * b.share)
-    }));
-  };
-
-  const isBalanced = (actual, needed) => {
-    const allowed = Math.max(TOL.min_candidates, needed * TOL.pct);
-    return Math.abs(actual - needed) <= allowed;
-  };
-
-  const gapAnalysis = (counts, target) => {
-    const messages = [];
-    const entered = stageKeys().filter(
-      k => counts[k] !== undefined && counts[k] !== null && hasRate(k)
-    );
-
-    for (let i = 0; i < entered.length; i++) {
-      for (let j = i + 1; j < entered.length; j++) {
-        const early = entered[i], late = entered[j];
-        const actual = counts[early];
-        const needed = convert(late, counts[late], early);
-        if (needed === null) continue;
-        const neededR = roundHalfUp(needed);
-        let kind, gap;
-        if (isBalanced(actual, needed)) { kind = "balanced"; gap = 0; }
-        else if (actual < needed) { kind = "deficit"; gap = neededR - actual; }
-        else { kind = "surplus"; gap = actual - neededR; }
-        messages.push({ kind, stage: early, against: late, gap, needed: neededR, actual });
-      }
-    }
-
-    if (target !== null && target !== undefined && entered.length) {
-      const deepest = entered[entered.length - 1];
-      const projected = projectHires(deepest, counts[deepest]);
-      const projectedR = roundHalfUp(projected);
-      let kind, gap;
-      if (isBalanced(projected, target)) { kind = "target_ok"; gap = 0; }
-      else if (projected < target) { kind = "target_miss"; gap = target - projectedR; }
-      else { kind = "target_over"; gap = projectedR - target; }
-      messages.push({ kind, stage: deepest, target, gap, projected: projectedR });
-    }
-
-    return messages;
-  };
-
-  const fillFrom = (k, count) => {
-    const out = {};
-    stageKeys().forEach(other => {
-      if (other === k) { out[other] = { value: count, source: "input" }; return; }
-      const conv = convert(k, count, other);
-      out[other] = conv === null ? null : { value: roundHalfUp(conv), source: "derived" };
-    });
-    const hires = projectHires(k, count);
-    out.hires = hires === null ? null : roundHalfUp(hires);
-    return out;
   };
 
   const requiredFunnel = (target) => {
@@ -420,9 +539,19 @@ const Engine = (() => {
     return out;
   };
 
-  return { stage, hasRate, rate, stageKeys, roundHalfUp, projectHires,
-           requiredForTarget, convert, timeline, gapAnalysis, fillFrom,
-           requiredFunnel };
+  const targetVerdict = (projected, target) => {
+    if (target === null || target === undefined) return null;
+    const allowed = Math.max(TOL.min_candidates, target * TOL.pct);
+    let kind, gap;
+    if (Math.abs(projected - target) <= allowed) { kind = "target_ok"; gap = 0; }
+    else if (projected < target) { kind = "target_miss"; gap = target - projected; }
+    else { kind = "target_over"; gap = projected - target; }
+    return { kind: kind, gap: gap, projected: projected, target: target };
+  };
+
+  return { stage, hasRate, rate, label, stageKeys, forward, roundHalfUp,
+           projectCohort, timeline, combine, crossCheck,
+           requiredForTarget, requiredFunnel, targetVerdict };
 })();
 /* __ENGINE_END__ */
 
@@ -432,66 +561,54 @@ const Engine = (() => {
 const $ = id => document.getElementById(id);
 const nf = n => n.toLocaleString("he-IL");
 const pct = x => (x * 100).toFixed(1) + "%";
-const label = k => Engine.stage(k).label;
+const el = (tag, cls, text) => {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  return e;
+};
 
 const REDUCED = typeof matchMedia === "function" &&
                 matchMedia("(prefers-reduced-motion: reduce)").matches;
 const CAN_ANIMATE = !REDUCED && typeof requestAnimationFrame === "function";
 
-/* ספירה עולה של מספר. בלי תמיכה באנימציה - הערך נכתב מיד. */
-function countUp(el, to, duration) {
-  if (!CAN_ANIMATE) { el.textContent = nf(to); return; }
+function countUp(node, to, duration) {
+  if (!CAN_ANIMATE) { node.textContent = nf(to); return; }
   const start = performance.now();
   const step = now => {
     const t = Math.min(1, (now - start) / duration);
-    const eased = 1 - Math.pow(1 - t, 3);
-    el.textContent = nf(Math.round(to * eased));
-    if (t < 1) requestAnimationFrame(step);
-    else el.textContent = nf(to);
+    node.textContent = nf(Math.round(to * (1 - Math.pow(1 - t, 3))));
+    if (t < 1) requestAnimationFrame(step); else node.textContent = nf(to);
   };
   requestAnimationFrame(step);
 }
 
-/* מילוי רוחב של פס. בלי אנימציה - נקבע מיד. */
-function growBar(el, widthPct, delay) {
-  if (!CAN_ANIMATE) { el.style.width = widthPct + "%"; return; }
-  setTimeout(() => { el.style.width = widthPct + "%"; }, delay);
+function later(fn, delay) {
+  if (!CAN_ANIMATE) { fn(); return; }
+  setTimeout(fn, delay);
 }
 
-/* --- בניית שדות הקלט --- */
+/* --- שדות הקלט --- */
 function makeField(key, labelText, extraClass, hintText) {
-  const wrap = document.createElement("div");
-  wrap.className = "field" + (extraClass ? " " + extraClass : "");
-
-  const lab = document.createElement("label");
+  const wrap = el("div", "field" + (extraClass ? " " + extraClass : ""));
+  const lab = el("label", null, labelText);
   lab.setAttribute("for", "in_" + key);
-  lab.textContent = labelText;
-
-  const inp = document.createElement("input");
+  const inp = el("input");
   inp.id = "in_" + key;
   inp.type = "number";
   inp.min = "0";
   inp.placeholder = "—";
-
   wrap.append(lab, inp);
-
-  if (hintText) {
-    const h = document.createElement("span");
-    h.className = "hint";
-    h.textContent = hintText;
-    wrap.append(h);
-  }
+  if (hintText) wrap.append(el("span", "hint", hintText));
   return wrap;
 }
 
 function buildInputs() {
   const grid = $("inputGrid");
   DATA.stages.forEach(s => {
-    grid.append(makeField(
-      s.key, s.label,
+    grid.append(makeField(s.key, s.label,
       s.has_data ? "" : "no-data",
-      s.has_data ? "" : "אין נתוני המרה במקור"
-    ));
+      s.has_data ? "" : "אין נתונים במקור"));
   });
   grid.append(makeField("target", "יעד גיוס", "target", ""));
 }
@@ -508,246 +625,299 @@ function readInputs() {
   return { counts, target: Number.isFinite(t) ? t : null };
 }
 
-/* --- כרטיס התוצאה הראשי --- */
-function renderHero(cap, value, note) {
+/* --- תיאור מקור הגזירה, כדי שלא יהיה ספק ממה נגזר כל מספר --- */
+function sourceText(sources) {
+  return sources.map(s =>
+    s.from === undefined || s.count === s.from_count
+      ? "הוזן ידנית"
+      : nf(s.count) + " מתוך " + nf(s.from_count) + " ב«" + s.from_label + "»"
+  ).join("  +  ");
+}
+
+/* --- כרטיס התוצאה --- */
+function renderHero(cap, value, note, from) {
   $("heroCap").textContent = cap;
   $("heroNote").textContent = note;
+  $("heroFrom").textContent = from;
   countUp($("heroValue"), value, 900);
+  $("stickyValue").textContent = nf(value);
 }
 
-/* --- המשפך --- */
-function renderFunnel(filled, anchor, manual) {
+/* --- גרף 1: כמה צפויים בכל שלב --- */
+/* denom - הכמות שממנה הכול נגזר, כשיש קבוצה אחת בלבד. אז אפשר להציג
+   אחוז בעל משמעות. כשיש כמה קבוצות אין מכנה משותף, ולא מוצג אחוז. */
+function renderFunnel(entries, manual, denom) {
   const body = $("funnelBody");
   body.innerHTML = "";
+  const max = Math.max.apply(null, entries.map(e => e.total).concat([1]));
 
-  const values = DATA.stages
-    .map(s => filled[s.key] ? filled[s.key].value : 0)
-    .concat([filled.hires || 0]);
-  const max = Math.max.apply(null, values.concat([1]));
-
-  let i = 0;
+  // שלבים ללא נתונים נרשמים במקומם בסדר התהליך, ולא מוערכים
   DATA.stages.forEach(s => {
-    const cell = filled[s.key];
-    const row = document.createElement("div");
-    row.className = "fstage" +
-      (s.key === anchor ? " anchor" : "") +
-      (s.has_data ? "" : " nodata");
-
-    const name = document.createElement("div");
-    name.className = "fname";
-    name.textContent = s.label;
-    if (s.key === anchor) {
-      const chip = document.createElement("span");
-      chip.className = "chip";
-      chip.textContent = "הוזן";
-      name.append(chip);
-    }
-
-    const track = document.createElement("div");
-    track.className = "ftrack";
-    const bar = document.createElement("div");
-    bar.className = "fbar";
-    track.append(bar);
-
-    const val = document.createElement("div");
-    val.className = "fval";
-
-    const rateCell = document.createElement("div");
-    rateCell.className = "frate";
-
-    if (!s.has_data) {
-      val.textContent = manual[s.key] !== null ? nf(manual[s.key]) : "—";
-      rateCell.textContent = "—";
-    } else {
-      countUp(val, cell.value, 800);
-      growBar(bar, (cell.value / max) * 100, 60 + i * 55);
-      rateCell.textContent = pct(Engine.rate(s.key));
-    }
-
-    row.append(name, track, val, rateCell);
+    if (s.has_data) return;
+    const row = el("div", "fstage nodata");
+    const head = el("div", "fhead");
+    head.append(el("span", "fname", s.label));
+    row.append(head, el("div", "ftrack"),
+               el("div", "fval", manual[s.key] !== null ? nf(manual[s.key]) : "—"),
+               el("div", "fsrc", manual[s.key] !== null
+                  ? "הוזן ידנית. אין במקור נתוני המרה לשלב הזה, ולכן לא נגזר ממנו דבר."
+                  : "אין מקור נתונים לשלב הזה."));
     body.append(row);
-    i++;
   });
 
-  const row = document.createElement("div");
-  row.className = "fstage hires";
-  const name = document.createElement("div");
-  name.className = "fname";
-  name.textContent = "מגויסים";
-  const track = document.createElement("div");
-  track.className = "ftrack";
-  const bar = document.createElement("div");
-  bar.className = "fbar";
-  track.append(bar);
-  const val = document.createElement("div");
-  val.className = "fval";
-  countUp(val, filled.hires, 800);
-  growBar(bar, (filled.hires / max) * 100, 60 + i * 55);
-  const rateCell = document.createElement("div");
-  rateCell.className = "frate";
-  rateCell.textContent = "100%";
-  row.append(name, track, val, rateCell);
-  body.append(row);
+  entries.forEach((entry, i) => {
+    const isHire = entry.key === DATA.hire_key;
+    const isSource = !isHire && entry.sources.some(s => s.from === entry.key);
+
+    const row = el("div", "fstage" + (isHire ? " hire" : isSource ? " source" : ""));
+
+    const head = el("div", "fhead");
+    head.append(el("span", "fname", entry.label));
+    if (isSource) head.append(el("span", "chip", "הוזן"));
+    else if (denom) head.append(el("span", "fpct", pct(entry.total / denom)));
+
+    const track = el("div", "ftrack");
+    const bar = el("div", "fbar");
+    track.append(bar);
+    later(() => { bar.style.width = ((entry.total / max) * 100).toFixed(1) + "%"; },
+          70 + i * 60);
+
+    const val = el("div", "fval");
+    countUp(val, entry.total, 850);
+
+    row.append(head, track, val, el("div", "fsrc", sourceText(entry.sources)));
+    body.append(row);
+  });
+
 }
 
-/* --- הודעות פערים --- */
-function renderGaps(messages, extraNotes) {
-  const body = $("gapBody");
+/* --- גרף 2: מתי צפויים להגיע לכל שלב --- */
+function renderWhen(cohorts) {
+  const body = $("whenBody");
   body.innerHTML = "";
 
-  extraNotes.forEach(text => {
-    const d = document.createElement("div");
-    d.className = "msg warn";
-    d.textContent = text;
-    body.append(d);
-  });
-
-  messages.forEach(m => {
-    const d = document.createElement("div");
-    if (m.kind === "deficit") {
-      d.className = "msg bad";
-      d.textContent = "חסרים " + nf(m.gap) + " מועמדים בשלב «" + label(m.stage) +
-        "» כדי לתמוך בנתון שהוזן בשלב «" + label(m.against) + "». נדרשים " +
-        nf(m.needed) + ", בפועל " + nf(m.actual) + ".";
-    } else if (m.kind === "surplus") {
-      d.className = "msg good";
-      d.textContent = "עודף של " + nf(m.gap) + " מועמדים בשלב «" + label(m.stage) +
-        "» ביחס לנדרש עבור שלב «" + label(m.against) + "». נדרשים " +
-        nf(m.needed) + ", בפועל " + nf(m.actual) + ".";
-    } else if (m.kind === "balanced") {
-      d.className = "msg flat";
-      d.textContent = "שלב «" + label(m.stage) + "» מאוזן מול שלב «" + label(m.against) +
-        "»: נדרשים " + nf(m.needed) + ", בפועל " + nf(m.actual) + ".";
-    } else if (m.kind === "target_miss") {
-      d.className = "msg bad";
-      d.textContent = "מתחת ליעד: מהנתון בשלב «" + label(m.stage) + "» צפויים " +
-        nf(m.projected) + " מגויסים, מול יעד של " + nf(m.target) +
-        ". חסרים " + nf(m.gap) + ".";
-    } else if (m.kind === "target_over") {
-      d.className = "msg good";
-      d.textContent = "מעל היעד: מהנתון בשלב «" + label(m.stage) + "» צפויים " +
-        nf(m.projected) + " מגויסים, מול יעד של " + nf(m.target) +
-        ". עודף של " + nf(m.gap) + ".";
-    } else if (m.kind === "target_ok") {
-      d.className = "msg flat";
-      d.textContent = "היעד מושג: מהנתון בשלב «" + label(m.stage) + "» צפויים " +
-        nf(m.projected) + " מגויסים, והיעד הוא " + nf(m.target) + ".";
+  cohorts.forEach(c => {
+    const block = el("div", "cohort");
+    if (cohorts.length > 1) {
+      block.append(el("div", "cohort-title",
+        "מתוך " + nf(c.count) + " ב«" + c.label + "»"));
     }
-    body.append(d);
+
+    const steps = c.steps.filter(s => !s.is_source);
+    if (!steps.length) {
+      block.append(el("p", "cardsub", "אין שלבי המשך מדודים לשלב הזה."));
+      body.append(block);
+      return;
+    }
+
+    const maxDay = Math.max.apply(null, steps.map(s => s.days_median).concat([1]));
+    const tl = el("div", "tl");
+
+    steps.forEach((s, i) => {
+      const row = el("div", "tlrow" + (s.is_hire ? " hire" : ""));
+
+      const head = el("div", "tlhead");
+      head.append(el("div", "tlname", s.label));
+      head.append(el("div", "tlcount", nf(s.count) + " מועמדים · " + pct(s.reach)));
+
+      const track = el("div", "tltrack");
+      const fill = el("div", "tlfill");
+      const dot = el("div", "tldot");
+      track.append(fill, dot);
+      const w = (s.days_median / maxDay) * 100;
+      later(() => {
+        fill.style.width = w.toFixed(1) + "%";
+        dot.style.insetInlineStart = w.toFixed(1) + "%";
+        dot.classList.add("on");
+      }, 90 + i * 90);
+
+      const day = el("div", "tlday", Math.round(s.days_median));
+      day.append(el("small", null, "ימים"));
+
+      row.append(head, track, day);
+      tl.append(row);
+    });
+
+    const axis = el("div", "tlaxis-wrap");
+    const axisLine = el("div", "tlaxis");
+    axisLine.append(el("span", null, "יום 0"), el("span", null, "יום " + Math.round(maxDay)));
+    axis.append(el("div"), axisLine, el("div"));
+    tl.append(axis);
+
+    block.append(tl);
+    body.append(block);
+  });
+}
+
+/* --- גרף 3: התפלגות מועדי הגיוס --- */
+function renderTimeline(cohorts) {
+  const body = $("timelineBody");
+  body.innerHTML = "";
+  let any = false;
+
+  cohorts.forEach(c => {
+    const rows = Engine.timeline(c.stage, c.count);
+    if (!rows) return;
+    any = true;
+
+    const block = el("div", "cohort");
+    const st = Engine.stage(c.stage);
+    const d = st.days_to_hire;
+    block.append(el("div", "cohort-title",
+      nf(c.hires) + " מגויסים מתוך " + nf(c.count) + " ב«" + c.label + "»"));
+    block.append(el("p", "cardsub",
+      "חציון " + d.median + " ימים, ממוצע " + d.mean + " ימים, נמדד על " +
+      nf(d.n) + " מועמדים שהתגייסו בפועל."));
+
+    const bars = el("div", "bars");
+    const maxShare = Math.max.apply(null, rows.map(r => r.share || 0).concat([0.0001]));
+    rows.forEach((r, i) => {
+      const row = el("div", "bar-row");
+      const track = el("div", "bar-track");
+      const fill = el("div", "bar-fill");
+      track.append(fill);
+      later(() => { fill.style.width = ((r.share / maxShare) * 100).toFixed(1) + "%"; },
+            90 + i * 60);
+      const val = el("div", "bar-val");
+      countUp(val, r.hires, 850);
+      row.append(el("div", null, r.label), track, val);
+      bars.append(row);
+    });
+
+    block.append(bars);
+    body.append(block);
   });
 
+  return any;
+}
+
+/* --- הערות ובדיקות --- */
+function renderNotes(messages) {
+  const body = $("gapBody");
+  body.innerHTML = "";
+  messages.forEach(m => body.append(el("div", "msg " + m.kind, m.text)));
   if (!body.children.length) {
-    const d = document.createElement("div");
-    d.className = "msg flat";
-    d.textContent = "אין פערים להצגה. להשוואה בין שלבים יש להזין מספרים בשני שלבים או יותר.";
-    body.append(d);
+    body.append(el("div", "msg flat", "אין הערות."));
   }
 }
 
-/* --- פריסת מועדי הגיוס --- */
-function renderTimeline(anchor, count) {
-  const rows = Engine.timeline(anchor, count);
-  const body = $("timelineBody");
-  body.innerHTML = "";
-  if (!rows) { $("timelineCard").classList.add("hidden"); return false; }
-  $("timelineCard").classList.remove("hidden");
-
-  const st = Engine.stage(anchor);
-  const d = st.days_to_hire;
-  $("timelineSub").textContent =
-    "מתי צפויים להיקלט המגויסים מתוך " + nf(count) + " מועמדים בשלב «" + st.label +
-    "», נמדד מיום הפעילות בשלב. חציון " + d.median + " ימים, ממוצע " + d.mean +
-    " ימים, על " + nf(d.n) + " מועמדים שהתגייסו בפועל.";
-
-  const maxShare = Math.max.apply(null, rows.map(r => r.share || 0).concat([0.0001]));
-
-  rows.forEach((r, i) => {
-    const row = document.createElement("div");
-    row.className = "bar-row";
-
-    const name = document.createElement("div");
-    name.textContent = r.label;
-
-    const track = document.createElement("div");
-    track.className = "bar-track";
-    const fill = document.createElement("div");
-    fill.className = "bar-fill";
-    track.append(fill);
-    growBar(fill, (r.share / maxShare) * 100, 80 + i * 60);
-
-    const val = document.createElement("div");
-    val.className = "bar-val";
-    countUp(val, r.hires, 800);
-
-    row.append(name, track, val);
-    body.append(row);
-  });
-  return true;
-}
-
-/* --- הופעת כרטיסי התוצאה בזה אחר זה --- */
+/* --- חשיפת התוצאות --- */
 function revealResults(cards) {
   $("results").classList.remove("hidden");
   cards.forEach(id => $(id).classList.remove("in"));
+  ["heroCard", "funnelCard", "whenCard", "timelineCard", "gapCard"].forEach(id => {
+    $(id).classList.toggle("hidden", cards.indexOf(id) === -1);
+  });
 
-  if (!CAN_ANIMATE) {
-    cards.forEach(id => $(id).classList.add("in"));
-    return;
-  }
+  if (!CAN_ANIMATE) { cards.forEach(id => $(id).classList.add("in")); return; }
   cards.forEach((id, i) => setTimeout(() => $(id).classList.add("in"), 40 + i * 110));
 
-  const hero = $("heroCard");
-  if (hero && typeof hero.scrollIntoView === "function") {
-    setTimeout(() => hero.scrollIntoView({ behavior: "smooth", block: "nearest" }), 60);
+  const results = $("results");
+  if (results && typeof results.scrollIntoView === "function") {
+    setTimeout(() => results.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
   }
 }
 
 /* --- ההרצה הראשית --- */
 function calculate() {
   const { counts, target } = readInputs();
-  const withData = Engine.stageKeys().filter(k => counts[k] !== null);
+  const entered = Engine.stageKeys().filter(k => counts[k] !== null && Engine.hasRate(k));
   const notes = [];
 
   DATA.stages.forEach(s => {
     if (!s.has_data && counts[s.key] !== null) {
-      notes.push("הנתון שהוזן בשלב «" + s.label + "» נרשם אך לא שימש לחישוב: " +
-                 "אין בקבצי המקור נתוני המרה לשלב הזה, ולכן לא ניתן לגזור ממנו תחזית.");
+      notes.push({ kind: "warn", text:
+        "הנתון שהוזן בשלב «" + s.label + "» נרשם אך לא שימש לחישוב: אין " +
+        "בקבצי המקור נתוני המרה לשלב הזה, ולכן לא ניתן לגזור ממנו תחזית." });
     }
   });
 
   const manual = {};
   DATA.stages.forEach(s => { manual[s.key] = counts[s.key]; });
 
-  if (!withData.length && target === null) {
+  if (!entered.length && target === null) {
     $("results").classList.add("hidden");
     return;
   }
 
-  if (!withData.length) {
-    // רק יעד הוזן - חישוב לאחור.
+  /* --- מצב חישוב לאחור: רק יעד גיוס הוזן --- */
+  if (!entered.length) {
     const filled = Engine.requiredFunnel(target);
-    renderHero("יעד גיוס", target, "כמה מועמדים נדרשים בכל שלב כדי להגיע ליעד הזה");
-    renderFunnel(filled, null, manual);
-    notes.unshift("חישוב לאחור מיעד של " + nf(target) + " מגויסים.");
-    renderGaps([], notes);
-    $("timelineCard").classList.add("hidden");
+    const entries = Engine.stageKeys()
+      .filter(k => filled[k])
+      .map(k => ({
+        key: k, label: Engine.stage(k).label, total: filled[k].value,
+        sources: [{ from_label: "יעד של " + nf(target) + " מגויסים",
+                    from_count: target, count: filled[k].value }]
+      }));
+
+    renderHero("יעד גיוס", target, "כמה מועמדים נדרשים בכל שלב כדי להגיע ליעד הזה",
+               "כל מספר נגזר מהיעד לאחור, לפי שיעור הגיוס הנמדד של אותו שלב.");
+    renderFunnel(entries, manual, null);
+    notes.unshift({ kind: "flat", text:
+      "חישוב לאחור מיעד של " + nf(target) + " מגויסים. כל שורה עומדת בפני עצמה - " +
+      "כמה מועמדים באותו שלב לבדו נדרשים כדי להגיע ליעד. אלה אינן שורות " +
+      "שמצטברות זו לזו." });
+    renderNotes(notes);
     revealResults(["heroCard", "funnelCard", "gapCard"]);
     return;
   }
 
-  // עוגן: השלב המתקדם ביותר שהוזן - הקרוב ביותר לגיוס, ולכן המדויק ביותר.
-  const anchor = withData[withData.length - 1];
-  const anchorCount = counts[anchor];
-  const filled = Engine.fillFrom(anchor, anchorCount);
+  /* --- מצב גזירה קדימה --- */
+  const result = Engine.combine(counts);
 
-  renderHero("מגויסים צפויים", filled.hires,
-             "מתוך " + nf(anchorCount) + " מועמדים בשלב «" + label(anchor) + "»");
-  renderFunnel(filled, anchor, manual);
-  renderGaps(Engine.gapAnalysis(counts, target), notes);
-  const hasTimeline = renderTimeline(anchor, anchorCount);
+  const heroFrom = result.cohorts.map(c =>
+    nf(c.hires) + " מתוך " + nf(c.count) + " ב«" + c.label + "»").join("  +  ");
+  const heroNote = result.cohorts.length === 1
+    ? "מתוך " + nf(result.cohorts[0].count) + " מועמדים ב«" + result.cohorts[0].label + "»"
+    : "מסך " + result.cohorts.length + " הקבוצות שהוזנו";
 
-  const cards = ["heroCard", "funnelCard", "gapCard"];
+  renderHero("מגויסים צפויים", result.hires, heroNote, heroFrom);
+
+  $("funnelSub").textContent = result.cohorts.length === 1
+    ? "הכול נגזר מ-" + nf(result.cohorts[0].count) + " המועמדים שהוזנו ב«" +
+      result.cohorts[0].label + "», קדימה בלבד."
+    : "כל שלב מציג את הסכום, ומתחתיו כתוב כמה תרמה כל קבוצה שהוזנה.";
+
+  renderFunnel(result.per_stage, manual,
+                result.cohorts.length === 1 ? result.cohorts[0].count : null);
+  renderWhen(result.cohorts);
+  const hasTimeline = renderTimeline(result.cohorts);
+
+  if (result.overlap_warning) {
+    notes.push({ kind: "warn", text:
+      "הוזנו " + result.cohorts.length + " שלבים, והסכום מניח שמדובר בקבוצות " +
+      "נפרדות. אם אותם מועמדים נמצאים ביותר משלב אחד, הם נספרים כאן פעמיים." });
+  }
+
+  Engine.crossCheck(counts).forEach(cc => {
+    const base = "מ-" + nf(cc.early_count) + " ב«" + Engine.label(cc.early) +
+                 "» צפויים להגיע ל«" + Engine.label(cc.late) + "» " + nf(cc.expected) +
+                 " מועמדים, והוזנו " + nf(cc.actual) + ". ";
+    if (cc.verdict === "matches") {
+      notes.push({ kind: "good", text: base + "המספרים עקביים זה עם זה." });
+    } else if (cc.verdict === "fewer") {
+      notes.push({ kind: "bad", text: base + "חסרים " + nf(cc.gap) +
+        " ביחס לצפוי - אם מדובר באותם אנשים." });
+    } else {
+      notes.push({ kind: "good", text: base + "עודף של " + nf(cc.gap) +
+        " ביחס לצפוי - אם מדובר באותם אנשים." });
+    }
+  });
+
+  const v = Engine.targetVerdict(result.hires, target);
+  if (v) {
+    const text = "יעד הגיוס הוא " + nf(v.target) + ", והתחזית היא " + nf(v.projected) + ". ";
+    if (v.kind === "target_miss") notes.push({ kind: "bad", text: text + "חסרים " + nf(v.gap) + "." });
+    else if (v.kind === "target_over") notes.push({ kind: "good", text: text + "עודף של " + nf(v.gap) + "." });
+    else notes.push({ kind: "good", text: text + "היעד מושג." });
+  }
+
+  renderNotes(notes);
+
+  const cards = ["heroCard", "funnelCard", "whenCard"];
   if (hasTimeline) cards.push("timelineCard");
+  cards.push("gapCard");
   revealResults(cards);
 }
 
@@ -755,8 +925,21 @@ function reset() {
   DATA.stages.forEach(s => { $("in_" + s.key).value = ""; });
   $("in_target").value = "";
   $("results").classList.add("hidden");
-  ["heroCard", "funnelCard", "gapCard", "timelineCard"]
+  $("stickyBar").classList.remove("show");
+  ["heroCard", "funnelCard", "whenCard", "timelineCard", "gapCard"]
     .forEach(id => $(id).classList.remove("in"));
+}
+
+/* --- הסרגל הדביק: מופיע כשכרטיס התוצאה יוצא מהמסך --- */
+function watchHero() {
+  if (typeof IntersectionObserver !== "function") return;
+  const bar = $("stickyBar");
+  new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      const gone = !e.isIntersecting && e.boundingClientRect.top < 0;
+      bar.classList.toggle("show", gone && !$("results").classList.contains("hidden"));
+    });
+  }, { threshold: 0 }).observe($("heroCard"));
 }
 
 /* --- פאנל בסיס הנתונים --- */
@@ -769,38 +952,38 @@ function renderBasis() {
     nf(m.hire_rows) + " שורות גיוס (" + nf(m.hire_candidates) + " מועמדים, " +
     m.hire_first + " עד " + m.hire_last + "). נבנה בתאריך " + m.generated_at + ".";
 
-  let html = "<table><thead><tr><th>שלב</th><th>סוג פעילות במקור</th>" +
-             "<th>קוהורט בשל</th><th>מתוכם גויסו</th><th>יחס גיוס</th>" +
-             "<th>שני הבסיסים</th><th>חציון ימים</th><th>אחוזון 90</th>" +
+  let html = "<table><thead><tr><th>משלב</th><th>אל שלב</th><th>שיעור הגעה</th>" +
+             "<th>שני הבסיסים</th><th>חציון ימים</th><th>ממוצע</th><th>נמדד על</th>" +
              "</tr></thead><tbody>";
   DATA.stages.forEach(s => {
     if (!s.has_data) {
-      html += "<tr class='nodata'><td>" + s.label + "</td><td colspan='7'>" +
-              s.note + "</td></tr>";
+      html += "<tr class='nodata'><td>" + s.label + "</td><td colspan='6'>" + s.note + "</td></tr>";
       return;
     }
-    const b = s.basis.mature, d = s.days_to_hire, r = s.hire_rate;
-    html += "<tr><td>" + s.label + "</td><td>" + s.activity_type + "</td>" +
-            "<td class='num'>" + nf(b.candidates) + "</td>" +
-            "<td class='num'>" + nf(b.hired) + "</td>" +
-            "<td class='num'><strong>" + pct(r.mid) + "</strong></td>" +
-            "<td class='num'>" + pct(r.low) + " / " + pct(r.high) + "</td>" +
-            "<td class='num'>" + d.median + "</td>" +
-            "<td class='num'>" + d.p90 + "</td></tr>";
+    s.forward.forEach((f, i) => {
+      html += "<tr><td>" + (i === 0 ? s.label : "") + "</td><td>" + f.label + "</td>" +
+              "<td class='num'><strong>" + pct(f.reach.mid) + "</strong></td>" +
+              "<td class='num'>" + pct(f.reach.low) + " / " + pct(f.reach.high) + "</td>" +
+              "<td class='num'>" + f.days.median + "</td>" +
+              "<td class='num'>" + f.days.mean + "</td>" +
+              "<td class='num'>" + nf(f.days.n) + "</td></tr>";
+    });
   });
   html += "</tbody></table>";
   $("basisBody").innerHTML = html;
 
   const limits = [
-    "השלב «הגשות» אינו קיים בקבצי המקור. לא נגזר עבורו יחס המרה, והוא אינו משתתף בחישוב.",
-    "המשפך אינו סדרתי: לא כל מועמד עובר דרך כל השלבים. יחס הגיוס של כל שלב נמדד מול הגיוסים בפועל, ולא כשרשרת של אחוזי מעבר.",
-    "מרכז הערכה הוא שלב סלקטיבי שרק חלק מהמועמדים עוברים בו, ולכן מספר המועמדים בו קטן ממספר הגיוסים באותה תקופה.",
-    "זמני הגיוס נמדדים מהפעילות הראשונה של המועמד בשלב ועד לגיוסו הראשון, ורק עבור מי שהתגייס בפועל. מועמדים שעדיין בתהליך אינם נספרים.",
+    "השלב «הגשות» אינו קיים בקבצי המקור. לא נגזר עבורו שיעור, והוא אינו משתתף בחישוב.",
+    "הגזירה היא קדימה בלבד. ממספר שהוזן בשלב מסוים אי אפשר לדעת כמה מועמדים היו בשלבים שלפניו, ולכן הם אינם מוצגים.",
+    "המשפך אינו סדרתי: לא כל מועמד עובר דרך כל השלבים. כל מעבר נמדד ישירות בין שני השלבים, ולא כמכפלה של אחוזי מעבר. לכן שיעור ההגעה לגיוס יכול להיות גבוה משיעור ההגעה לשלב שלפניו.",
+    "מרכז הערכה הוא שלב סלקטיבי שרק חלק מהמועמדים עוברים בו.",
+    "הזמנים נמדדים רק על מועמדים שהגיעו בפועל לשלב היעד. מי שנעצר בדרך אינו נספר.",
     "הנתונים מכסים " + m.activity_first + " עד " + m.hire_last +
       " בלבד. מועמדים שהחלו את התהליך לפני תחילת התקופה נראים בקובץ כאילו התחילו בתוכה.",
     nf(m.hires_without_activity) + " מגויסים מתוך " + nf(m.hire_candidates) + " (" +
       pct(m.hires_without_activity / m.hire_candidates) + ") אינם מופיעים כלל בקובץ הפעילויות. " +
-      "התהליך שלהם אינו מתועד, ולכן יחסי ההמרה שכאן אינם מכסים אותם."
+      "התהליך שלהם אינו מתועד, ולכן השיעורים שכאן אינם מכסים אותם.",
+    "כשמוזן יותר משלב אחד, המערכת מניחה שמדובר בקבוצות נפרדות ומסכמת אותן. היא אינה יכולה לדעת אם אותם מועמדים מופיעים בכמה שלבים."
   ];
   if (m.unmapped_activity_types && m.unmapped_activity_types.length) {
     limits.push("סוגי פעילות שקיימים בקובץ ואינם ממופים לשלב במחשבון: " +
@@ -813,6 +996,7 @@ function renderBasis() {
 
 buildInputs();
 renderBasis();
+watchHero();
 $("calcBtn").addEventListener("click", calculate);
 $("resetBtn").addEventListener("click", reset);
 document.addEventListener("keydown", e => { if (e.key === "Enter") calculate(); });

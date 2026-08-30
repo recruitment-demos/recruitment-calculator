@@ -4,8 +4,10 @@
     "pct": 0.02,
     "min_candidates": 1
   },
+  "hire_key": "hire",
+  "hire_label": "גיוס",
   "meta": {
-    "generated_at": "2026-08-30 11:40",
+    "generated_at": "2026-08-30 12:22",
     "activities_file": "נתונים למערכת/פעילויות למחשבון.xlsx",
     "hires_file": "נתונים למערכת/גיוסים 20.8.xlsx",
     "activity_rows": 64038,
@@ -68,7 +70,8 @@
       "hire_rate": null,
       "days_to_hire": null,
       "buckets": null,
-      "basis": null
+      "basis": null,
+      "forward": null
     },
     {
       "key": "file_check",
@@ -77,9 +80,9 @@
       "has_data": true,
       "note": "",
       "hire_rate": {
-        "low": 0.089306,
-        "high": 0.109215,
-        "mid": 0.09926
+        "low": 0.089244,
+        "high": 0.109121,
+        "mid": 0.099183
       },
       "days_to_hire": {
         "n": 1170,
@@ -137,17 +140,211 @@
         "conservative": {
           "cutoff": "2026-05-20",
           "candidates": 16102,
-          "hired": 1438,
-          "rate": 0.089306
+          "reached": 1437,
+          "rate": 0.089244
         },
         "mature": {
           "cutoff": "2026-04-01",
           "followup_days_p90": 140.0,
           "candidates": 10722,
-          "hired": 1171,
-          "rate": 0.109215
+          "reached": 1170,
+          "rate": 0.109121
         }
-      }
+      },
+      "forward": [
+        {
+          "key": "online_invite",
+          "label": "זימון למבחן מקוון",
+          "reach": {
+            "low": 0.248344,
+            "high": 0.257049,
+            "mid": 0.252696
+          },
+          "days": {
+            "n": 4423,
+            "mean": 15.6,
+            "median": 6.0,
+            "p25": 1.0,
+            "p75": 18.0,
+            "p90": 41.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 16102,
+              "reached": 4139,
+              "rate": 0.257049
+            },
+            "mature": {
+              "cutoff": "2026-06-03",
+              "followup_days_p90": 41.0,
+              "candidates": 17810,
+              "reached": 4423,
+              "rate": 0.248344
+            }
+          }
+        },
+        {
+          "key": "online_day",
+          "label": "יום מיון מקוון",
+          "reach": {
+            "low": 0.190722,
+            "high": 0.198934,
+            "mid": 0.194828
+          },
+          "days": {
+            "n": 1754,
+            "mean": 46.2,
+            "median": 27.0,
+            "p25": 14.0,
+            "p75": 60.0,
+            "p90": 128.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 16102,
+              "reached": 3071,
+              "rate": 0.190722
+            },
+            "mature": {
+              "cutoff": "2026-03-08",
+              "followup_days_p90": 128.0,
+              "candidates": 8817,
+              "reached": 1754,
+              "rate": 0.198934
+            }
+          }
+        },
+        {
+          "key": "screening_day",
+          "label": "יום מיון",
+          "reach": {
+            "low": 0.154825,
+            "high": 0.169717,
+            "mid": 0.162271
+          },
+          "days": {
+            "n": 1808,
+            "mean": 48.5,
+            "median": 37.0,
+            "p25": 22.0,
+            "p75": 64.0,
+            "p90": 105.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 16102,
+              "reached": 2493,
+              "rate": 0.154825
+            },
+            "mature": {
+              "cutoff": "2026-03-31",
+              "followup_days_p90": 105.0,
+              "candidates": 10653,
+              "reached": 1808,
+              "rate": 0.169717
+            }
+          }
+        },
+        {
+          "key": "yachbam",
+          "label": "יחב\"מ",
+          "reach": {
+            "low": 0.080363,
+            "high": 0.098043,
+            "mid": 0.089203
+          },
+          "days": {
+            "n": 902,
+            "mean": 67.1,
+            "median": 63.5,
+            "p25": 39.0,
+            "p75": 92.0,
+            "p90": 122.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 16102,
+              "reached": 1294,
+              "rate": 0.080363
+            },
+            "mature": {
+              "cutoff": "2026-03-14",
+              "followup_days_p90": 122.0,
+              "candidates": 9200,
+              "reached": 902,
+              "rate": 0.098043
+            }
+          }
+        },
+        {
+          "key": "assessment",
+          "label": "מרכז הערכה",
+          "reach": {
+            "low": 0.045274,
+            "high": 0.057397,
+            "mid": 0.051336
+          },
+          "days": {
+            "n": 561,
+            "mean": 71.4,
+            "median": 66.0,
+            "p25": 48.0,
+            "p75": 89.0,
+            "p90": 116.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 16102,
+              "reached": 729,
+              "rate": 0.045274
+            },
+            "mature": {
+              "cutoff": "2026-03-20",
+              "followup_days_p90": 116.0,
+              "candidates": 9774,
+              "reached": 561,
+              "rate": 0.057397
+            }
+          }
+        },
+        {
+          "key": "hire",
+          "label": "גיוס",
+          "reach": {
+            "low": 0.089244,
+            "high": 0.109121,
+            "mid": 0.099183
+          },
+          "days": {
+            "n": 1170,
+            "mean": 71.7,
+            "median": 71.0,
+            "p25": 30.2,
+            "p75": 106.0,
+            "p90": 140.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 16102,
+              "reached": 1437,
+              "rate": 0.089244
+            },
+            "mature": {
+              "cutoff": "2026-04-01",
+              "followup_days_p90": 140.0,
+              "candidates": 10722,
+              "reached": 1170,
+              "rate": 0.109121
+            }
+          }
+        }
+      ]
     },
     {
       "key": "online_invite",
@@ -216,17 +413,179 @@
         "conservative": {
           "cutoff": "2026-05-20",
           "candidates": 4433,
-          "hired": 760,
+          "reached": 760,
           "rate": 0.171441
         },
         "mature": {
           "cutoff": "2026-03-29",
           "followup_days_p90": 143.0,
           "candidates": 2880,
-          "hired": 551,
+          "reached": 551,
           "rate": 0.191319
         }
-      }
+      },
+      "forward": [
+        {
+          "key": "online_day",
+          "label": "יום מיון מקוון",
+          "reach": {
+            "low": 0.620311,
+            "high": 0.624408,
+            "mid": 0.622359
+          },
+          "days": {
+            "n": 2993,
+            "mean": 19.9,
+            "median": 14.0,
+            "p25": 8.0,
+            "p75": 23.0,
+            "p90": 39.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 4433,
+              "reached": 2768,
+              "rate": 0.624408
+            },
+            "mature": {
+              "cutoff": "2026-06-05",
+              "followup_days_p90": 39.0,
+              "candidates": 4825,
+              "reached": 2993,
+              "rate": 0.620311
+            }
+          }
+        },
+        {
+          "key": "screening_day",
+          "label": "יום מיון",
+          "reach": {
+            "low": 0.470562,
+            "high": 0.477432,
+            "mid": 0.473997
+          },
+          "days": {
+            "n": 1703,
+            "mean": 38.5,
+            "median": 28.0,
+            "p25": 19.0,
+            "p75": 49.0,
+            "p90": 81.8
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 4433,
+              "reached": 2086,
+              "rate": 0.470562
+            },
+            "mature": {
+              "cutoff": "2026-04-23",
+              "followup_days_p90": 81.8,
+              "candidates": 3567,
+              "reached": 1703,
+              "rate": 0.477432
+            }
+          }
+        },
+        {
+          "key": "assessment",
+          "label": "מרכז הערכה",
+          "reach": {
+            "low": 0.143469,
+            "high": 0.171026,
+            "mid": 0.157248
+          },
+          "days": {
+            "n": 510,
+            "mean": 64.0,
+            "median": 60.0,
+            "p25": 46.0,
+            "p75": 77.0,
+            "p90": 101.1
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 4433,
+              "reached": 636,
+              "rate": 0.143469
+            },
+            "mature": {
+              "cutoff": "2026-04-03",
+              "followup_days_p90": 101.1,
+              "candidates": 2982,
+              "reached": 510,
+              "rate": 0.171026
+            }
+          }
+        },
+        {
+          "key": "yachbam",
+          "label": "יחב\"מ",
+          "reach": {
+            "low": 0.202346,
+            "high": 0.236862,
+            "mid": 0.219604
+          },
+          "days": {
+            "n": 622,
+            "mean": 69.5,
+            "median": 65.0,
+            "p25": 46.0,
+            "p75": 88.0,
+            "p90": 115.9
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 4433,
+              "reached": 897,
+              "rate": 0.202346
+            },
+            "mature": {
+              "cutoff": "2026-03-20",
+              "followup_days_p90": 115.9,
+              "candidates": 2626,
+              "reached": 622,
+              "rate": 0.236862
+            }
+          }
+        },
+        {
+          "key": "hire",
+          "label": "גיוס",
+          "reach": {
+            "low": 0.171441,
+            "high": 0.191319,
+            "mid": 0.18138
+          },
+          "days": {
+            "n": 551,
+            "mean": 91.0,
+            "median": 86.0,
+            "p25": 64.0,
+            "p75": 114.5,
+            "p90": 143.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 4433,
+              "reached": 760,
+              "rate": 0.171441
+            },
+            "mature": {
+              "cutoff": "2026-03-29",
+              "followup_days_p90": 143.0,
+              "candidates": 2880,
+              "reached": 551,
+              "rate": 0.191319
+            }
+          }
+        }
+      ]
     },
     {
       "key": "online_day",
@@ -235,9 +594,9 @@
       "has_data": true,
       "note": "",
       "hire_rate": {
-        "low": 0.230618,
-        "high": 0.243734,
-        "mid": 0.237176
+        "low": 0.224157,
+        "high": 0.237559,
+        "mid": 0.230858
       },
       "days_to_hire": {
         "n": 654,
@@ -295,17 +654,147 @@
         "conservative": {
           "cutoff": "2026-05-20",
           "candidates": 3560,
-          "hired": 821,
-          "rate": 0.230618
+          "reached": 798,
+          "rate": 0.224157
         },
         "mature": {
           "cutoff": "2026-04-15",
           "followup_days_p90": 126.0,
           "candidates": 2753,
-          "hired": 671,
-          "rate": 0.243734
+          "reached": 654,
+          "rate": 0.237559
         }
-      }
+      },
+      "forward": [
+        {
+          "key": "screening_day",
+          "label": "יום מיון",
+          "reach": {
+            "low": 0.534551,
+            "high": 0.536605,
+            "mid": 0.535578
+          },
+          "days": {
+            "n": 1957,
+            "mean": 21.8,
+            "median": 14.0,
+            "p25": 7.0,
+            "p75": 25.0,
+            "p90": 46.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 3560,
+              "reached": 1903,
+              "rate": 0.534551
+            },
+            "mature": {
+              "cutoff": "2026-05-29",
+              "followup_days_p90": 46.0,
+              "candidates": 3647,
+              "reached": 1957,
+              "rate": 0.536605
+            }
+          }
+        },
+        {
+          "key": "assessment",
+          "label": "מרכז הערכה",
+          "reach": {
+            "low": 0.19382,
+            "high": 0.205128,
+            "mid": 0.199474
+          },
+          "days": {
+            "n": 600,
+            "mean": 48.3,
+            "median": 43.0,
+            "p25": 30.0,
+            "p75": 60.0,
+            "p90": 80.1
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 3560,
+              "reached": 690,
+              "rate": 0.19382
+            },
+            "mature": {
+              "cutoff": "2026-04-24",
+              "followup_days_p90": 80.1,
+              "candidates": 2925,
+              "reached": 600,
+              "rate": 0.205128
+            }
+          }
+        },
+        {
+          "key": "yachbam",
+          "label": "יחב\"מ",
+          "reach": {
+            "low": 0.257022,
+            "high": 0.277627,
+            "mid": 0.267325
+          },
+          "days": {
+            "n": 716,
+            "mean": 54.5,
+            "median": 49.0,
+            "p25": 32.0,
+            "p75": 70.0,
+            "p90": 98.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 3560,
+              "reached": 915,
+              "rate": 0.257022
+            },
+            "mature": {
+              "cutoff": "2026-04-07",
+              "followup_days_p90": 98.0,
+              "candidates": 2579,
+              "reached": 716,
+              "rate": 0.277627
+            }
+          }
+        },
+        {
+          "key": "hire",
+          "label": "גיוס",
+          "reach": {
+            "low": 0.224157,
+            "high": 0.237559,
+            "mid": 0.230858
+          },
+          "days": {
+            "n": 654,
+            "mean": 72.6,
+            "median": 66.0,
+            "p25": 46.2,
+            "p75": 92.0,
+            "p90": 126.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 3560,
+              "reached": 798,
+              "rate": 0.224157
+            },
+            "mature": {
+              "cutoff": "2026-04-15",
+              "followup_days_p90": 126.0,
+              "candidates": 2753,
+              "reached": 654,
+              "rate": 0.237559
+            }
+          }
+        }
+      ]
     },
     {
       "key": "screening_day",
@@ -374,17 +863,115 @@
         "conservative": {
           "cutoff": "2026-05-20",
           "candidates": 2455,
-          "hired": 1004,
+          "reached": 1004,
           "rate": 0.408961
         },
         "mature": {
           "cutoff": "2026-04-30",
           "followup_days_p90": 111.0,
           "candidates": 2055,
-          "hired": 897,
+          "reached": 897,
           "rate": 0.436496
         }
-      }
+      },
+      "forward": [
+        {
+          "key": "assessment",
+          "label": "מרכז הערכה",
+          "reach": {
+            "low": 0.350713,
+            "high": 0.352841,
+            "mid": 0.351777
+          },
+          "days": {
+            "n": 832,
+            "mean": 34.2,
+            "median": 29.0,
+            "p25": 21.0,
+            "p75": 42.0,
+            "p90": 58.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 2455,
+              "reached": 861,
+              "rate": 0.350713
+            },
+            "mature": {
+              "cutoff": "2026-05-17",
+              "followup_days_p90": 58.0,
+              "candidates": 2358,
+              "reached": 832,
+              "rate": 0.352841
+            }
+          }
+        },
+        {
+          "key": "yachbam",
+          "label": "יחב\"מ",
+          "reach": {
+            "low": 0.481466,
+            "high": 0.493043,
+            "mid": 0.487255
+          },
+          "days": {
+            "n": 1063,
+            "mean": 39.2,
+            "median": 34.0,
+            "p25": 22.0,
+            "p75": 48.0,
+            "p90": 70.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 2455,
+              "reached": 1182,
+              "rate": 0.481466
+            },
+            "mature": {
+              "cutoff": "2026-05-05",
+              "followup_days_p90": 70.0,
+              "candidates": 2156,
+              "reached": 1063,
+              "rate": 0.493043
+            }
+          }
+        },
+        {
+          "key": "hire",
+          "label": "גיוס",
+          "reach": {
+            "low": 0.408961,
+            "high": 0.436496,
+            "mid": 0.422729
+          },
+          "days": {
+            "n": 897,
+            "mean": 62.4,
+            "median": 56.0,
+            "p25": 37.0,
+            "p75": 80.0,
+            "p90": 111.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 2455,
+              "reached": 1004,
+              "rate": 0.408961
+            },
+            "mature": {
+              "cutoff": "2026-04-30",
+              "followup_days_p90": 111.0,
+              "candidates": 2055,
+              "reached": 897,
+              "rate": 0.436496
+            }
+          }
+        }
+      ]
     },
     {
       "key": "assessment",
@@ -453,17 +1040,83 @@
         "conservative": {
           "cutoff": "2026-05-20",
           "candidates": 908,
-          "hired": 455,
+          "reached": 455,
           "rate": 0.501101
         },
         "mature": {
           "cutoff": "2026-05-31",
           "followup_days_p90": 80.0,
           "candidates": 968,
-          "hired": 487,
+          "reached": 487,
           "rate": 0.503099
         }
-      }
+      },
+      "forward": [
+        {
+          "key": "yachbam",
+          "label": "יחב\"מ",
+          "reach": {
+            "low": 0.532755,
+            "high": 0.550661,
+            "mid": 0.541708
+          },
+          "days": {
+            "n": 553,
+            "mean": 15.4,
+            "median": 11.0,
+            "p25": 7.0,
+            "p75": 18.0,
+            "p90": 30.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 908,
+              "reached": 500,
+              "rate": 0.550661
+            },
+            "mature": {
+              "cutoff": "2026-06-14",
+              "followup_days_p90": 30.0,
+              "candidates": 1038,
+              "reached": 553,
+              "rate": 0.532755
+            }
+          }
+        },
+        {
+          "key": "hire",
+          "label": "גיוס",
+          "reach": {
+            "low": 0.501101,
+            "high": 0.503099,
+            "mid": 0.5021
+          },
+          "days": {
+            "n": 487,
+            "mean": 40.1,
+            "median": 31.0,
+            "p25": 17.0,
+            "p75": 52.0,
+            "p90": 80.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 908,
+              "reached": 455,
+              "rate": 0.501101
+            },
+            "mature": {
+              "cutoff": "2026-05-31",
+              "followup_days_p90": 80.0,
+              "candidates": 968,
+              "reached": 487,
+              "rate": 0.503099
+            }
+          }
+        }
+      ]
     },
     {
       "key": "yachbam",
@@ -472,9 +1125,9 @@
       "has_data": true,
       "note": "",
       "hire_rate": {
-        "low": 0.774815,
-        "high": 0.779518,
-        "mid": 0.777166
+        "low": 0.77284,
+        "high": 0.777711,
+        "mid": 0.775275
       },
       "days_to_hire": {
         "n": 1565,
@@ -532,17 +1185,51 @@
         "conservative": {
           "cutoff": "2026-05-20",
           "candidates": 1660,
-          "hired": 1294,
-          "rate": 0.779518
+          "reached": 1291,
+          "rate": 0.777711
         },
         "mature": {
           "cutoff": "2026-06-23",
           "followup_days_p90": 57.0,
           "candidates": 2025,
-          "hired": 1569,
-          "rate": 0.774815
+          "reached": 1565,
+          "rate": 0.77284
         }
-      }
+      },
+      "forward": [
+        {
+          "key": "hire",
+          "label": "גיוס",
+          "reach": {
+            "low": 0.77284,
+            "high": 0.777711,
+            "mid": 0.775275
+          },
+          "days": {
+            "n": 1565,
+            "mean": 25.3,
+            "median": 17.0,
+            "p25": 8.0,
+            "p75": 36.0,
+            "p90": 57.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 1660,
+              "reached": 1291,
+              "rate": 0.777711
+            },
+            "mature": {
+              "cutoff": "2026-06-23",
+              "followup_days_p90": 57.0,
+              "candidates": 2025,
+              "reached": 1565,
+              "rate": 0.77284
+            }
+          }
+        }
+      ]
     }
   ]
 }

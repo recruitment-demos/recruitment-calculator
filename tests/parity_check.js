@@ -32,24 +32,28 @@ const scenarios = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
 const results = [];
 
 for (const sc of scenarios) {
-  if (sc.op === "project_hires") {
-    results.push(Engine.projectHires(sc.stage, sc.count));
-  } else if (sc.op === "required_for_target") {
-    results.push(Engine.requiredForTarget(sc.stage, sc.target));
-  } else if (sc.op === "convert") {
-    results.push(Engine.convert(sc.from, sc.count, sc.to));
-  } else if (sc.op === "fill_from") {
-    results.push(Engine.fillFrom(sc.stage, sc.count));
-  } else if (sc.op === "required_funnel") {
-    results.push(Engine.requiredFunnel(sc.target));
+  if (sc.op === "rate") {
+    results.push(Engine.rate(sc.stage));
+  } else if (sc.op === "forward") {
+    results.push(Engine.forward(sc.stage));
+  } else if (sc.op === "project_cohort") {
+    results.push(Engine.projectCohort(sc.stage, sc.count));
   } else if (sc.op === "timeline") {
     results.push(Engine.timeline(sc.stage, sc.count));
-  } else if (sc.op === "gap_analysis") {
-    results.push(Engine.gapAnalysis(sc.counts, sc.target));
-  } else if (sc.op === "rate") {
-    results.push(Engine.rate(sc.stage));
+  } else if (sc.op === "combine") {
+    results.push(Engine.combine(sc.counts));
+  } else if (sc.op === "cross_check") {
+    results.push(Engine.crossCheck(sc.counts));
+  } else if (sc.op === "required_for_target") {
+    results.push(Engine.requiredForTarget(sc.stage, sc.target));
+  } else if (sc.op === "required_funnel") {
+    results.push(Engine.requiredFunnel(sc.target));
+  } else if (sc.op === "target_verdict") {
+    results.push(Engine.targetVerdict(sc.projected, sc.target));
+  } else if (sc.op === "label") {
+    results.push(Engine.label(sc.stage));
   } else {
-    console.error("\u05e4\u05e2\u05d5\u05dc\u05d4 \u05dc\u05d0 \u05de\u05d5\u05db\u05e8\u05ea: " + sc.op);
+    console.error("unknown op: " + sc.op);
     process.exit(1);
   }
 }

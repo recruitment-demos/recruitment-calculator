@@ -20,13 +20,19 @@ function makeEl(tag) {
     children: [],
     style: {},
     attributes: {},
+    value: "",
     _text: "",
     _html: "",
     classList: {
       _s: new Set(),
       add(...c) { c.forEach(x => this._s.add(x)); },
       remove(...c) { c.forEach(x => this._s.delete(x)); },
-      contains(c) { return this._s.has(c); }
+      contains(c) { return this._s.has(c); },
+      toggle(c, force) {
+        const on = force === undefined ? !this._s.has(c) : !!force;
+        if (on) this._s.add(c); else this._s.delete(c);
+        return on;
+      }
     },
     setAttribute(k, v) { this.attributes[k] = v; },
     append(...kids) { kids.forEach(k => this.children.push(k)); },
@@ -76,29 +82,33 @@ function check(name, fn) {
   }
 }
 
-const stageKeys = sandbox.DATA.stages.map(s => s.key);
-const withData = sandbox.DATA.stages.filter(s => s.has_data).map(s => s.key);
+const D = sandbox.DATA;
+const stageKeys = D.stages.map(s => s.key);
+const withData = D.stages.filter(s => s.has_data).map(s => s.key);
 const setVal = (id, v) => { registry["in_" + id].value = v; };
 const clearAll = () => { stageKeys.forEach(k => setVal(k, "")); setVal("target", ""); };
 const shown = id => !registry[id].classList.contains("hidden");
 const revealed = id => registry[id].classList.contains("in");
 const num = s => Number(String(s).replace(/[^0-9]/g, ""));
+const allText = node => {
+  let out = node.textContent || "";
+  (node.children || []).forEach(c => { out += " " + allText(c); });
+  return out;
+};
 
 check("שדות הקלט נבנו", () =>
-  stageKeys.every(k => registry["in_" + k]) && registry.in_target
-    ? null : "חסר שדה קלט");
+  stageKeys.every(k => registry["in_" + k]) && registry.in_target ? null : "חסר שדה קלט");
 
 check("חותמת הנתונים הוצגה", () =>
   registry.stamp.textContent.length > 40 ? null : "חותמת ריקה");
 
-check("פאנל בסיס הנתונים הוצג", () =>
-  registry.basisBody.innerHTML.includes("<table") ? null : "אין טבלת בסיס");
-
-check("טבלת הבסיס מציגה יחס יחיד ולא טווח", () =>
-  registry.basisBody.innerHTML.includes("<strong>") ? null : "אין יחס מודגש");
+check("טבלת המעברים הוצגה", () => {
+  const h = registry.basisBody.innerHTML;
+  return h.includes("<table") && h.includes("<strong>") ? null : "אין טבלת מעברים";
+});
 
 check("רשימת המגבלות הוצגה", () =>
-  (registry.limitsBody.innerHTML.match(/<li>/g) || []).length >= 6
+  (registry.limitsBody.innerHTML.match(/<li>/g) || []).length >= 8
     ? null : "פחות מדי מגבלות");
 
 check("בלי קלט התוצאות נשארות מוסתרות", () => {
@@ -108,49 +118,83 @@ check("בלי קלט התוצאות נשארות מוסתרות", () => {
 });
 
 for (const key of withData) {
-  check("חישוב קדימה משלב " + key, () => {
+  check("גזירה קדימה משלב " + key, () => {
     clearAll();
-    setVal(key, "500");
+    setVal(key, "1000");
     sandbox.calculate();
     if (!shown("results")) return "אזור התוצאות מוסתר";
-    if (!revealed("heroCard")) return "כרטיס התוצאה לא הופיע";
-    if (!revealed("funnelCard")) return "המשפך לא הופיע";
-    if (!revealed("timelineCard")) return "ציר הזמן לא הופיע";
-    if (registry.funnelBody.children.length !== stageKeys.length + 1)
-      return "מספר שורות משפך שגוי";
-    if (registry.timelineBody.children.length !== sandbox.DATA.time_buckets.length)
-      return "מספר דליי זמן שגוי";
-    if (!registry.heroCap.textContent.includes("מגויסים")) return "כותרת שגויה";
-    if (!registry.heroNote.textContent.includes("500")) return "אין הסבר לתוצאה";
-    const hero = num(registry.heroValue.textContent);
-    if (!(hero > 0)) return "מספר המגויסים אינו חיובי";
-    if (!registry.timelineSub.textContent.includes("חציון")) return "אין תיאור לציר הזמן";
+    ["heroCard", "funnelCard", "whenCard", "gapCard"].forEach(id => {
+      if (!revealed(id)) throw new Error("הכרטיס " + id + " לא הופיע");
+    });
+    const proj = sandbox.Engine.projectCohort(key, 1000);
+    if (num(registry.heroValue.textContent) !== proj.hires)
+      return "מספר המגויסים אינו תואם את המנוע";
+    // מספר שורות המשפך = שלבי הקבוצה + שלבים ללא נתונים
+    const noData = D.stages.filter(s => !s.has_data).length;
+    if (registry.funnelBody.children.length !== proj.steps.length + noData)
+      return "מספר שורות משפך שגוי: " + registry.funnelBody.children.length;
+    if (!registry.whenBody.children.length) return "גרף הזמנים ריק";
     return null;
   });
 }
 
-check("מספר המגויסים תואם את המנוע", () => {
-  clearAll();
-  setVal("online_day", "1000");
-  sandbox.calculate();
-  const expected = sandbox.Engine.fillFrom("online_day", 1000).hires;
-  const shownVal = num(registry.heroValue.textContent);
-  return shownVal === expected ? null : "הוצג " + shownVal + " במקום " + expected;
-});
-
-check("אין טווחים בתצוגה", () => {
+check("כל מספר במשפך מסומן ממה נגזר", () => {
   clearAll();
   setVal("file_check", "5000");
-  setVal("target", "300");
   sandbox.calculate();
-  const texts = [registry.heroValue.textContent]
-    .concat(registry.funnelBody.children.map(r =>
-      r.children.map(c => c.textContent).join(" ")))
-    .concat(registry.gapBody.children.map(c => c.textContent))
-    .concat(registry.timelineBody.children.map(r =>
-      r.children.map(c => c.textContent).join(" ")));
-  const bad = texts.find(t => /\d\s*[-–]\s*\d/.test(t));
-  return bad ? "נמצא טווח בתצוגה: " + bad : null;
+  const rows = registry.funnelBody.children;
+  const missing = rows.filter(r =>
+    !r.children.some(c => c.classList.contains("fsrc") && c.textContent.length > 3));
+  return missing.length ? missing.length + " שורות בלי מקור" : null;
+});
+
+check("אין גזירה לאחור", () => {
+  clearAll();
+  setVal("yachbam", "300");
+  sandbox.calculate();
+  const text = allText(registry.funnelBody);
+  // בדיקת קבצים קודמת ליחב"מ ולכן אסור שתופיע עם מספר גזור
+  const proj = sandbox.Engine.projectCohort("yachbam", 300);
+  const keys = proj.steps.map(s => s.key);
+  return keys.indexOf("file_check") === -1 && !text.includes("בדיקת קבצים ")
+    ? null : "הופיע שלב מוקדם יותר";
+});
+
+check("גרף הזמנים מציג שלב, כמות וימים", () => {
+  clearAll();
+  setVal("file_check", "5000");
+  sandbox.calculate();
+  const proj = sandbox.Engine.projectCohort("file_check", 5000);
+  const rows = registry.whenBody.children[0].children
+    .filter(c => c.classList.contains("tl"))[0].children
+    .filter(c => c.classList.contains("tlrow"));
+  if (rows.length !== proj.steps.length - 1)
+    return "מספר שורות זמן שגוי: " + rows.length;
+  const txt = allText(rows[0]);
+  return txt.includes("מועמדים") ? null : "אין כמות בשורת הזמן";
+});
+
+check("שתי קבוצות מסתכמות ומזהירות מכפילות", () => {
+  clearAll();
+  setVal("file_check", "5000");
+  setVal("yachbam", "300");
+  sandbox.calculate();
+  const a = sandbox.Engine.projectCohort("file_check", 5000).hires;
+  const b = sandbox.Engine.projectCohort("yachbam", 300).hires;
+  if (num(registry.heroValue.textContent) !== a + b) return "הסכום שגוי";
+  const warned = registry.gapBody.children.some(c => c.classList.contains("warn"));
+  if (!warned) return "אין אזהרת חפיפה";
+  if (registry.whenBody.children.length !== 2) return "אין גרף זמנים לכל קבוצה";
+  return null;
+});
+
+check("בדיקת עקביות מוצגת", () => {
+  clearAll();
+  setVal("file_check", "5000");
+  setVal("yachbam", "10");
+  sandbox.calculate();
+  return registry.gapBody.children.some(c => c.textContent.includes("חסרים"))
+    ? null : "לא הוצגה בדיקת עקביות";
 });
 
 check("חישוב לאחור מיעד בלבד", () => {
@@ -160,18 +204,18 @@ check("חישוב לאחור מיעד בלבד", () => {
   if (!shown("results")) return "אזור התוצאות מוסתר";
   if (num(registry.heroValue.textContent) !== 400) return "היעד לא הוצג";
   if (!registry.heroCap.textContent.includes("יעד")) return "כותרת שגויה";
-  if (!registry.timelineCard.classList.contains("hidden"))
-    return "ציר הזמן היה צריך להיות מוסתר";
-  return registry.gapBody.children.length > 0 ? null : "אין הודעת הסבר";
+  if (shown("whenCard")) return "גרף הזמנים היה צריך להיות מוסתר";
+  if (shown("timelineCard")) return "גרף ההתפלגות היה צריך להיות מוסתר";
+  return null;
 });
 
-check("שני שלבים מייצרים ניתוח פערים", () => {
+check("יעד מול תחזית", () => {
   clearAll();
-  setVal("file_check", "100");
-  setVal("yachbam", "400");
+  setVal("file_check", "5000");
+  setVal("target", "400");
   sandbox.calculate();
-  return registry.gapBody.children.some(c => c.classList.contains("bad"))
-    ? null : "לא הוצג חוסר";
+  return registry.gapBody.children.some(c => c.textContent.includes("יעד הגיוס"))
+    ? null : "אין הודעת יעד";
 });
 
 check("שלב ללא נתונים מפיק אזהרה ולא תחזית", () => {
@@ -181,7 +225,29 @@ check("שלב ללא נתונים מפיק אזהרה ולא תחזית", () => 
   sandbox.calculate();
   const warned = registry.gapBody.children.some(
     c => c.classList.contains("warn") && c.textContent.includes("הגשות"));
-  return warned ? null : "לא הוצגה אזהרה על שלב ללא נתונים";
+  const cohorts = sandbox.Engine.combine({ submissions: 9999, yachbam: 100 }).cohorts;
+  if (cohorts.length !== 1) return "שלב ללא נתונים נכנס לחישוב";
+  return warned ? null : "לא הוצגה אזהרה";
+});
+
+check("אין טווחים בתצוגה", () => {
+  clearAll();
+  setVal("file_check", "5000");
+  setVal("target", "300");
+  sandbox.calculate();
+  const texts = [registry.heroValue.textContent, allText(registry.funnelBody),
+                 allText(registry.whenBody), allText(registry.timelineBody),
+                 allText(registry.gapBody)];
+  const bad = texts.find(t => /\d\s*[-–]\s*\d/.test(t));
+  return bad ? "נמצא טווח בתצוגה" : null;
+});
+
+check("הסרגל הדביק מקבל את המספר", () => {
+  clearAll();
+  setVal("file_check", "5000");
+  sandbox.calculate();
+  const hires = sandbox.Engine.projectCohort("file_check", 5000).hires;
+  return num(registry.stickyValue.textContent) === hires ? null : "הסרגל לא עודכן";
 });
 
 check("איפוס מנקה הכל", () => {
@@ -195,4 +261,4 @@ if (fails.length) {
   fails.forEach(f => console.error("  " + f));
   process.exit(1);
 }
-console.log("כל בדיקות הממשק עברו (" + (stageKeys.length + 10) + " תרחישים)");
+console.log("כל בדיקות הממשק עברו");

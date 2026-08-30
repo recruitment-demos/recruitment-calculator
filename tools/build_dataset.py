@@ -6,21 +6,26 @@
 
 שיטת החישוב
 -----------
-ספירה ברמת מועמד ייחודי: מועמד שהופיע כמה פעמים באותו שלב נספר פעם אחת.
+ספירה ברמת מועמד ייחודי: מועמד שהופיע כמה פעמים באותו שלב נספר פעם אחת,
+לפי מועד הפעילות הראשונה שלו באותו שלב.
 
-לכל שלב מחושב יחס המרה לגיוס כטווח, מפני שהנתונים קטועים מימין
-(right-censoring): מועמד שביצע פעילות סמוך לסוף התקופה עדיין לא הספיק
-להתגייס, ולכן ייראה כמי שלא התגייס.
+לכל זוג שלבים (משלב מקור לשלב יעד מאוחר יותר) נמדדים שני דברים:
+  שיעור הגעה - איזה חלק מהמועמדים שהיו בשלב המקור הגיעו בפועל לשלב היעד.
+  זמן הגעה   - כמה ימים חלפו בין השלבים.
+שלב היעד יכול להיות גם הגיוס עצמו, ואז שיעור ההגעה הוא יחס הגיוס.
 
-  גבול תחתון  - כל המועמדים עד תאריך החיתוך הקבוע שב-config, מול הגיוסים
-                שלהם בכל אורך הקובץ. שלבים מאוחרים בחלון עדיין לא הבשילו,
-                ולכן היחס הזה נוטה כלפי מטה.
-  גבול עליון  - רק קוהורטים שהספיקו להבשיל: תאריך החיתוך לכל שלב נקבע
-                כתאריך הגיוס האחרון בקובץ פחות האחוזון ה-90 של זמן הגיוס
-                באותו שלב (חישוב איטרטיבי עד להתכנסות).
+כל שיעור נמדד בשני בסיסים, מפני שהנתונים קטועים מימין (right-censoring):
+מועמד שביצע פעילות סמוך לסוף התקופה עדיין לא הספיק להתקדם, ולכן ייראה
+כמי שלא הגיע לשלב הבא.
 
-זמני הגיוס נמדדים מהפעילות הראשונה של המועמד בשלב ועד לגיוסו הראשון,
-על קוהורט הבשל בלבד.
+  בסיס א' - כל המועמדים עד תאריך החיתוך הקבוע שב-config, מול ההגעות
+            שלהם בכל אורך הקובץ. שלבים מאוחרים בחלון עדיין לא הבשילו,
+            ולכן השיעור הזה נוטה כלפי מטה.
+  בסיס ב' - רק קוהורטים שהספיקו להבשיל: תאריך החיתוך נקבע כתאריך האירוע
+            האחרון בקובץ פחות האחוזון ה-90 של זמן ההגעה (חישוב איטרטיבי
+            עד להתכנסות).
+
+השיעור שבשימוש הוא הממוצע בין השניים. שני הבסיסים נשמרים בקובץ הפלט.
 """
 
 import json
@@ -33,6 +38,9 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "config" / "params.json"
 OUT_PATH = ROOT / "data" / "recruitment_data.json"
+
+HIRE_KEY = "hire"
+HIRE_LABEL = "גיוס"
 
 
 def load_config():
@@ -77,45 +85,27 @@ def load_sources(cfg):
     return act, rec
 
 
-def bucket_shares(days, buckets):
-    """התפלגות סדרת ימים לפי הדליים שהוגדרו ב-config."""
-    n = len(days)
-    out = []
-    for b in buckets:
-        if n == 0:
-            share = None
-        else:
-            mask = days >= b["min_days"]
-            if b["max_days"] is not None:
-                mask &= days <= b["max_days"]
-            share = round(float(mask.mean()), 6)
-        out.append({
-            "key": b["key"],
-            "label": b["label"],
-            "min_days": b["min_days"],
-            "max_days": b["max_days"],
-            "share": share,
-        })
-    return out
+def days_between(cohort, event_dates):
+    """ימים מהאירוע בשלב המקור עד האירוע בשלב היעד, למי שהגיע."""
+    joined = cohort.to_frame("from").join(event_dates.rename("to"), how="inner")
+    joined["days"] = (joined["to"] - joined["from"]).dt.days
+    return joined.loc[joined["days"] >= 0, "days"]
 
 
-def mature_cutoff(first_activity, hire_date, last_hire, percentile, iterations):
-    """חיתוך הבשלה לשלב: הרחקה מסוף הקובץ באורך האחוזון ה-90 של זמן הגיוס.
+def mature_cutoff(source_dates, event_dates, horizon, percentile, iterations):
+    """חיתוך הבשלה: הרחקה מסוף הקובץ באורך האחוזון ה-90 של זמן ההגעה.
 
-    מחושב איטרטיבית - האחוזון עצמו מושפע מהחיתוך, ולכן חוזרים עד להתכנסות.
+    האחוזון עצמו מושפע מהחיתוך, ולכן חוזרים עד להתכנסות.
     מחזיר (תאריך חיתוך, ערך האחוזון בימים).
     """
-    cut = last_hire
+    cut = horizon
     p = None
     for _ in range(iterations):
-        cohort = first_activity[first_activity <= cut]
-        joined = cohort.to_frame("act").join(hire_date.rename("hire"), how="inner")
-        joined["days"] = (joined["hire"] - joined["act"]).dt.days
-        joined = joined[joined["days"] >= 0]
-        if joined.empty:
+        days = days_between(source_dates[source_dates <= cut], event_dates)
+        if days.empty:
             return cut, None
-        p = float(joined["days"].quantile(percentile))
-        cut = last_hire - pd.Timedelta(days=p)
+        p = float(days.quantile(percentile))
+        cut = horizon - pd.Timedelta(days=p)
     return cut, p
 
 
@@ -132,82 +122,87 @@ def days_stats(days):
     }
 
 
-def build_stage(stage_cfg, act, hire_date, hired_ids, cfg, last_hire, conservative_date):
-    label = stage_cfg["label"]
-    activity_type = stage_cfg["activity_type"]
+def bucket_shares(days, buckets):
+    """התפלגות סדרת ימים לפי הדליים שהוגדרו ב-config."""
+    n = len(days)
+    out = []
+    for b in buckets:
+        if n == 0:
+            share = None
+        else:
+            mask = days >= b["min_days"]
+            if b["max_days"] is not None:
+                mask &= days <= b["max_days"]
+            share = round(float(mask.mean()), 6)
+        out.append({
+            "key": b["key"], "label": b["label"],
+            "min_days": b["min_days"], "max_days": b["max_days"],
+            "share": share,
+        })
+    return out
 
-    if activity_type is None:
-        # שלב שאין לו מקור בקבצים - נרשם במפורש כחסר ולא מוערך.
-        return {
-            "key": stage_cfg["key"],
-            "label": label,
-            "activity_type": None,
-            "has_data": False,
-            "note": stage_cfg.get("note", ""),
-            "hire_rate": None,
-            "days_to_hire": None,
-            "buckets": None,
-            "basis": None,
-        }
 
-    rows = act[act["activity"] == activity_type]
-    if rows.empty:
-        sys.exit(f"סוג הפעילות '{activity_type}' לא נמצא בקובץ הפעילויות.")
+def reached_ids_after(cohort, event_dates):
+    """מי מהקוהורט הגיע לשלב היעד *אחרי* השלב שממנו מודדים.
 
-    first_activity = rows.groupby("candidate")["date"].min()
+    מועמד שביצע את פעילות היעד לפני שלב המקור אינו "הגיע" - זו הגשה
+    חוזרת או רישום קודם, ולא התקדמות במשפך.
+    """
+    joined = cohort.to_frame("from").join(event_dates.rename("to"), how="inner")
+    return set(joined.index[joined["to"] >= joined["from"]])
 
-    # --- גבול תחתון: חלון קבוע, גיוסים לאורך כל הקובץ ---
-    cons_cohort = first_activity[first_activity <= conservative_date]
+
+def measure(source_dates, event_dates, horizon, conservative_date, cfg,
+            want_buckets=False):
+    """מדידת שיעור הגעה וזמן הגעה משלב מקור לשלב יעד, בשני בסיסים."""
+    cons_cohort = source_dates[source_dates <= conservative_date]
     cons_n = int(len(cons_cohort))
-    cons_hired = int(len(set(cons_cohort.index) & hired_ids))
+    cons_reached = int(len(reached_ids_after(cons_cohort, event_dates)))
 
-    # --- גבול עליון: קוהורט בשל בלבד ---
     cut, p90 = mature_cutoff(
-        first_activity, hire_date, last_hire,
+        source_dates, event_dates, horizon,
         cfg["cutoff"]["mature_percentile"], cfg["cutoff"]["mature_iterations"],
     )
-    mat_cohort = first_activity[first_activity <= cut]
+    mat_cohort = source_dates[source_dates <= cut]
     mat_n = int(len(mat_cohort))
-    mat_hired = int(len(set(mat_cohort.index) & hired_ids))
+    mat_reached = int(len(reached_ids_after(mat_cohort, event_dates)))
 
-    cons_rate = cons_hired / cons_n if cons_n else None
-    mat_rate = mat_hired / mat_n if mat_n else None
+    if cons_n == 0 or mat_n == 0:
+        return None
+
+    cons_rate = cons_reached / cons_n
+    mat_rate = mat_reached / mat_n
     low, high = sorted([cons_rate, mat_rate])
 
-    # --- זמני גיוס על הקוהורט הבשל ---
-    joined = mat_cohort.to_frame("act").join(hire_date.rename("hire"), how="inner")
-    joined["days"] = (joined["hire"] - joined["act"]).dt.days
-    days = joined.loc[joined["days"] >= 0, "days"]
+    days = days_between(mat_cohort, event_dates)
+    stats = days_stats(days)
+    if stats is None:
+        return None
 
-    return {
-        "key": stage_cfg["key"],
-        "label": label,
-        "activity_type": activity_type,
-        "has_data": True,
-        "note": stage_cfg.get("note", ""),
-        "hire_rate": {
+    out = {
+        "reach": {
             "low": round(low, 6),
             "high": round(high, 6),
             "mid": round((low + high) / 2, 6),
         },
-        "days_to_hire": days_stats(days),
-        "buckets": bucket_shares(days, cfg["time_buckets"]),
+        "days": stats,
         "basis": {
             "conservative": {
                 "cutoff": conservative_date.date().isoformat(),
-                "candidates": cons_n,
-                "hired": cons_hired,
-                "rate": round(cons_rate, 6) if cons_rate is not None else None,
+                "candidates": cons_n, "reached": cons_reached,
+                "rate": round(cons_rate, 6),
             },
             "mature": {
                 "cutoff": cut.date().isoformat(),
                 "followup_days_p90": round(p90, 1) if p90 is not None else None,
-                "candidates": mat_n,
-                "hired": mat_hired,
-                "rate": round(mat_rate, 6) if mat_rate is not None else None,
+                "candidates": mat_n, "reached": mat_reached,
+                "rate": round(mat_rate, 6),
             },
         },
     }
+    if want_buckets:
+        out["buckets"] = bucket_shares(days, cfg["time_buckets"])
+    return out
 
 
 def main():
@@ -217,12 +212,72 @@ def main():
     hire_date = rec.groupby("candidate")["date"].min()
     hired_ids = set(hire_date.index)
     last_hire = rec["date"].max()
+    last_activity = act["date"].max()
     conservative_date = pd.Timestamp(cfg["cutoff"]["conservative_date"])
 
-    stages = [
-        build_stage(s, act, hire_date, hired_ids, cfg, last_hire, conservative_date)
-        for s in cfg["stages"]
-    ]
+    # מועד הפעילות הראשונה של כל מועמד בכל שלב
+    first = {}
+    for s in cfg["stages"]:
+        if s["activity_type"] is None:
+            continue
+        rows = act[act["activity"] == s["activity_type"]]
+        if rows.empty:
+            sys.exit(f"סוג הפעילות '{s['activity_type']}' לא נמצא בקובץ הפעילויות.")
+        first[s["key"]] = rows.groupby("candidate")["date"].min()
+
+    data_keys = [s["key"] for s in cfg["stages"] if s["activity_type"] is not None]
+    stages = []
+
+    for s in cfg["stages"]:
+        if s["activity_type"] is None:
+            # שלב שאין לו מקור בקבצים - נרשם במפורש כחסר ולא מוערך.
+            stages.append({
+                "key": s["key"], "label": s["label"], "activity_type": None,
+                "has_data": False, "note": s.get("note", ""),
+                "hire_rate": None, "days_to_hire": None,
+                "buckets": None, "basis": None, "forward": None,
+            })
+            continue
+
+        src = first[s["key"]]
+        forward = []
+
+        # שלבי היעד: רק שלבים שבאים אחרי השלב הזה בסדר התהליך.
+        # הסדר שב-config תואם את הסדר שנמדד בפועל לפי חציון הימים.
+        later = data_keys[data_keys.index(s["key"]) + 1:]
+        for other in later:
+            m = measure(src, first[other], last_activity, conservative_date, cfg)
+            if m is None or m["days"]["n"] < cfg["min_transition_n"]:
+                continue
+            forward.append({
+                "key": other,
+                "label": next(x["label"] for x in cfg["stages"] if x["key"] == other),
+                "reach": m["reach"], "days": m["days"], "basis": m["basis"],
+            })
+
+        hire_m = measure(src, hire_date, last_hire, conservative_date, cfg,
+                         want_buckets=True)
+        if hire_m is None:
+            sys.exit(f"אין נתוני גיוס לשלב {s['label']}")
+
+        # סדר התצוגה נקבע מהנתונים: לפי חציון הימים עד ההגעה.
+        forward.sort(key=lambda f: f["days"]["median"])
+        forward.append({
+            "key": HIRE_KEY, "label": HIRE_LABEL,
+            "reach": hire_m["reach"], "days": hire_m["days"],
+            "basis": hire_m["basis"],
+        })
+
+        stages.append({
+            "key": s["key"], "label": s["label"],
+            "activity_type": s["activity_type"],
+            "has_data": True, "note": s.get("note", ""),
+            "hire_rate": hire_m["reach"],
+            "days_to_hire": hire_m["days"],
+            "buckets": hire_m["buckets"],
+            "basis": hire_m["basis"],
+            "forward": forward,
+        })
 
     known_types = {s["activity_type"] for s in cfg["stages"] if s["activity_type"]}
     unmapped = sorted(set(act["activity"].dropna().unique()) - known_types)
@@ -230,6 +285,8 @@ def main():
 
     dataset = {
         "gap_tolerance": cfg["gap_tolerance"],
+        "hire_key": HIRE_KEY,
+        "hire_label": HIRE_LABEL,
         "meta": {
             "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "activities_file": cfg["sources"]["activities"]["file"],
@@ -237,7 +294,7 @@ def main():
             "activity_rows": int(len(act)),
             "activity_candidates": int(act["candidate"].nunique()),
             "activity_first": act["date"].min().date().isoformat(),
-            "activity_last": act["date"].max().date().isoformat(),
+            "activity_last": last_activity.date().isoformat(),
             "hire_rows": int(len(rec)),
             "hire_candidates": int(len(hired_ids)),
             "hire_first": rec["date"].min().date().isoformat(),
@@ -259,15 +316,14 @@ def main():
     print(f"  גיוסים:   {len(rec):,} שורות, {len(hired_ids):,} מועמדים ייחודיים")
     for s in stages:
         if not s["has_data"]:
-            print(f"  {s['label']:<20} אין נתונים במקור")
+            print(f"\n  {s['label']}: אין נתונים במקור")
             continue
-        r = s["hire_rate"]
-        d = s["days_to_hire"]
-        print(f"  {s['label']:<20} יחס גיוס {r['mid']*100:5.1f}%   "
-              f"(נמדד {r['low']*100:.1f}% ו-{r['high']*100:.1f}%)   "
-              f"חציון {d['median']:.0f} ימים (n={d['n']:,})")
+        print(f"\n  מתוך «{s['label']}» ממשיכים אל:")
+        for f in s["forward"]:
+            print(f"    {f['label']:<22} {f['reach']['mid']*100:5.1f}%   "
+                  f"חציון {f['days']['median']:>5.0f} ימים   (n={f['days']['n']:,})")
     if unmapped:
-        print(f"  סוגי פעילות שלא מופו: {', '.join(unmapped)}")
+        print(f"\n  סוגי פעילות שלא מופו: {', '.join(unmapped)}")
 
 
 if __name__ == "__main__":
