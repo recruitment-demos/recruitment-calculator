@@ -1,0 +1,543 @@
+{
+  "meta": {
+    "generated_at": "2026-08-30 10:23",
+    "activities_file": "נתונים למערכת/פעילויות למחשבון.xlsx",
+    "hires_file": "נתונים למערכת/גיוסים 20.8.xlsx",
+    "activity_rows": 64038,
+    "activity_candidates": 25811,
+    "activity_first": "2026-01-01",
+    "activity_last": "2026-07-14",
+    "hire_rows": 2331,
+    "hire_candidates": 2328,
+    "hire_first": "2026-01-01",
+    "hire_last": "2026-08-19",
+    "conservative_cutoff": "2026-05-20",
+    "unmapped_activity_types": [],
+    "hires_without_activity": 226
+  },
+  "time_buckets": [
+    {
+      "key": "w1",
+      "label": "עד שבוע",
+      "min_days": 0,
+      "max_days": 7
+    },
+    {
+      "key": "w2",
+      "label": "שבוע עד שבועיים",
+      "min_days": 8,
+      "max_days": 14
+    },
+    {
+      "key": "m1",
+      "label": "שבועיים עד חודש",
+      "min_days": 15,
+      "max_days": 30
+    },
+    {
+      "key": "m2",
+      "label": "חודש עד חודשיים",
+      "min_days": 31,
+      "max_days": 60
+    },
+    {
+      "key": "m3",
+      "label": "חודשיים עד 3 חודשים",
+      "min_days": 61,
+      "max_days": 90
+    },
+    {
+      "key": "m3p",
+      "label": "מעל 3 חודשים",
+      "min_days": 91,
+      "max_days": null
+    }
+  ],
+  "stages": [
+    {
+      "key": "submissions",
+      "label": "הגשות",
+      "activity_type": null,
+      "has_data": false,
+      "note": "אין מקור נתונים לשלב זה בקבצים שהתקבלו. המחשבון לא מציג עבורו יחס המרה.",
+      "hire_rate": null,
+      "days_to_hire": null,
+      "buckets": null,
+      "basis": null
+    },
+    {
+      "key": "file_check",
+      "label": "בדיקת קבצים",
+      "activity_type": "בדיקת קבצים",
+      "has_data": true,
+      "note": "",
+      "hire_rate": {
+        "low": 0.089306,
+        "high": 0.109215,
+        "mid": 0.09926
+      },
+      "days_to_hire": {
+        "n": 1170,
+        "mean": 71.7,
+        "median": 71.0,
+        "p25": 30.2,
+        "p75": 106.0,
+        "p90": 140.0
+      },
+      "buckets": [
+        {
+          "key": "w1",
+          "label": "עד שבוע",
+          "min_days": 0,
+          "max_days": 7,
+          "share": 0.176068
+        },
+        {
+          "key": "w2",
+          "label": "שבוע עד שבועיים",
+          "min_days": 8,
+          "max_days": 14,
+          "share": 0.032479
+        },
+        {
+          "key": "m1",
+          "label": "שבועיים עד חודש",
+          "min_days": 15,
+          "max_days": 30,
+          "share": 0.04188
+        },
+        {
+          "key": "m2",
+          "label": "חודש עד חודשיים",
+          "min_days": 31,
+          "max_days": 60,
+          "share": 0.164103
+        },
+        {
+          "key": "m3",
+          "label": "חודשיים עד 3 חודשים",
+          "min_days": 61,
+          "max_days": 90,
+          "share": 0.231624
+        },
+        {
+          "key": "m3p",
+          "label": "מעל 3 חודשים",
+          "min_days": 91,
+          "max_days": null,
+          "share": 0.353846
+        }
+      ],
+      "basis": {
+        "conservative": {
+          "cutoff": "2026-05-20",
+          "candidates": 16102,
+          "hired": 1438,
+          "rate": 0.089306
+        },
+        "mature": {
+          "cutoff": "2026-04-01",
+          "followup_days_p90": 140.0,
+          "candidates": 10722,
+          "hired": 1171,
+          "rate": 0.109215
+        }
+      }
+    },
+    {
+      "key": "online_invite",
+      "label": "זימון למבחן מקוון",
+      "activity_type": "זימון למבחן מקוון",
+      "has_data": true,
+      "note": "",
+      "hire_rate": {
+        "low": 0.171441,
+        "high": 0.191319,
+        "mid": 0.18138
+      },
+      "days_to_hire": {
+        "n": 551,
+        "mean": 91.0,
+        "median": 86.0,
+        "p25": 64.0,
+        "p75": 114.5,
+        "p90": 143.0
+      },
+      "buckets": [
+        {
+          "key": "w1",
+          "label": "עד שבוע",
+          "min_days": 0,
+          "max_days": 7,
+          "share": 0.005445
+        },
+        {
+          "key": "w2",
+          "label": "שבוע עד שבועיים",
+          "min_days": 8,
+          "max_days": 14,
+          "share": 0.00363
+        },
+        {
+          "key": "m1",
+          "label": "שבועיים עד חודש",
+          "min_days": 15,
+          "max_days": 30,
+          "share": 0.027223
+        },
+        {
+          "key": "m2",
+          "label": "חודש עד חודשיים",
+          "min_days": 31,
+          "max_days": 60,
+          "share": 0.174229
+        },
+        {
+          "key": "m3",
+          "label": "חודשיים עד 3 חודשים",
+          "min_days": 61,
+          "max_days": 90,
+          "share": 0.319419
+        },
+        {
+          "key": "m3p",
+          "label": "מעל 3 חודשים",
+          "min_days": 91,
+          "max_days": null,
+          "share": 0.470054
+        }
+      ],
+      "basis": {
+        "conservative": {
+          "cutoff": "2026-05-20",
+          "candidates": 4433,
+          "hired": 760,
+          "rate": 0.171441
+        },
+        "mature": {
+          "cutoff": "2026-03-29",
+          "followup_days_p90": 143.0,
+          "candidates": 2880,
+          "hired": 551,
+          "rate": 0.191319
+        }
+      }
+    },
+    {
+      "key": "online_day",
+      "label": "יום מיון מקוון",
+      "activity_type": "תוצאות מבחן דפ\"ר",
+      "has_data": true,
+      "note": "",
+      "hire_rate": {
+        "low": 0.230618,
+        "high": 0.243734,
+        "mid": 0.237176
+      },
+      "days_to_hire": {
+        "n": 654,
+        "mean": 72.6,
+        "median": 66.0,
+        "p25": 46.2,
+        "p75": 92.0,
+        "p90": 126.0
+      },
+      "buckets": [
+        {
+          "key": "w1",
+          "label": "עד שבוע",
+          "min_days": 0,
+          "max_days": 7,
+          "share": 0.01682
+        },
+        {
+          "key": "w2",
+          "label": "שבוע עד שבועיים",
+          "min_days": 8,
+          "max_days": 14,
+          "share": 0.019878
+        },
+        {
+          "key": "m1",
+          "label": "שבועיים עד חודש",
+          "min_days": 15,
+          "max_days": 30,
+          "share": 0.06422
+        },
+        {
+          "key": "m2",
+          "label": "חודש עד חודשיים",
+          "min_days": 31,
+          "max_days": 60,
+          "share": 0.334862
+        },
+        {
+          "key": "m3",
+          "label": "חודשיים עד 3 חודשים",
+          "min_days": 61,
+          "max_days": 90,
+          "share": 0.304281
+        },
+        {
+          "key": "m3p",
+          "label": "מעל 3 חודשים",
+          "min_days": 91,
+          "max_days": null,
+          "share": 0.259939
+        }
+      ],
+      "basis": {
+        "conservative": {
+          "cutoff": "2026-05-20",
+          "candidates": 3560,
+          "hired": 821,
+          "rate": 0.230618
+        },
+        "mature": {
+          "cutoff": "2026-04-15",
+          "followup_days_p90": 126.0,
+          "candidates": 2753,
+          "hired": 671,
+          "rate": 0.243734
+        }
+      }
+    },
+    {
+      "key": "screening_day",
+      "label": "יום מיון",
+      "activity_type": "ראיון התאמה",
+      "has_data": true,
+      "note": "",
+      "hire_rate": {
+        "low": 0.408961,
+        "high": 0.436496,
+        "mid": 0.422729
+      },
+      "days_to_hire": {
+        "n": 897,
+        "mean": 62.4,
+        "median": 56.0,
+        "p25": 37.0,
+        "p75": 80.0,
+        "p90": 111.0
+      },
+      "buckets": [
+        {
+          "key": "w1",
+          "label": "עד שבוע",
+          "min_days": 0,
+          "max_days": 7,
+          "share": 0.018952
+        },
+        {
+          "key": "w2",
+          "label": "שבוע עד שבועיים",
+          "min_days": 8,
+          "max_days": 14,
+          "share": 0.018952
+        },
+        {
+          "key": "m1",
+          "label": "שבועיים עד חודש",
+          "min_days": 15,
+          "max_days": 30,
+          "share": 0.119287
+        },
+        {
+          "key": "m2",
+          "label": "חודש עד חודשיים",
+          "min_days": 31,
+          "max_days": 60,
+          "share": 0.404682
+        },
+        {
+          "key": "m3",
+          "label": "חודשיים עד 3 חודשים",
+          "min_days": 61,
+          "max_days": 90,
+          "share": 0.240803
+        },
+        {
+          "key": "m3p",
+          "label": "מעל 3 חודשים",
+          "min_days": 91,
+          "max_days": null,
+          "share": 0.197324
+        }
+      ],
+      "basis": {
+        "conservative": {
+          "cutoff": "2026-05-20",
+          "candidates": 2455,
+          "hired": 1004,
+          "rate": 0.408961
+        },
+        "mature": {
+          "cutoff": "2026-04-30",
+          "followup_days_p90": 111.0,
+          "candidates": 2055,
+          "hired": 897,
+          "rate": 0.436496
+        }
+      }
+    },
+    {
+      "key": "assessment",
+      "label": "מרכז הערכה",
+      "activity_type": "תוצאות מרכז הערכה/מבדק",
+      "has_data": true,
+      "note": "",
+      "hire_rate": {
+        "low": 0.501101,
+        "high": 0.503099,
+        "mid": 0.5021
+      },
+      "days_to_hire": {
+        "n": 487,
+        "mean": 40.1,
+        "median": 31.0,
+        "p25": 17.0,
+        "p75": 52.0,
+        "p90": 80.0
+      },
+      "buckets": [
+        {
+          "key": "w1",
+          "label": "עד שבוע",
+          "min_days": 0,
+          "max_days": 7,
+          "share": 0.045175
+        },
+        {
+          "key": "w2",
+          "label": "שבוע עד שבועיים",
+          "min_days": 8,
+          "max_days": 14,
+          "share": 0.104723
+        },
+        {
+          "key": "m1",
+          "label": "שבועיים עד חודש",
+          "min_days": 15,
+          "max_days": 30,
+          "share": 0.336756
+        },
+        {
+          "key": "m2",
+          "label": "חודש עד חודשיים",
+          "min_days": 31,
+          "max_days": 60,
+          "share": 0.330595
+        },
+        {
+          "key": "m3",
+          "label": "חודשיים עד 3 חודשים",
+          "min_days": 61,
+          "max_days": 90,
+          "share": 0.110883
+        },
+        {
+          "key": "m3p",
+          "label": "מעל 3 חודשים",
+          "min_days": 91,
+          "max_days": null,
+          "share": 0.071869
+        }
+      ],
+      "basis": {
+        "conservative": {
+          "cutoff": "2026-05-20",
+          "candidates": 908,
+          "hired": 455,
+          "rate": 0.501101
+        },
+        "mature": {
+          "cutoff": "2026-05-31",
+          "followup_days_p90": 80.0,
+          "candidates": 968,
+          "hired": 487,
+          "rate": 0.503099
+        }
+      }
+    },
+    {
+      "key": "yachbam",
+      "label": "יחב\"מ",
+      "activity_type": "תשובת יחב\"מ",
+      "has_data": true,
+      "note": "",
+      "hire_rate": {
+        "low": 0.774815,
+        "high": 0.779518,
+        "mid": 0.777166
+      },
+      "days_to_hire": {
+        "n": 1565,
+        "mean": 25.3,
+        "median": 17.0,
+        "p25": 8.0,
+        "p75": 36.0,
+        "p90": 57.0
+      },
+      "buckets": [
+        {
+          "key": "w1",
+          "label": "עד שבוע",
+          "min_days": 0,
+          "max_days": 7,
+          "share": 0.244728
+        },
+        {
+          "key": "w2",
+          "label": "שבוע עד שבועיים",
+          "min_days": 8,
+          "max_days": 14,
+          "share": 0.182748
+        },
+        {
+          "key": "m1",
+          "label": "שבועיים עד חודש",
+          "min_days": 15,
+          "max_days": 30,
+          "share": 0.267093
+        },
+        {
+          "key": "m2",
+          "label": "חודש עד חודשיים",
+          "min_days": 31,
+          "max_days": 60,
+          "share": 0.226837
+        },
+        {
+          "key": "m3",
+          "label": "חודשיים עד 3 חודשים",
+          "min_days": 61,
+          "max_days": 90,
+          "share": 0.051118
+        },
+        {
+          "key": "m3p",
+          "label": "מעל 3 חודשים",
+          "min_days": 91,
+          "max_days": null,
+          "share": 0.027476
+        }
+      ],
+      "basis": {
+        "conservative": {
+          "cutoff": "2026-05-20",
+          "candidates": 1660,
+          "hired": 1294,
+          "rate": 0.779518
+        },
+        "mature": {
+          "cutoff": "2026-06-23",
+          "followup_days_p90": 57.0,
+          "candidates": 2025,
+          "hired": 1569,
+          "rate": 0.774815
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<title>מחשבון גיוס</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --bg: #eef1f6;
+    --card: #ffffff;
+    --ink: #0b2540;
+    --muted: #5b7089;
+    --line: #dde3ef;
+    --brand: #0052cc;
+    --brand-soft: #e8f1ff;
+    --good: #0a7a52;
+    --good-soft: #e3f6ee;
+    --bad: #c13737;
+    --bad-soft: #ffeceb;
+    --warn: #8a5a00;
+    --warn-soft: #fff4e0;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.55;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 22px 16px 56px; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: 0 6px 20px rgba(9, 30, 66, 0.09);
+    padding: 20px 22px 22px;
+    margin-bottom: 18px;
+  }
+
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+
+  .sub { font-size: 13px; color: var(--muted); margin: 0 0 4px; }
+
+  .stamp {
+    font-size: 12px;
+    color: var(--muted);
+    background: #f5f7fb;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 7px 10px;
+    margin-top: 12px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px 14px;
+  }
+  @media (max-width: 860px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+  .field { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; }
+  .field label { color: var(--muted); font-weight: 500; }
+  .field input {
+    border: 1px solid #c8d0e0;
+    border-radius: 9px;
+    padding: 9px 10px;
+    font-size: 14px;
+    text-align: center;
+    background: #fafbfd;
+    color: var(--ink);
+    outline: none;
+    font-family: inherit;
+  }
+  .field input:focus { border-color: var(--brand); background: #fff; box-shadow: 0 0 0 3px rgba(0,82,204,.12); }
+  .field.no-data label { color: var(--warn); }
+  .field.no-data input { background: #fffaf0; border-color: #e8d3a8; }
+  .field.target label { color: var(--bad); font-weight: 700; }
+  .field.target input { border-color: #f0b6b6; background: #fff7f7; }
+
+  .hint { font-size: 11px; color: var(--warn); }
+
+  .row { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+  button {
+    border: none; border-radius: 9px; padding: 9px 20px;
+    font-size: 14px; cursor: pointer; font-family: inherit; font-weight: 600;
+  }
+  .primary { background: var(--brand); color: #fff; }
+  .primary:hover { background: #0043a8; }
+  .ghost { background: #f1f3f8; color: var(--muted); border: 1px solid var(--line); font-weight: 500; }
+  .ghost:hover { background: #e7eaf2; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { padding: 9px 10px; text-align: right; border-bottom: 1px solid var(--line); }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; background: #f7f9fc; }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr.is-input td { background: var(--brand-soft); font-weight: 700; }
+  tr.is-hires td { background: #f4f7fb; font-weight: 700; border-top: 2px solid var(--line); }
+  tr.is-missing td { color: var(--warn); background: var(--warn-soft); }
+  .tag {
+    font-size: 11px; padding: 2px 7px; border-radius: 999px;
+    background: #eef1f6; color: var(--muted); font-weight: 600;
+  }
+  .tag.input { background: var(--brand); color: #fff; }
+
+  .msg { padding: 9px 12px; border-radius: 9px; font-size: 13.5px; margin-bottom: 7px; }
+  .msg.good { background: var(--good-soft); color: var(--good); }
+  .msg.bad { background: var(--bad-soft); color: var(--bad); }
+  .msg.flat { background: #f2f4f8; color: var(--muted); }
+  .msg.warn { background: var(--warn-soft); color: var(--warn); }
+
+  .bars { display: flex; flex-direction: column; gap: 8px; }
+  .bar-row { display: grid; grid-template-columns: 150px 1fr 92px; align-items: center; gap: 10px; font-size: 13px; }
+  @media (max-width: 620px) { .bar-row { grid-template-columns: 116px 1fr 78px; font-size: 12px; } }
+  .bar-track { background: #eef1f6; border-radius: 999px; height: 20px; overflow: hidden; }
+  .bar-fill { background: linear-gradient(90deg, #0052cc, #3d8bff); height: 100%; border-radius: 999px; }
+  .bar-val { text-align: left; font-variant-numeric: tabular-nums; color: var(--muted); }
+
+  details { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; background: #fafbfd; }
+  details + details { margin-top: 10px; }
+  summary { cursor: pointer; font-weight: 600; font-size: 13.5px; }
+  details p, details li { font-size: 13px; color: var(--muted); }
+  details ul { padding-inline-start: 18px; margin: 8px 0; }
+
+  .hidden { display: none; }
+  .foot { font-size: 12px; color: var(--muted); text-align: center; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="card">
+    <h1>מחשבון גיוס</h1>
+    <p class="sub">הזנת מספר מועמדים באחד השלבים או יעד גיוס, וקבלת השלמה של כל המשפך, ניתוח פערים ופריסת מועדי הקליטה הצפויים.</p>
+    <div class="stamp" id="stamp"></div>
+  </div>
+
+  <div class="card">
+    <h2>נתוני קלט</h2>
+    <div class="grid" id="inputGrid"></div>
+    <div class="row">
+      <button class="primary" id="calcBtn">חשב</button>
+      <button class="ghost" id="resetBtn">איפוס</button>
+    </div>
+  </div>
+
+  <div class="card hidden" id="funnelCard">
+    <h2>המשפך המלא</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>שלב</th>
+          <th>מועמדים</th>
+          <th>מקור</th>
+          <th>יחס גיוס נמדד</th>
+        </tr>
+      </thead>
+      <tbody id="funnelBody"></tbody>
+    </table>
+  </div>
+
+  <div class="card hidden" id="gapCard">
+    <h2>ניתוח פערים</h2>
+    <div id="gapBody"></div>
+  </div>
+
+  <div class="card hidden" id="timelineCard">
+    <h2>פריסת מועדי הגיוס הצפויים</h2>
+    <p class="sub" id="timelineSub"></p>
+    <div class="bars" id="timelineBody"></div>
+  </div>
+
+  <div class="card">
+    <h2>בסיס הנתונים ושיטת החישוב</h2>
+    <details>
+      <summary>מאיפה מגיעים המספרים</summary>
+      <div id="basisBody"></div>
+    </details>
+    <details>
+      <summary>למה כל תוצאה היא טווח ולא מספר יחיד</summary>
+      <p>
+        הנתונים קטועים מימין: מועמד שביצע פעילות סמוך לסוף התקופה עדיין לא הספיק
+        להתגייס, ובקובץ הוא נראה כמי שלא התגייס. ככל שמתקרבים לסוף התקופה, יחס
+        הגיוס הנמדד נמוך יותר - לא מפני שהאיכות ירדה, אלא מפני שלא עבר מספיק זמן.
+      </p>
+      <ul>
+        <li><strong>הגבול התחתון</strong> - כל המועמדים עד תאריך החיתוך הקבוע, מול הגיוסים שלהם לאורך כל הקובץ. חלק מהם עדיין בתהליך, ולכן היחס נוטה כלפי מטה.</li>
+        <li><strong>הגבול העליון</strong> - רק קוהורטים שהספיקו להבשיל. תאריך החיתוך נקבע לכל שלב בנפרד: תאריך הגיוס האחרון בקובץ, פחות האחוזון ה-90 של זמן הגיוס באותו שלב.</li>
+      </ul>
+      <p>
+        התוצאה האמיתית נמצאת בין השניים. המחשבון מציג את הטווח במקום לבחור מספר
+        אחד ולהציג אותו כוודאות.
+      </p>
+    </details>
+    <details>
+      <summary>מגבלות שחשוב להכיר</summary>
+      <ul id="limitsBody"></ul>
+    </details>
+    <p class="foot" id="foot"></p>
+  </div>
+
+</div>
+
+<script>
+/* ------------------------------------------------------------------ *
+ *  נתוני המערכת - מוטמעים בזמן הבנייה מתוך data/recruitment_data.json  *
+ *  אין לערוך ידנית. לעדכון: החלפת קובץ המקור והרצת make.               *
+ * ------------------------------------------------------------------ */
+const DATA = /*__DATA__*/null/*__DATA__*/;
+
+/* ------------------------------------------------------------------ *
+ *  מנוע החישוב - חייב להישאר זהה ל-recruit_calc/engine.py.             *
+ *  tests/test_parity.py מוודא שהשניים מחזירים אותן תוצאות.            *
+ * ------------------------------------------------------------------ */
+/* __ENGINE_START__ */
+const Engine = (() => {
+  const byKey = {};
+  DATA.stages.forEach(s => { byKey[s.key] = s; });
+
+  const stage = k => {
+    if (!(k in byKey)) throw new Error("שלב לא מוכר: " + k);
+    return byKey[k];
+  };
+
+  const hasRate = k => {
+    const s = stage(k);
+    return s.has_data && s.hire_rate !== null;
+  };
+
+  const stageKeys = (withDataOnly) =>
+    DATA.stages.filter(s => !withDataOnly || (s.has_data && s.hire_rate)).map(s => s.key);
+
+  // טווח: low תמיד קטן מ-high, עיגול תחתון כלפי מטה ועליון כלפי מעלה.
+  const range = (a, b) => {
+    const low = Math.min(a, b), high = Math.max(a, b);
+    return { low, high, rounded: () => [Math.floor(low), Math.ceil(high)] };
+  };
+
+  const asDict = r => {
+    if (r === null) return null;
+    const [low, high] = r.rounded();
+    return { low, high };
+  };
+
+  const projectHires = (k, count) => {
+    if (count === null || !hasRate(k)) return null;
+    const r = stage(k).hire_rate;
+    return range(count * r.low, count * r.high);
+  };
+
+  const requiredForTarget = (k, target) => {
+    if (target === null || !hasRate(k)) return null;
+    const r = stage(k).hire_rate;
+    return range(target / r.high, target / r.low);
+  };
+
+  const convert = (fromKey, count, toKey) => {
+    if (count === null) return null;
+    if (fromKey === toKey) return range(count, count);
+    if (!(hasRate(fromKey) && hasRate(toKey))) return null;
+    const a = stage(fromKey).hire_rate, b = stage(toKey).hire_rate;
+    return range(count * a.low / b.high, count * a.high / b.low);
+  };
+
+  const timeline = (k, count) => {
+    const hires = projectHires(k, count);
+    if (hires === null) return null;
+    const s = stage(k);
+    if (!s.buckets) return null;
+    return s.buckets.map(b => {
+      if (b.share === null) return { key: b.key, label: b.label, share: null, hires: null };
+      return {
+        key: b.key, label: b.label, share: b.share,
+        hires: range(hires.low * b.share, hires.high * b.share)
+      };
+    });
+  };
+
+  const gapAnalysis = (counts, target) => {
+    const messages = [];
+    const entered = stageKeys().filter(
+      k => counts[k] !== undefined && counts[k] !== null && hasRate(k)
+    );
+
+    for (let i = 0; i < entered.length; i++) {
+      for (let j = i + 1; j < entered.length; j++) {
+        const early = entered[i], late = entered[j];
+        const actual = counts[early];
+        const needed = convert(late, counts[late], early);
+        if (needed === null) continue;
+        const [lo, hi] = needed.rounded();
+        if (actual < lo) {
+          messages.push({
+            kind: "deficit", stage: early, against: late,
+            shortfall: asDict(range(lo - actual, hi - actual)),
+            needed: { low: lo, high: hi }, actual
+          });
+        } else if (actual > hi) {
+          messages.push({
+            kind: "surplus", stage: early, against: late,
+            surplus: asDict(range(actual - hi, actual - lo)),
+            needed: { low: lo, high: hi }, actual
+          });
+        } else {
+          messages.push({
+            kind: "balanced", stage: early, against: late,
+            needed: { low: lo, high: hi }, actual
+          });
+        }
+      }
+    }
+
+    if (target !== null && target !== undefined && entered.length) {
+      const deepest = entered[entered.length - 1];
+      const projected = projectHires(deepest, counts[deepest]);
+      const [lo, hi] = projected.rounded();
+      let kind;
+      if (hi < target) kind = "target_miss";
+      else if (lo > target) kind = "target_over";
+      else kind = "target_ok";
+      messages.push({ kind, stage: deepest, target, projected: { low: lo, high: hi } });
+    }
+
+    return messages;
+  };
+
+  const fillFrom = (k, count) => {
+    const out = {};
+    stageKeys().forEach(other => {
+      if (other === k) { out[other] = { low: count, high: count, source: "input" }; return; }
+      const conv = convert(k, count, other);
+      if (conv === null) { out[other] = null; return; }
+      const d = asDict(conv);
+      d.source = "derived";
+      out[other] = d;
+    });
+    const hires = projectHires(k, count);
+    out.hires = hires ? asDict(hires) : null;
+    return out;
+  };
+
+  return { stage, hasRate, stageKeys, range, asDict, projectHires,
+           requiredForTarget, convert, timeline, gapAnalysis, fillFrom };
+})();
+/* __ENGINE_END__ */
+
+/* ------------------------------------------------------------------ *
+ *  ממשק המשתמש                                                        *
+ * ------------------------------------------------------------------ */
+const $ = id => document.getElementById(id);
+const nf = n => n.toLocaleString("he-IL");
+const pct = x => (x * 100).toFixed(1) + "%";
+const label = k => Engine.stage(k).label;
+
+const rangeText = d => {
+  if (d === null || d === undefined) return "—";
+  return d.low === d.high ? nf(d.low) : nf(d.low) + " – " + nf(d.high);
+};
+
+/* --- בניית שדות הקלט --- */
+function makeField(key, labelText, extraClass, hintText) {
+  const wrap = document.createElement("div");
+  wrap.className = "field" + (extraClass ? " " + extraClass : "");
+
+  const lab = document.createElement("label");
+  lab.setAttribute("for", "in_" + key);
+  lab.textContent = labelText;
+
+  const inp = document.createElement("input");
+  inp.id = "in_" + key;
+  inp.type = "number";
+  inp.min = "0";
+  inp.placeholder = "—";
+
+  wrap.append(lab, inp);
+
+  if (hintText) {
+    const h = document.createElement("span");
+    h.className = "hint";
+    h.textContent = hintText;
+    wrap.append(h);
+  }
+  return wrap;
+}
+
+function buildInputs() {
+  const grid = $("inputGrid");
+  DATA.stages.forEach(s => {
+    grid.append(makeField(
+      s.key, s.label,
+      s.has_data ? "" : "no-data",
+      s.has_data ? "" : "אין נתוני המרה במקור"
+    ));
+  });
+  grid.append(makeField("target", "יעד גיוס", "target", ""));
+}
+
+function readInputs() {
+  const counts = {};
+  DATA.stages.forEach(s => {
+    const raw = $("in_" + s.key).value.trim();
+    const n = raw === "" ? null : Number(raw);
+    counts[s.key] = Number.isFinite(n) ? n : null;
+  });
+  const rawT = $("in_target").value.trim();
+  const t = rawT === "" ? null : Number(rawT);
+  return { counts, target: Number.isFinite(t) ? t : null };
+}
+
+/* --- טבלת המשפך --- */
+function renderFunnel(filled, anchor, manualOnly) {
+  const body = $("funnelBody");
+  body.innerHTML = "";
+
+  DATA.stages.forEach(s => {
+    const tr = document.createElement("tr");
+    const cell = filled[s.key];
+
+    let valueText, sourceTag, rateText;
+
+    if (!s.has_data) {
+      tr.className = "is-missing";
+      valueText = manualOnly[s.key] !== null ? nf(manualOnly[s.key]) : "—";
+      sourceTag = manualOnly[s.key] !== null ? "הוזן ידנית" : "אין מקור נתונים";
+      rateText = "לא נמדד";
+    } else {
+      const isInput = s.key === anchor;
+      if (isInput) tr.className = "is-input";
+      valueText = rangeText(cell);
+      sourceTag = isInput ? "הוזן" : "נגזר";
+      const r = s.hire_rate;
+      rateText = pct(r.low) + " – " + pct(r.high);
+    }
+
+    tr.innerHTML =
+      "<td>" + s.label + "</td>" +
+      '<td class="num">' + valueText + "</td>" +
+      '<td><span class="tag' + (s.key === anchor ? " input" : "") + '">' + sourceTag + "</span></td>" +
+      '<td class="num">' + rateText + "</td>";
+    body.append(tr);
+  });
+
+  const tr = document.createElement("tr");
+  tr.className = "is-hires";
+  tr.innerHTML =
+    "<td>מגויסים צפויים</td>" +
+    '<td class="num">' + rangeText(filled.hires) + "</td>" +
+    '<td><span class="tag">נגזר</span></td>' +
+    '<td class="num">—</td>';
+  body.append(tr);
+
+  $("funnelCard").classList.remove("hidden");
+}
+
+/* --- הודעות פערים --- */
+function renderGaps(messages, extraNotes) {
+  const body = $("gapBody");
+  body.innerHTML = "";
+
+  extraNotes.forEach(text => {
+    const d = document.createElement("div");
+    d.className = "msg warn";
+    d.textContent = text;
+    body.append(d);
+  });
+
+  messages.forEach(m => {
+    const d = document.createElement("div");
+    if (m.kind === "deficit") {
+      d.className = "msg bad";
+      d.textContent = "חסרים " + rangeText(m.shortfall) + " מועמדים בשלב «" + label(m.stage) +
+        "» כדי לתמוך בנתון שהוזן בשלב «" + label(m.against) + "». נדרשים " +
+        rangeText(m.needed) + ", בפועל " + nf(m.actual) + ".";
+    } else if (m.kind === "surplus") {
+      d.className = "msg good";
+      d.textContent = "עודף של " + rangeText(m.surplus) + " מועמדים בשלב «" + label(m.stage) +
+        "» ביחס לנדרש עבור שלב «" + label(m.against) + "». נדרשים " + rangeText(m.needed) +
+        ", בפועל " + nf(m.actual) + ".";
+    } else if (m.kind === "balanced") {
+      d.className = "msg flat";
+      d.textContent = "שלב «" + label(m.stage) + "» מאוזן מול שלב «" + label(m.against) +
+        "»: נדרשים " + rangeText(m.needed) + ", בפועל " + nf(m.actual) + ".";
+    } else if (m.kind === "target_miss") {
+      d.className = "msg bad";
+      d.textContent = "מתחת ליעד: מהנתון בשלב «" + label(m.stage) + "» צפויים " +
+        rangeText(m.projected) + " מגויסים, מול יעד של " + nf(m.target) + ".";
+    } else if (m.kind === "target_over") {
+      d.className = "msg good";
+      d.textContent = "מעל היעד: מהנתון בשלב «" + label(m.stage) + "» צפויים " +
+        rangeText(m.projected) + " מגויסים, מול יעד של " + nf(m.target) + ".";
+    } else if (m.kind === "target_ok") {
+      d.className = "msg flat";
+      d.textContent = "היעד בתוך הטווח: מהנתון בשלב «" + label(m.stage) + "» צפויים " +
+        rangeText(m.projected) + " מגויסים, והיעד הוא " + nf(m.target) + ".";
+    }
+    body.append(d);
+  });
+
+  if (!body.children.length) {
+    const d = document.createElement("div");
+    d.className = "msg flat";
+    d.textContent = "אין פערים להצגה. להשוואה בין שלבים יש להזין מספרים בשני שלבים או יותר.";
+    body.append(d);
+  }
+
+  $("gapCard").classList.remove("hidden");
+}
+
+/* --- פריסת מועדי הגיוס --- */
+function renderTimeline(anchor, count) {
+  const rows = Engine.timeline(anchor, count);
+  const body = $("timelineBody");
+  body.innerHTML = "";
+  if (!rows) { $("timelineCard").classList.add("hidden"); return; }
+
+  const st = Engine.stage(anchor);
+  const d = st.days_to_hire;
+  $("timelineSub").textContent =
+    "מתי צפויים להיקלט המגויסים מתוך " + nf(count) + " מועמדים בשלב «" + st.label +
+    "», נמדד מיום הפעילות בשלב. חציון " + d.median + " ימים, ממוצע " + d.mean +
+    " ימים, על " + nf(d.n) + " מועמדים שהתגייסו בפועל.";
+
+  const maxShare = Math.max(...rows.map(r => r.share || 0));
+  rows.forEach(r => {
+    const row = document.createElement("div");
+    row.className = "bar-row";
+    const w = maxShare > 0 ? (r.share / maxShare) * 100 : 0;
+    row.innerHTML =
+      "<div>" + r.label + "</div>" +
+      '<div class="bar-track"><div class="bar-fill" style="width:' + w.toFixed(1) + '%"></div></div>' +
+      '<div class="bar-val">' + rangeText(Engine.asDict(r.hires)) + "</div>";
+    body.append(row);
+  });
+
+  $("timelineCard").classList.remove("hidden");
+}
+
+/* --- ההרצה הראשית --- */
+function calculate() {
+  const { counts, target } = readInputs();
+  const withData = Engine.stageKeys().filter(k => counts[k] !== null);
+  const notes = [];
+
+  DATA.stages.forEach(s => {
+    if (!s.has_data && counts[s.key] !== null) {
+      notes.push("הנתון שהוזן בשלב «" + s.label + "» נרשם אך לא שימש לחישוב: " +
+                 "אין בקבצי המקור נתוני המרה לשלב הזה, ולכן לא ניתן לגזור ממנו תחזית.");
+    }
+  });
+
+  let anchor = null, anchorCount = null;
+
+  if (withData.length) {
+    // עוגן: השלב המתקדם ביותר שהוזן - הקרוב ביותר לגיוס, ולכן המדויק ביותר.
+    anchor = withData[withData.length - 1];
+    anchorCount = counts[anchor];
+  } else if (target !== null) {
+    // רק יעד הוזן - חישוב לאחור: כמה נדרשים בכל שלב.
+    const filled = {};
+    Engine.stageKeys().forEach(k => {
+      filled[k] = Engine.asDict(Engine.requiredForTarget(k, target));
+      if (filled[k]) filled[k].source = "derived";
+    });
+    filled.hires = { low: target, high: target };
+    const manual = {};
+    DATA.stages.forEach(s => { manual[s.key] = counts[s.key]; });
+    renderFunnel(filled, null, manual);
+    notes.unshift("חישוב לאחור מיעד של " + nf(target) +
+                  " מגויסים: כמה מועמדים נדרשים בכל שלב כדי להגיע אליו.");
+    renderGaps([], notes);
+    $("timelineCard").classList.add("hidden");
+    return;
+  } else {
+    renderGaps([], ["יש להזין מספר מועמדים באחד השלבים, או יעד גיוס."]);
+    $("funnelCard").classList.add("hidden");
+    $("timelineCard").classList.add("hidden");
+    return;
+  }
+
+  const filled = Engine.fillFrom(anchor, anchorCount);
+  const manual = {};
+  DATA.stages.forEach(s => { manual[s.key] = counts[s.key]; });
+  renderFunnel(filled, anchor, manual);
+  renderGaps(Engine.gapAnalysis(counts, target), notes);
+  renderTimeline(anchor, anchorCount);
+}
+
+function reset() {
+  DATA.stages.forEach(s => { $("in_" + s.key).value = ""; });
+  $("in_target").value = "";
+  ["funnelCard", "gapCard", "timelineCard"].forEach(id => $(id).classList.add("hidden"));
+}
+
+/* --- פאנל בסיס הנתונים --- */
+function renderBasis() {
+  const m = DATA.meta;
+
+  $("stamp").textContent =
+    "מבוסס על " + nf(m.activity_rows) + " שורות פעילות (" + nf(m.activity_candidates) +
+    " מועמדים ייחודיים, " + m.activity_first + " עד " + m.activity_last + ") ועל " +
+    nf(m.hire_rows) + " שורות גיוס (" + nf(m.hire_candidates) + " מועמדים, " +
+    m.hire_first + " עד " + m.hire_last + "). נבנה בתאריך " + m.generated_at + ".";
+
+  let html = "<table><thead><tr><th>שלב</th><th>סוג פעילות במקור</th>" +
+             "<th>קוהורט בשל</th><th>מתוכם גויסו</th><th>יחס גיוס</th>" +
+             "<th>חציון ימים</th><th>אחוזון 90</th></tr></thead><tbody>";
+  DATA.stages.forEach(s => {
+    if (!s.has_data) {
+      html += "<tr class='is-missing'><td>" + s.label + "</td><td colspan='6'>" +
+              s.note + "</td></tr>";
+      return;
+    }
+    const b = s.basis.mature, d = s.days_to_hire, r = s.hire_rate;
+    html += "<tr><td>" + s.label + "</td><td>" + s.activity_type + "</td>" +
+            "<td class='num'>" + nf(b.candidates) + "</td>" +
+            "<td class='num'>" + nf(b.hired) + "</td>" +
+            "<td class='num'>" + pct(r.low) + " – " + pct(r.high) + "</td>" +
+            "<td class='num'>" + d.median + "</td>" +
+            "<td class='num'>" + d.p90 + "</td></tr>";
+  });
+  html += "</tbody></table>";
+  $("basisBody").innerHTML = html;
+
+  const limits = [
+    "השלב «הגשות» אינו קיים בקבצי המקור. לא נגזר עבורו יחס המרה, והוא אינו משתתף בחישוב.",
+    "המשפך אינו סדרתי מלא: לא כל מועמד עובר דרך כל השלבים. יחס הגיוס של כל שלב נמדד מול הגיוסים בפועל, ולא כשרשרת של אחוזי מעבר.",
+    "מרכז הערכה הוא שלב סלקטיבי שרק חלק מהמועמדים עוברים בו, ולכן מספר המועמדים בו קטן ממספר הגיוסים באותה תקופה.",
+    "זמני הגיוס נמדדים מהפעילות הראשונה של המועמד בשלב ועד לגיוסו הראשון, ורק עבור מי שהתגייס בפועל. מועמדים שעדיין בתהליך אינם נספרים.",
+    "הנתונים מכסים " + m.activity_first + " עד " + m.hire_last +
+      " בלבד. מועמדים שהחלו את התהליך לפני תחילת התקופה נראים בקובץ כאילו התחילו בתוכה.",
+    nf(m.hires_without_activity) + " מגויסים מתוך " + nf(m.hire_candidates) + " (" +
+      pct(m.hires_without_activity / m.hire_candidates) + ") אינם מופיעים כלל בקובץ הפעילויות. " +
+      "התהליך שלהם אינו מתועד, ולכן יחסי ההמרה שכאן אינם מכסים אותם."
+  ];
+  if (m.unmapped_activity_types && m.unmapped_activity_types.length) {
+    limits.push("סוגי פעילות שקיימים בקובץ ואינם ממופים לשלב במחשבון: " +
+                m.unmapped_activity_types.join(", ") + ".");
+  }
+  $("limitsBody").innerHTML = limits.map(t => "<li>" + t + "</li>").join("");
+
+  $("foot").textContent = "נתוני המערכת נבנים מקבצי המקור. אין לערוך את הקובץ הזה ידנית.";
+}
+
+buildInputs();
+renderBasis();
+$("calcBtn").addEventListener("click", calculate);
+$("resetBtn").addEventListener("click", reset);
+document.addEventListener("keydown", e => { if (e.key === "Enter") calculate(); });
+</script>
+</body>
+</html>

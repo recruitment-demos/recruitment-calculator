@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>מחשבון פערי גיוס</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f1f3f6;
+      color: #0b2540;
+    }
+
+    .page-wrapper {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 20px 16px 40px;
+    }
+
+    .card {
+      background: #ffffff;
+      border-radius: 14px;
+      box-shadow: 0 8px 24px rgba(9, 30, 66, 0.16);
+      border: 1px solid #dde3ef;
+      padding: 18px 20px 20px;
+    }
+
+    h1 {
+      font-size: 20px;
+      margin: 0 0 6px;
+      text-align: center;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: #4a6077;
+      text-align: center;
+      margin-bottom: 14px;
+    }
+
+    .inputs-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px 14px;
+      margin-top: 8px;
+    }
+
+    @media (max-width: 900px) {
+      .inputs-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 12px;
+    }
+
+    .field label {
+      color: #4a6077;
+    }
+
+    .field input {
+      border-radius: 999px;
+      border: 1px solid #c8d0e0;
+      padding: 7px 10px;
+      font-size: 13px;
+      outline: none;
+      text-align: center;
+      background: #f9fafc;
+      transition: border-color 0.15s, box-shadow 0.15s, background 0.15s, color 0.15s;
+      color: #111827;
+    }
+
+    .field input:focus {
+      border-color: #0052cc;
+      box-shadow: 0 0 0 1px rgba(0, 82, 204, 0.15);
+      background: #ffffff;
+    }
+
+    .field input.user-entered {
+      color: #111827;
+      font-weight: 600;
+      background: #ffffff;
+    }
+
+    .field input.auto-value {
+      color: #8b93a8;
+      font-weight: 500;
+    }
+
+    .field-target label {
+      color: #8b1f1f;
+      font-weight: 600;
+    }
+
+    .field-target input {
+      border-color: #f1b1b1;
+      background: #fff5f5;
+    }
+
+    .field-target input:focus {
+      border-color: #de5b5b;
+      box-shadow: 0 0 0 1px rgba(222, 91, 91, 0.25);
+      background: #ffffff;
+    }
+
+    .buttons-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .buttons-row button {
+      border-radius: 999px;
+      border: none;
+      padding: 7px 16px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #0078ff, #00c3ff);
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(0, 120, 255, 0.35);
+    }
+
+    .btn-secondary {
+      background: #f4f5f7;
+      color: #4a6077;
+      border: 1px solid #c8d0e0;
+    }
+
+    .summary-card {
+      margin-top: 18px;
+      background: #f7f8fb;
+      border-radius: 12px;
+      border: 1px solid #dde3ef;
+      padding: 10px 14px 12px;
+      font-size: 13px;
+      min-height: 46px;
+    }
+
+    .summary-title {
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .summary-messages {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .msg-line {
+      padding: 6px 8px;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+
+    .msg-good {
+      background: #e6f4ff;
+      color: #0052cc;
+      font-weight: 500;
+    }
+
+    .msg-bad {
+      background: #ffe8e6;
+      color: #c13737;
+      font-weight: 500;
+    }
+
+    .msg-neutral {
+      color: #4a6077;
+      font-size: 12px;
+      padding: 2px 0;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page-wrapper">
+    <div class="card">
+      <h1>מחשבון הגיוס החכם שלך</h1>
+      <div class="subtitle">
+        הקלד/י את הנתונים וגלה/י כמה מגויסים צפויים לאורך המשפך.
+      </div>
+
+      <div class="inputs-grid">
+        <div class="field">
+          <label for="submissions">הגשות</label>
+          <input id="submissions" type="number" min="0" />
+        </div>
+
+        <div class="field">
+          <label for="files">בדיקת קבצים</label>
+          <input id="files" type="number" min="0" />
+        </div>
+
+        <div class="field">
+          <label for="online">יום מיון מקוון</label>
+          <input id="online" type="number" min="0" />
+        </div>
+
+        <div class="field">
+          <label for="day">יום מיון</label>
+          <input id="day" type="number" min="0" />
+        </div>
+
+        <div class="field">
+          <label for="center">מרכז הערכה</label>
+          <input id="center" type="number" min="0" />
+        </div>
+
+        <div class="field">
+          <label for="yachbam">יחב"מ</label>
+          <input id="yachbam" type="number" min="0" />
+        </div>
+
+        <div class="field field-target">
+          <label for="target">יעד גיוס</label>
+          <input id="target" type="number" min="0" />
+        </div>
+      </div>
+
+      <div class="buttons-row">
+        <button class="btn-primary" id="calcBtn">חשב פערים</button>
+        <button class="btn-secondary" id="resetBtn">איפוס</button>
+      </div>
+
+      <div class="summary-card">
+        <div class="summary-title">תמצית מצב לאורך המשפך:</div>
+        <div class="summary-messages" id="summaryBox">
+          <div class="msg-neutral">הזן נתון אחד לפחות ולחץ "חשב פערים".</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const baseCounts = [7620, 3542, 870, 701, 537, 330, 300]; // הגשות..גיוס
+
+    const stages = [
+      { id: "submissions", label: "הגשות" },
+      { id: "files",       label: "בדיקת קבצים" },
+      { id: "online",      label: "יום מיון מקוון" },
+      { id: "day",         label: "יום מיון" },
+      { id: "center",      label: "מרכז הערכה" },
+      { id: "yachbam",     label: "יחב\"מ" },
+      { id: "target",      label: "יעד גיוס", isTarget: true }
+    ];
+
+    const inputs = stages.map(s => document.getElementById(s.id));
+    const summaryBox = document.getElementById("summaryBox");
+
+    function projectValue(fromIndex, fromValue, toIndex) {
+      if (fromValue == null) return null;
+      const factor = baseCounts[toIndex] / baseCounts[fromIndex];
+      return fromValue * factor;
+    }
+
+    function parseValues() {
+      const values = [];
+      const userEntered = [];
+
+      inputs.forEach((input, i) => {
+        const raw = input.value.trim();
+        const num = raw === "" ? null : Number(raw);
+        values[i] = Number.isFinite(num) ? num : null;
+        userEntered[i] = values[i] !== null;
+        input.classList.remove("user-entered", "auto-value");
+        if (userEntered[i]) {
+          input.classList.add("user-entered");
+        }
+      });
+
+      return { values, userEntered };
+    }
+
+    function fillMissing(values, userEntered) {
+      const lastIndex = stages.length - 1;
+      let anchorIndex = -1;
+      for (let i = 0; i < lastIndex; i++) {
+        if (userEntered[i]) anchorIndex = i;
+      }
+
+      if (anchorIndex === -1 && userEntered[lastIndex]) {
+        anchorIndex = lastIndex;
+      }
+
+      if (anchorIndex === -1) return;
+
+      const anchorVal = values[anchorIndex];
+      if (anchorVal == null) return;
+
+      for (let i = 0; i < stages.length; i++) {
+        if (i === anchorIndex) continue;
+        if (stages[i].isTarget) continue;
+        if (values[i] == null) {
+          const v = projectValue(anchorIndex, anchorVal, i);
+          if (v != null) {
+            values[i] = Math.round(v);
+            inputs[i].value = values[i];
+            if (!inputs[i].classList.contains("user-entered")) {
+              inputs[i].classList.add("auto-value");
+            }
+          }
+        }
+      }
+
+      const targetIndex = lastIndex;
+      if (values[targetIndex] == null) {
+        let lastStage = -1;
+        for (let i = 0; i < targetIndex; i++) {
+          if (values[i] != null) lastStage = i;
+        }
+        if (lastStage !== -1) {
+          const v = projectValue(lastStage, values[lastStage], targetIndex);
+          values[targetIndex] = Math.round(v);
+          inputs[targetIndex].value = values[targetIndex];
+          inputs[targetIndex].classList.add("auto-value");
+        }
+      }
+    }
+
+    function buildSummary(values, userEntered) {
+      summaryBox.innerHTML = "";
+
+      const lastIndex = stages.length - 1;
+      const msgs = [];
+
+      const userIndexes = [];
+      for (let i = 0; i < lastIndex; i++) {
+        if (userEntered[i]) userIndexes.push(i);
+      }
+      userIndexes.sort((a, b) => a - b);
+
+      for (let a = 0; a < userIndexes.length; a++) {
+        for (let b = a + 1; b < userIndexes.length; b++) {
+          const i = userIndexes[a];
+          const j = userIndexes[b];
+
+          const actualEarly = values[i];
+          const actualLate  = values[j];
+          if (actualEarly == null || actualLate == null) continue;
+
+          const requiredEarly = Math.round(actualLate * (baseCounts[i] / baseCounts[j]));
+          const diff = actualEarly - requiredEarly;
+
+          if (Math.abs(diff) < 1) continue;
+
+          if (diff > 0) {
+            msgs.push({
+              type: "good",
+              text: `עודף של כ-${Math.abs(diff)} מועמדים בשלב ${stages[i].label} ביחס למה שנדרש לשלב ${stages[j].label}.`
+            });
+          } else {
+            msgs.push({
+              type: "bad",
+              text: `חסרים כ-${Math.abs(diff)} מועמדים בשלב ${stages[i].label} כדי לתמוך בנתון בשלב ${stages[j].label}.`
+            });
+          }
+        }
+      }
+
+      const targetVal = values[lastIndex];
+      if (targetVal != null) {
+        let baseStage = -1;
+        for (let i = lastIndex - 1; i >= 0; i--) {
+          if (values[i] != null) {
+            baseStage = i;
+            break;
+          }
+        }
+
+        if (baseStage !== -1) {
+          const expectedFromStage = Math.round(
+            projectValue(baseStage, values[baseStage], lastIndex)
+          );
+          const diff = expectedFromStage - targetVal;
+
+          if (Math.abs(diff) >= 1) {
+            if (diff > 0) {
+              msgs.push({
+                type: "good",
+                text: `לפי הנתונים בשלב ${stages[baseStage].label} צפויים כ-${expectedFromStage} מגויסים – כ-${Math.abs(diff)} מעל יעד הגיוס (${targetVal}).`
+              });
+            } else {
+              msgs.push({
+                type: "bad",
+                text: `לפי הנתונים בשלב ${stages[baseStage].label} צפויים כ-${expectedFromStage} מגויסים – כ-${Math.abs(diff)} מתחת ליעד הגיוס (${targetVal}).`
+              });
+            }
+          }
+        }
+      }
+
+      if (msgs.length === 0) {
+        const div = document.createElement("div");
+        div.className = "msg-neutral";
+        div.textContent = "אין פערים משמעותיים לפי הנתונים שהוזנו.";
+        summaryBox.appendChild(div);
+      } else {
+        msgs.forEach(m => {
+          const div = document.createElement("div");
+          div.className = "msg-line " + (m.type === "good" ? "msg-good" : "msg-bad");
+          div.textContent = m.text;
+          summaryBox.appendChild(div);
+        });
+      }
+    }
+
+    function handleCalc() {
+      const { values, userEntered } = parseValues();
+      const anyValue = values.some(v => v != null);
+      if (!anyValue) {
+        summaryBox.innerHTML = '<div class="msg-neutral">הזן נתון אחד לפחות ולחץ "חשב פערים".</div>';
+        return;
+      }
+      fillMissing(values, userEntered);
+      buildSummary(values, userEntered);
+    }
+
+    function handleReset() {
+      inputs.forEach(input => {
+        input.value = "";
+        input.classList.remove("user-entered", "auto-value");
+      });
+      summaryBox.innerHTML = '<div class="msg-neutral">הזן נתון אחד לפחות ולחץ "חשב פערים".</div>';
+    }
+
+    document.getElementById("calcBtn").addEventListener("click", handleCalc);
+    document.getElementById("resetBtn").addEventListener("click", handleReset);
+  </script>
+</body>
+</html>

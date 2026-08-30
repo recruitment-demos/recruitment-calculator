@@ -1,0 +1,86 @@
+{
+  "_comment": "פרמטרי בנייה של מאגר הנתונים. אין כאן מספרי תוצאה - רק הגדרות מיפוי וחיתוך. כל המספרים נגזרים מקבצי המקור בתיקיית 'נתונים למערכת'.",
+
+  "sources": {
+    "activities": {
+      "file": "נתונים למערכת/פעילויות למחשבון.xlsx",
+      "sheet": "Data",
+      "columns": {
+        "candidate": "מועמד(קוד)",
+        "requisition": "דרישה",
+        "activity_type": "סוג פעילות",
+        "date": "תאריך יצירה",
+        "result": "תוצאה",
+        "district": "י.ארגונית מחוזית"
+      }
+    },
+    "hires": {
+      "file": "נתונים למערכת/גיוסים 20.8.xlsx",
+      "sheet": "Sheet1",
+      "columns": {
+        "candidate": "מספר מועמדד",
+        "group": "תת קבוצה עובדים בגיוס",
+        "date": "תאריך גיוס",
+        "profession": "מקצוע בגיוס",
+        "unit": "רמה היררכית 2 בגיוס",
+        "first_hire": "גיוס ראשון"
+      },
+      "date_dayfirst": true
+    }
+  },
+
+  "stages": [
+    {
+      "key": "submissions",
+      "label": "הגשות",
+      "activity_type": null,
+      "note": "אין מקור נתונים לשלב זה בקבצים שהתקבלו. המחשבון לא מציג עבורו יחס המרה."
+    },
+    {
+      "key": "file_check",
+      "label": "בדיקת קבצים",
+      "activity_type": "בדיקת קבצים"
+    },
+    {
+      "key": "online_invite",
+      "label": "זימון למבחן מקוון",
+      "activity_type": "זימון למבחן מקוון"
+    },
+    {
+      "key": "online_day",
+      "label": "יום מיון מקוון",
+      "activity_type": "תוצאות מבחן דפ\"ר"
+    },
+    {
+      "key": "screening_day",
+      "label": "יום מיון",
+      "activity_type": "ראיון התאמה"
+    },
+    {
+      "key": "assessment",
+      "label": "מרכז הערכה",
+      "activity_type": "תוצאות מרכז הערכה/מבדק"
+    },
+    {
+      "key": "yachbam",
+      "label": "יחב\"מ",
+      "activity_type": "תשובת יחב\"מ"
+    }
+  ],
+
+  "cutoff": {
+    "_comment": "שתי בסיסי חישוב. 'conservative' - חלון קבוע שנקבע ידנית (הגבול התחתון). 'mature' - חיתוך לכל שלב בנפרד, כך שלכל קוהורט יש מעקב ארוך לפחות כמו האחוזון ה-90 של זמן הגיוס באותו שלב (הגבול העליון).",
+    "conservative_date": "2026-05-20",
+    "mature_percentile": 0.90,
+    "mature_iterations": 6
+  },
+
+  "time_buckets": [
+    { "key": "w1",   "label": "עד שבוע",             "min_days": 0,  "max_days": 7 },
+    { "key": "w2",   "label": "שבוע עד שבועיים",     "min_days": 8,  "max_days": 14 },
+    { "key": "m1",   "label": "שבועיים עד חודש",     "min_days": 15, "max_days": 30 },
+    { "key": "m2",   "label": "חודש עד חודשיים",     "min_days": 31, "max_days": 60 },
+    { "key": "m3",   "label": "חודשיים עד 3 חודשים", "min_days": 61, "max_days": 90 },
+    { "key": "m3p",  "label": "מעל 3 חודשים",        "min_days": 91, "max_days": null }
+  ]
+}

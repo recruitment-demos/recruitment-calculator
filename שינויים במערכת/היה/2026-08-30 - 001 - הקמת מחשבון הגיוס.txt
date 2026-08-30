@@ -1,0 +1,806 @@
+================================================================
+סבב 001 - הקמת מחשבון הגיוס
+2026-08-30 10:27
+================================================================
+
+מה התבקש
+---------
+המרת הפרויקט המשוכפל (סימולטור שכר) למחשבון גיוס, על בסיס שני קובצי
+אקסל - פעילויות וגיוסים - ועל בסיס המחשבון הקודם AAA13.HTML.
+לצד הבקשה צורף אפיון שנכתב בגמיני, אך המשתמש ביקש במפורש שהמערכת
+תיבנה על האקסלים בלבד. כמו כן: שינוי שם התיקייה ל«מחשבון גיוס»,
+קובץ עצמאי שנפתח בלחיצה כפולה, וגרסת GitHub.
+
+מה בוצע
+--------
+1. התיקייה שונתה מ«מערכת גיוס» ל«מחשבון גיוס». היא הייתה נעולה על ידי
+   תהליך אחר ולכן בוצעה העתקה, אימות זהות מלאה, ומחיקת המקור.
+
+2. נוקו כל שרידי סימולטור השכר. כל הקבצים המקוריים נותרו שלמים
+   בתיקייה /mnt/c/projects/salary_calculator, ולכן לא אבד דבר.
+
+3. כל המספרים חושבו מחדש מהאקסלים. המספרים שבאפיון של גמיני לא שימשו,
+   ובבדיקה התברר שחלקם מוטים - ראו סעיף "מה לא בוצע".
+
+4. נבנתה המערכת: config/params.json, tools/build_dataset.py,
+   tools/build_web.py, tools/verify_sources.py, recruit_calc/engine.py,
+   recruit_calc/cli.py, web/template.html, ו-35 בדיקות.
+
+5. שני קובצי פלט זהים: index.html לגרסת GitHub Pages, ו«מחשבון גיוס.html»
+   כקובץ עצמאי לפתיחה בלחיצה כפולה. שניהם ללא ספריות חיצוניות וללא
+   קריאות רשת.
+
+6. make ו-make test עוברים במלואם.
+
+מה לא בוצע ולמה
+----------------
+1. מספרי האפיון של גמיני לא אומצו. הם חושבו כשגם הפעילויות וגם הגיוסים
+   נחתכו ב-20.05.2026, וזה מכניס בדיוק את ההטיה שהאפיון התיימר למנוע:
+   נספרו רק מועמדים שהתגייסו מהר. כך יצא באפיון שחציון הזמן מבדיקת
+   קבצים ועד גיוס הוא 4 ימים. החישוב מהנתונים נותן 71 ימים.
+   במקום מספר יחיד, המערכת מציגה טווח בין שני בסיסי חישוב.
+
+2. לא נבנה מודול בדיקת מועמדים (Candidate Inspector) שהופיע באפיון.
+   הוא היה מחייב הטמעת מזהי מועמדים בתוך עמוד שמתפרסם באופן ציבורי
+   ב-GitHub Pages. קובצי המקור הוחרגו מהמאגר מאותה סיבה.
+
+3. לא נבנתה העלאת אקסלים מהדפדפן (SheetJS). המשתמש בחר בנתונים
+   מוטמעים בלבד.
+
+4. אין פילוח מחוזי. שיוך מחוזי קיים ב-63.7% משורות הפעילות בלבד,
+   ופילוח על בסיס כזה היה מציג הבדלים שנובעים מאיכות הרישום.
+
+5. שלב «הגשות» נותר ללא נתונים, כפי שצוין באפיון. הוא מסומן במפורש
+   ואינו משתתף בחישוב.
+
+
+================================================================
+הבקשה המקורית כפי שהתקבלה
+================================================================
+
+```python
+import pandas as pd
+import os
+
+files = [f for f in os.listdir('.') if f.endswith('.xlsx') or f.endswith('.xls')]
+print("Files:", files)
+
+for f in files:
+    xls = pd.ExcelFile(f)
+    print(f"\n--- {f} ---")
+    print("Sheets:", xls.sheet_names)
+    for sheet in xls.sheet_names:
+        df = pd.read_excel(f, sheet_name=sheet)
+        print(f"\nSheet '{sheet}' shape:", df.shape)
+        print("Columns:", df.columns.tolist())
+        print(df.head(3))
+
+
+```
+
+```text
+Files: ['פעילויות למחשבון.xlsx', 'גיוסים 20.8.xlsx']
+
+--- פעילויות למחשבון.xlsx ---
+Sheets: ['Data']
+
+Sheet 'Data' shape: (64038, 6)
+Columns: ['מועמד(קוד)', 'דרישה', 'סוג פעילות', 'תאריך יצירה', 'תוצאה', 'י.ארגונית מחוזית']
+   מועמד(קוד)                                            דרישה   סוג פעילות תאריך יצירה תוצאה  י.ארגונית מחוזית
+0    50423038  מיועד ללוחם פרויקט כפיר/הכשרה מלאה/מג"ב ירושלים  בדיקת קבצים  2026-03-15   NaN  מפקדת משמר הגבול
+1    51560151                             לידים/שוטר מגייס חבר  בדיקת קבצים  2026-01-05   NaN               NaN
+2    51560151                                      לידים/חרדים  בדיקת קבצים  2026-01-21   NaN               NaN
+
+--- גיוסים 20.8.xlsx ---
+Sheets: ['Sheet1']
+
+Sheet 'Sheet1' shape: (2331, 6)
+Columns: ['מספר מועמדד', 'תת קבוצה עובדים בגיוס', 'תאריך גיוס', 'מקצוע בגיוס', 'רמה היררכית 2 בגיוס', 'גיוס ראשון']
+   מספר מועמדד תת קבוצה עובדים בגיוס  תאריך גיוס         מקצוע בגיוס  רמה היררכית 2 בגיוס  גיוס ראשון
+0     50188832                  שמ"ז  29/01/2026  סייר תנועה אופנוען        לשכת ראש את"ן  29/01/2026
+1     50085815                  שוטר  11/06/2026          יועץ משפטי   לשכת ראש אגף משפטי  11/06/2026
+2     50209637                  שוטר  15/04/2026                סייר  לשכת מפקד מחוז צפון  15/04/2026
+
+
+```
+
+```python
+df_act = pd.read_excel('פעילויות למחשבון.xlsx')
+df_rec = pd.read_excel('גיוסים 20.8.xlsx')
+
+print("Activity types:")
+print(df_act['סוג פעילות'].value_counts(dropna=False))
+
+print("\nActivity results:")
+print(df_act['תוצאה'].value_counts(dropna=False).head(10))
+
+print("\nActivity date min/max:", df_act['תאריך יצירה'].min(), df_act['תאריך יצירה'].max())
+
+df_rec['תאריך גיוס'] = pd.to_datetime(df_rec['תאריך גיוס'], dayfirst=True)
+print("Recruitment date min/max:", df_rec['תאריך גיוס'].min(), df_rec['תאריך גיוס'].max())
+
+
+```
+
+```text
+Activity types:
+סוג פעילות
+בדיקת קבצים               29916
+תוצאות מבחן דפ"ר          17962
+זימון למבחן מקוון          8656
+ראיון התאמה                3649
+תשובת יחב"מ                2456
+תוצאות מרכז הערכה/מבדק     1399
+Name: count, dtype: int64
+
+Activity results:
+תוצאה
+NaN                    39375
+5                       3762
+6                       3148
+4                       3131
+7                       2563
+3                       2194
+3.5                     1447
+8                       1444
+אישור סופי לרמת "רז     1150
+4.0                     1106
+Name: count, dtype: int64
+
+Activity date min/max: 2026-01-01 00:00:00 2026-07-14 00:00:00
+Recruitment date min/max: 2026-01-01 00:00:00 2026-08-19 00:00:00
+
+
+```
+
+```python
+# Filter data up to 20.5.2026
+df_act['תאריך יצירה'] = pd.to_datetime(df_act['תאריך יצירה'])
+df_act_cutoff = df_act[df_act['תאריך יצירה'] <= '2026-05-20'].copy()
+df_rec_cutoff = df_rec[df_rec['תאריך גיוס'] <= '2026-05-20'].copy()
+
+print(f"Activities total: {len(df_act)}, up to 20/05/2026: {len(df_act_cutoff)}")
+print(f"Recruitments total: {len(df_rec)}, up to 20/05/2026: {len(df_rec_cutoff)}")
+
+# Unique candidates up to 20.5
+unique_act_candidates = df_act_cutoff['מועמד(קוד)'].nunique()
+unique_rec_candidates = df_rec_cutoff['מספר מועמדד'].nunique()
+
+print(f"Unique candidates in activities (up to 20/5): {unique_act_candidates}")
+print(f"Unique candidates recruited (up to 20/5): {unique_rec_candidates}")
+
+# Group by activity type and calculate unique candidate count
+act_counts = df_act_cutoff.groupby('סוג פעילות')['מועמד(קוד)'].nunique()
+print("\nUnique candidates per activity type (up to 20/5):")
+print(act_counts)
+
+# Breakdown of results per activity type
+for act_type, group in df_act_cutoff.groupby('סוג פעילות'):
+    print(f"\n--- {act_type} ---")
+    print(f"Total rows: {len(group)}, Unique candidates: {group['מועמד(קוד)'].nunique()}")
+    print("Top results:")
+    print(group['תוצאה'].value_counts(dropna=False).head(5))
+
+
+```
+
+```text
+Activities total: 64038, up to 20/05/2026: 41787
+Recruitments total: 2331, up to 20/05/2026: 1392
+Unique candidates in activities (up to 20/5): 17928
+Unique candidates recruited (up to 20/5): 1391
+
+Unique candidates per activity type (up to 20/5):
+סוג פעילות
+בדיקת קבצים               16102
+זימון למבחן מקוון          4433
+ראיון התאמה                2455
+תוצאות מבחן דפ"ר           3560
+תוצאות מרכז הערכה/מבדק      908
+תשובת יחב"מ                1660
+Name: מועמד(קוד), dtype: int64
+
+--- בדיקת קבצים ---
+Total rows: 21554, Unique candidates: 16102
+Top results:
+תוצאה
+NaN    21554
+Name: count, dtype: int64
+
+--- זימון למבחן מקוון ---
+Total rows: 6403, Unique candidates: 4433
+Top results:
+תוצאה
+NaN    6403
+Name: count, dtype: int64
+
+--- ראיון התאמה ---
+Total rows: 2517, Unique candidates: 2455
+Top results:
+תוצאה
+3.5    821
+4.0    705
+3.0    306
+4.5    271
+NaN    170
+Name: count, dtype: int64
+
+--- תוצאות מבחן דפ"ר ---
+Total rows: 8503, Unique candidates: 3560
+Top results:
+תוצאה
+5    1798
+6    1467
+4    1437
+7    1231
+3    1064
+Name: count, dtype: int64
+
+--- תוצאות מרכז הערכה/מבדק ---
+Total rows: 1047, Unique candidates: 908
+Top results:
+תוצאה
+3.5    228
+2.5    214
+3.0    208
+2.0    181
+4.0     90
+Name: count, dtype: int64
+
+--- תשובת יחב"מ ---
+Total rows: 1763, Unique candidates: 1660
+Top results:
+תוצאה
+אישור סופי לרמת "רז     807
+אישור סופי לרמת "רז"    498
+NaN                     326
+פסילה                    79
+הגבלת שיבוץ              53
+Name: count, dtype: int64
+
+
+```
+
+```python
+# Merge recruitment dates with activities
+df_act_cutoff['מועמד(קוד)'] = df_act_cutoff['מועמד(קוד)'].astype(str)
+df_rec_cutoff['מספר מועמדד'] = df_rec_cutoff['מספר מועמדד'].astype(str)
+
+merged = pd.merge(df_act_cutoff, df_rec_cutoff, left_on='מועמד(קוד)', right_on='מספר מועמדד', how='inner')
+print("Merged rows:", len(merged))
+print("Unique recruited candidates who had activities:", merged['מועמד(קוד)'].nunique())
+
+# Calculate time difference between activity date and recruitment date
+merged['days_to_hire'] = (merged['תאריך גיוס'] - merged['תאריך יצירה']).dt.days
+
+# Filter positive days (activity before recruitment)
+valid_days = merged[merged['days_to_hire'] >= 0]
+
+print("\nAverage days to hire per activity type:")
+print(valid_days.groupby('סוג פעילות')['days_to_hire'].describe())
+
+# Distribution of time to hire ranges
+def categorize_time(days):
+    if days <= 7:
+        return "עד שבוע"
+    elif days <= 14:
+        return "שבוע עד שבועיים"
+    elif days <= 30:
+        return "שבועיים עד חודש"
+    elif days <= 60:
+        return "חודש עד חודשיים"
+    elif days <= 90:
+        return "חודשיים עד 3 חודשים"
+    else:
+        return "מעל 3 חודשים"
+
+valid_days['time_bucket'] = valid_days['days_to_hire'].apply(categorize_time)
+print("\nOverall Time-to-Hire Buckets:")
+print(valid_days['time_bucket'].value_counts(normalize=True) * 100)
+
+
+```
+
+```text
+Merged rows: 4942
+Unique recruited candidates who had activities: 1156
+
+Average days to hire per activity type:
+                         count       mean        std  min   25%   50%    75%    max
+סוג פעילות                                                                         
+בדיקת קבצים             1283.0  35.167576  35.418305  0.0   3.0  21.0  64.00  138.0
+זימון למבחן מקוון        404.0  65.462871  25.209418  2.0  49.0  64.0  84.00  133.0
+ראיון התאמה              605.0  48.242975  23.889899  0.0  31.0  46.0  64.00  125.0
+תוצאות מבחן דפ"ר         996.0  42.824297  26.661516  0.0  21.0  43.0  59.25  132.0
+תוצאות מרכז הערכה/מבדק   338.0  30.650888  19.508106  0.0  16.0  26.0  42.75  118.0
+תשובת יחב"מ             1132.0  20.725265  19.050530  0.0   7.0  15.0  30.00  114.0
+
+Overall Time-to-Hire Buckets:
+time_bucket
+חודש עד חודשיים        30.012610
+עד שבוע                19.987390
+שבועיים עד חודש        17.885666
+חודשיים עד 3 חודשים    16.393443
+שבוע עד שבועיים         9.688945
+מעל 3 חודשים            6.031946
+Name: proportion, dtype: float64
+
+
+```
+
+```python
+print(valid_days['time_bucket'].value_counts())
+print("\nPercentage:")
+print((valid_days['time_bucket'].value_counts(normalize=True) * 100).round(1))
+
+
+```
+
+```text
+time_bucket
+חודש עד חודשיים        1428
+עד שבוע                 951
+שבועיים עד חודש         851
+חודשיים עד 3 חודשים     780
+שבוע עד שבועיים         461
+מעל 3 חודשים            287
+Name: count, dtype: int64
+
+Percentage:
+time_bucket
+חודש עד חודשיים        30.0
+עד שבוע                20.0
+שבועיים עד חודש        17.9
+חודשיים עד 3 חודשים    16.4
+שבוע עד שבועיים         9.7
+מעל 3 חודשים            6.0
+Name: proportion, dtype: float64
+
+
+```
+
+```python
+# For each activity type, let's see how many unique candidates exist up to May 20
+stages_map = {
+    'בדיקת קבצים': 'בדיקת קבצים',
+    'תוצאות מבחן דפ"ר': 'יום מיון מקוון (דפ"ר)',
+    'ראיון התאמה': 'יום מיון (ראיון)',
+    'תוצאות מרכז הערכה/מבדק': 'מרכז הערכה',
+    'תשובת יחב"מ': 'יחב"מ'
+}
+
+candidates_per_stage = {}
+for act_type in stages_map.keys():
+    c_set = set(df_act_cutoff[df_act_cutoff['סוג פעילות'] == act_type]['מועמד(קוד)'])
+    candidates_per_stage[stages_map[act_type]] = c_set
+
+c_rec = set(df_rec_cutoff['מספר מועמדד'])
+candidates_per_stage['גיוס בפועל'] = c_rec
+
+for stage, c_set in candidates_per_stage.items():
+    print(f"Stage: {stage} -> Unique candidates: {len(c_set)}")
+
+# Let's check funnel progression by unique candidate ID
+all_file_check = candidates_per_stage['בדיקת קבצים']
+print("\nFunnel relative to בדיקת קבצים:")
+for stage, c_set in candidates_per_stage.items():
+    intersection = c_set.intersection(all_file_check)
+    print(f"Candidates in {stage} who also had בדיקת קבצים: {len(intersection)} ({len(intersection)/len(all_file_check)*100:.1f}%)")
+
+
+```
+
+```text
+Stage: בדיקת קבצים -> Unique candidates: 16102
+Stage: יום מיון מקוון (דפ"ר) -> Unique candidates: 3560
+Stage: יום מיון (ראיון) -> Unique candidates: 2455
+Stage: מרכז הערכה -> Unique candidates: 908
+Stage: יחב"מ -> Unique candidates: 1660
+Stage: גיוס בפועל -> Unique candidates: 1391
+
+Funnel relative to בדיקת קבצים:
+Candidates in בדיקת קבצים who also had בדיקת קבצים: 16102 (100.0%)
+Candidates in יום מיון מקוון (דפ"ר) who also had בדיקת קבצים: 2465 (15.3%)
+Candidates in יום מיון (ראיון) who also had בדיקת קבצים: 1913 (11.9%)
+Candidates in מרכז הערכה who also had בדיקת קבצים: 569 (3.5%)
+Candidates in יחב"מ who also had בדיקת קבצים: 1142 (7.1%)
+Candidates in גיוס בפועל who also had בדיקת קבצים: 838 (5.2%)
+
+
+```
+
+```python
+for act_type in df_act['סוג פעילות'].unique():
+    subset = df_act[df_act['סוג פעילות'] == act_type]
+    print(f"\n=== {act_type} ===")
+    print("Unique results:")
+    print(subset['תוצאה'].value_counts(dropna=False))
+
+
+```
+
+```text
+
+=== בדיקת קבצים ===
+Unique results:
+תוצאה
+NaN    29916
+Name: count, dtype: int64
+
+=== ראיון התאמה ===
+Unique results:
+תוצאה
+3.5         1158
+4.0          984
+3.0          467
+4.5          383
+NaN          295
+5.0          118
+2.5          110
+2.0           45
+ללא ערך       43
+1.5           19
+1.0            8
+5.5            6
+6.0            5
+ספק            3
+לא מתאים       2
+מתאים          2
+6.5            1
+Name: count, dtype: int64
+
+=== זימון למבחן מקוון ===
+Unique results:
+תוצאה
+NaN    8656
+Name: count, dtype: int64
+
+=== תוצאות מבחן דפ"ר ===
+Unique results:
+תוצאה
+5      3762
+6      3148
+4      3131
+7      2563
+3      2194
+8      1444
+2      1077
+9       340
+1       269
+NaN      34
+Name: count, dtype: int64
+
+=== תשובת יחב"מ ===
+Unique results:
+תוצאה
+אישור סופי לרמת "רז     1150
+אישור סופי לרמת "רז"     654
+NaN                      474
+פסילה                    107
+הגבלת שיבוץ               71
+Name: count, dtype: int64
+
+=== תוצאות מרכז הערכה/מבדק ===
+Unique results:
+תוצאה
+3.5    289
+2.5    279
+2.0    262
+3.0    260
+4.0    122
+4.5     89
+1.5     49
+5.0     34
+5.5      8
+1.0      4
+6.0      3
+Name: count, dtype: int64
+
+
+```
+
+```python
+# Calculate exact counts up to 20/05/2026
+df_act_cutoff = df_act[df_act['תאריך יצירה'] <= '2026-05-20'].copy()
+df_rec_cutoff = df_rec[df_rec['תאריך גיוס'] <= '2026-05-20'].copy()
+
+# Deduplicated unique candidate count per stage
+stage_counts = {
+    'בדיקת קבצים': df_act_cutoff[df_act_cutoff['סוג פעילות'] == 'בדיקת קבצים']['מועמד(קוד)'].nunique(),
+    'יום מיון מקוון (דפ"ר)': df_act_cutoff[df_act_cutoff['סוג פעילות'] == 'תוצאות מבחן דפ"ר']['מועמד(קוד)'].nunique(),
+    'יום מיון (ראיון)': df_act_cutoff[df_act_cutoff['סוג פעילות'] == 'ראיון התאמה']['מועמד(קוד)'].nunique(),
+    'מרכז הערכה': df_act_cutoff[df_act_cutoff['סוג פעילות'] == 'תוצאות מרכז הערכה/מבדק']['מועמד(קוד)'].nunique(),
+    'יחב"מ': df_act_cutoff[df_act_cutoff['סוג פעילות'] == 'תשובת יחב"מ']['מועמד(קוד)'].nunique(),
+    'גיוס בפועל': df_rec_cutoff['מספר מועמדד'].nunique()
+}
+
+print("Exact Deduplicated Candidate Counts (up to 20/05/2026):")
+for stage, count in stage_counts.items():
+    print(f"  {stage}: {count:,}")
+
+# Ratios relative to hires
+hire_count = stage_counts['גיוס בפועל']
+print("\nMultipliers needed per 1 hire:")
+for stage, count in stage_counts.items():
+    multiplier = count / hire_count
+    print(f"  {stage}: {multiplier:.2f} candidates per hire")
+
+
+```
+
+```text
+Exact Deduplicated Candidate Counts (up to 20/05/2026):
+  בדיקת קבצים: 16,102
+  יום מיון מקוון (דפ"ר): 3,560
+  יום מיון (ראיון): 2,455
+  מרכז הערכה: 908
+  יחב"מ: 1,660
+  גיוס בפועל: 1,391
+
+Multipliers needed per 1 hire:
+  בדיקת קבצים: 11.58 candidates per hire
+  יום מיון מקוון (דפ"ר): 2.56 candidates per hire
+  יום מיון (ראיון): 1.76 candidates per hire
+  מרכז הערכה: 0.65 candidates per hire
+  יחב"מ: 1.19 candidates per hire
+  גיוס בפועל: 1.00 candidates per hire
+
+
+```
+
+```python
+# Time to hire per stage
+time_summary = {}
+
+for act_name, act_label in [
+    ('בדיקת קבצים', 'בדיקת קבצים'),
+    ('תוצאות מבחן דפ"ר', 'יום מיון מקוון'),
+    ('ראיון התאמה', 'יום מיון'),
+    ('תוצאות מרכז הערכה/מבדק', 'מרכז הערכה'),
+    ('תשובת יחב"מ', 'יחב"מ')
+]:
+    act_df = df_act_cutoff[df_act_cutoff['סוג פעילות'] == act_name]
+    m = pd.merge(act_df, df_rec_cutoff, left_on='מועמד(קוד)', right_on='מספר מועמדד')
+    m['days'] = (m['תאריך גיוס'] - m['תאריך יצירה']).dt.days
+    m_valid = m[m['days'] >= 0]
+    
+    # Take earliest activity date per candidate
+    m_earliest = m_valid.groupby('מועמד(קוד)')['days'].min()
+    
+    avg_days = m_earliest.mean()
+    median_days = m_earliest.median()
+    
+    # buckets
+    b_1w = (m_earliest <= 7).mean() * 100
+    b_2w = ((m_earliest > 7) & (m_earliest <= 14)).mean() * 100
+    b_1m = ((m_earliest > 14) & (m_earliest <= 30)).mean() * 100
+    b_2m = ((m_earliest > 30) & (m_earliest <= 60)).mean() * 100
+    b_3m = ((m_earliest > 60) & (m_earliest <= 90)).mean() * 100
+    b_above3m = (m_earliest > 90).mean() * 100
+    
+    time_summary[act_label] = {
+        'avg_days': round(avg_days, 1),
+        'median_days': round(median_days, 1),
+        'up_to_1w': round(b_1w, 1),
+        '1w_to_2w': round(b_2w, 1),
+        '2w_to_1m': round(b_1m, 1),
+        '1m_to_2m': round(b_2m, 1),
+        '2m_to_3m': round(b_3m, 1),
+        'above_3m': round(b_above3m, 1)
+    }
+
+time_df = pd.DataFrame(time_summary).T
+print(time_df)
+
+
+```
+
+```text
+                avg_days  median_days  up_to_1w  1w_to_2w  2w_to_1m  1m_to_2m  2m_to_3m  above_3m
+בדיקת קבצים         21.5          4.0      57.3       9.3       7.2      10.3      11.0       4.9
+יום מיון מקוון      43.7         42.0       8.8       7.4      17.6      41.4      19.8       5.0
+יום מיון            48.2         46.0       3.4       3.0      17.3      48.0      22.8       5.5
+מרכז הערכה          30.5         25.5       5.2      13.9      39.7      33.3       7.0       0.9
+יחב"מ               20.1         15.0      29.5      20.0      26.9      20.3       2.7       0.7
+
+
+```
+
+# מסמך אפיון דרישות ותוכנית פיתוח למחשבון הגיוס החדש (PRD)
+
+להלן מסמך אפיון מלא המיועד להעברה ישירה ל-**Claude Code** לצד הקבצים `AAA13.HTML`, `פעילויות למחשבון.xlsx` ו-`גיוסים 20.8.xlsx`. המסמך מגדיר את אופן פיתוח המחשבון המעודכן, ניתוח הנתונים לפי מזהה מועמד ייחודי (`מועמד(קוד)` / `מספר מועמדד`), ניכוי כפילויות, חיתוך זמן למניעת הטיית קטועיות, ומודול חיזוי ציר זמן לגיוס (Time-to-Hire).
+
+---
+
+## 1. רקע, מטרות והגדרת הבעיה
+
+### 1.1 מטרת הפרויקט
+
+שדרוג המחשבון הקיים (`AAA13.HTML`) ממחשבון יחסים סטטי למערכת דינמית ומדויקת המבוססת על נתוני אמת של פעילויות וגיוסים בפועל. המערכת תאפשר:
+
+1. חישוב יעדי גיוס ופערי מועמדים בכל שלב במשפך.
+2. ניתוח יחסי המרה לפי מועמדים ייחודיים (Deduplicated Unique Candidates).
+3. פריסת צופה פני עתיד של מועדי הגיוס הצפויים לפי חלונות זמן (שבוע, שבועיים, חודש, חודשיים, 3 חודשים).
+4. תמיכה מלאה בהזנת נתוני "הגשות" (החסרים כעת בקובץ וי הושלמו בהמשך).
+
+---
+
+## 2. מפתח מיפוי שלבי המשפך והנתונים בקבצים
+
+הנתונים נתונים בשני קבצי אקסל ראשיים:
+
+1. **פעילויות למחשבון.xlsx** (גיליון `Data`): כולל מזהה מועמד `מועמד(קוד)`, `סוג פעילות`, `תאריך יצירה` ו-`תוצאה`.
+2. **גיוסים 20.8.xlsx** (גיליון `Sheet1`): כולל מזהה מועמד `מספר מועמדד` ו-`תאריך גיוס`.
+
+### 2.1 טבלת מיפוי השלבים במחשבון החדש
+
+| # | שם השלב במחשבון | מקור הנתונים בקובץ / שדה מפתח | הערות וקריטריונים |
+| --- | --- | --- | --- |
+| **1** | **הגשות** | הזנה ידנית / קובץ עתידי | השלב הראשון במשפך. כרגע חסר בקובץ; יש לאפשר הזנה ידנית בממשק. |
+| **2** | **בדיקת קבצים** | `סוג פעילות = 'בדיקת קבצים'` | תחילת תהליך הסינון האקטיבי. |
+| **3** | **יום מיון מקוון** | `סוג פעילות = 'תוצאות מבחן דפ"ר'` | מייצג את שלב המיון המקוון (לפי הנחיית המשתמש). |
+| **4** | **יום מיון** | `סוג פעילות = 'ראיון התאמה'` | ראיון התאמה/יום מיון פרונטלי. |
+| **5** | **מרכז הערכה** | `סוג פעילות = 'תוצאות מרכז הערכה/מבדק'` | שלב מרכז ההערכה/המבדקים. |
+| **6** | **יחב"מ** | `סוג פעילות = 'תשובת יחב"מ'` | שלב הבדוק הביטחוני/סיווג. |
+| **7** | **יעד גיוס / גיוס בפועל** | קובץ `גיוסים 20.8.xlsx` | מועמדים שהשלים את תהליך הגיוס ונקלטו בארגון. |
+
+---
+
+## 3. כללי עיבוד נתונים וחיתוך סטטיסטי (Cutoff Rules)
+
+### 3.1 חיתוך נתונים עד ה-20.05.2026 (Right-Censoring Prevention)
+
+משך תהליך גיוס ממוצע מקצה לקצה עומד על **כ-3 חודשים**.
+נתונים שנרשמו לאחר תאריך ה-20.05.2026 מייצגים מועמדים שנמצאים בעיצומו של המשפך וטרם הספיקו להשלים את הגיוס עד סוף אוגוסט. הכללת מועמדים אלו בחישוב יחסי ההמרה תעוות את היחסים (תציג תמונה כאילו אחוז מעבר נמוך בהרבה ממה שהוא באמת).
+
+* **כלל עיבוד 1**: כל חישובי הבסיס ויחסי ההמרה יבוצעו **אך ורק על פני פעילויות וגיוסים שמועד יצירתם/ביצועם הוא עד 20.05.2026 כולל**.
+* **כלל עיבוד 2**: המערכת תאפשר לנקות/לעדכן את תאריך החיתוך (Cutoff Date) בעתיד במידה ויוזנו נתונים חדשים.
+
+### 3.2 ניכוי כפילויות לפי מזהה מועמד (Candidate Deduplication)
+
+עבור כל שלב במשפך, הספירה מבוצעת ברמת **מועמד ייחודי** ולא ברמת שורת פעילות. מועמד שהופיע מספר פעמים באותו שלב ייספר **פעם אחת בלבד** בשלב זה.
+
+---
+
+## 4. נתוני הבסיס האמפיריים והמכפילים (Baseline Metrics)
+
+מניתוח הנתונים בקבצים עד תאריך ה-20.05.2026 עולים המספרים והמכפילים הבאים:
+
+### 4.1 ספירת מועמדים ייחודיים ויחסי המרה מדודים (01.01.2026 - 20.05.2026)
+
+| שלב במשפך | מועמדים ייחודיים (עד 20.05)
+
+ | יחס המרה ל-1 גיוס (Multipliers)
+
+ | אחוז מסך בדיקות הקבצים |
+| --- | --- | --- | --- |
+| **הגשות** | *יושלם בהמשך* | *יוגדר עם העלאת הקובץ* | - |
+| **בדיקת קבצים** | **16,102** | **11.58** מועמדים לכל גיוס | 100.0% |
+| **יום מיון מקוון (דפ"ר)** | **3,560** | **2.56** מועמדים לכל גיוס | 22.1% |
+| **יום מיון (ראיון)** | **2,455** | **1.76** מועמדים לכל גיוס | 15.2% |
+| **מרכז הערכה** | **908** | **0.65** מועמדים לכל גיוס | 5.6% |
+| **יחב"מ** | **1,660** | **1.19** מועמדים לכל גיוס | 10.3% |
+| **גיוס בפועל** | **1,391** | **1.00** | 8.6% |
+
+---
+
+## 5. מודל חיזוי ציר זמן לגיוס (Time-to-Hire Timeline Model)
+
+מניתוח הפרשי הימים בין תאריך ביצוע הבוחן/הפעילות לבין תאריך הגיוס בפועל (עבור מועמדים שהתגייסו), התקבלה התפלגות זמני האבטלה/המתנה המדויקת הבאה:
+
+### 5.1 ממוצע, חציון והתפלגות ימים מכל שלב עד הגיוס
+
+| שלב במשפך | ממוצע ימים
+
+ | חציון ימים
+
+ | עד שבוע
+
+ | שבוע–שבועיים
+
+ | שבועיים–חודש
+
+ | חודש–חודשיים
+
+ | חודשיים–3 חודשים
+
+ | מעל 3 חודשים
+
+ |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **בדיקת קבצים** | 21.5 | 4.0 | 57.3% | 9.3% | 7.2% | 10.3% | 11.0% | 4.9% |
+| **יום מיון מקוון (דפ"ר)** | 43.7 | 42.0 | 8.8% | 7.4% | 17.6% | 41.4% | 19.8% | 5.0% |
+| **יום מיון (ראיון)** | 48.2 | 46.0 | 3.4% | 3.0% | 17.3% | 48.0% | 22.8% | 5.5% |
+| **מרכז הערכה** | 30.5 | 25.5 | 5.2% | 13.9% | 39.7% | 33.3% | 7.0% | 0.9% |
+| **יחב"מ** | 20.1 | 15.0 | 29.5% | 20.0% | 26.9% | 20.3% | 2.7% | 0.7% |
+
+### 5.2 אלגוריתם חיזוי מועדי גיוס
+
+כאשר המשתמש מזין כמות מועמדים נתונה בשלב מסוים (למשל: 100 מועמדים שעברו יום מיון מקוון), המערכת תחשב:
+
+1. **כמות מגויסים צפויה כוללת**: $100 \times \frac{1,391}{3,560} \approx 39$ מגויסים.
+2. **התפלגות זמן קליטה של המגויסים הללו**:
+* תוך שבוע: $39 \times 8.8\% \approx 3$ מגויסים.
+* תוך שבוע עד שבועיים: $39 \times 7.4\% \approx 3$ מגויסים.
+* תוך שבועיים עד חודש: $39 \times 17.6\% \approx 7$ מגויסים.
+* תוך חודש עד חודשיים: $39 \times 41.4\% \approx 16$ מגויסים.
+* תוך חודשיים עד 3 חודשים: $39 \times 19.8\% \approx 8$ מגויסים.
+* מעל 3 חודשים: $39 \times 5.0\% \approx 2$ מגויסים.
+
+
+
+---
+
+## 6. דרישות ממשק משתמש ופונקציונליות (UI/UX Requirements)
+
+המערכת תיבנה כקובץ HTML/JS/CSS עצמאי (Single File Application) מודרני ונגיש, שיחליף/ישדרג את `AAA13.HTML`.
+
+### 6.1 רכיבי הממשק הראשיים
+
+1. **לוח בקרת קבצים (Data Ingestion & Refresh)**:
+* אפשרות להעלות/לרענן את קובץ הפעילויות וקובץ הגיוסים ישירות בדפדפן (באמצעות ספרית `SheetJS / xlsx.full.min.js`).
+* מנגנון זיהוי אוטומטי של תאריך חיתוך (ברירת מחדל: 20.05.2026) עם אפשרות לשינוי דינמי על ידי המשתמש.
+
+
+2. **מחשבון פערים ויעדים (Funnel Calculator & Gap Analysis)**:
+* **שדות קלט**: הגשות, בדיקת קבצים, יום מיון מקוון (דפ"ר), יום מיון (ראיון), מרכז הערכה, יחב"מ, יעד גיוס.
+* **חישוב קדימה ואחורה (Forward & Backward Projection)**: הזנת יעד גיוס תחשב מיידית כמה מועמדים נדרשים בכל שלב במשפך. הזנת מועמדים בשלב מסוים תציג כמה מגויסים צפויים להתקבל.
+* **תיבת התראות וסיכום פערים**: הצגת הודעות חיוביות (עודף מועמדים) או שליליות (חוסר מועמדים) עם צבעוניות ברורה (ירוק/אדום).
+
+
+3. **מודול ציר זמן ופריסת גיוסים (Time-to-Hire Timeline Dashboard)**:
+* הצגת טבלה/גרף פריסה המציג מתי צפויים המועמדים מכל שלב להפוך למגויסים בפועל (חלוקה ל-1w, 2w, 1m, 2m, 3m, >3m).
+
+
+4. **מודול בדיקת מועמדים (Candidate Inspector)**:
+* תצוגת טבלה פנימית המאפשרת לחפש מועמד לפי קוד מועמד ולראות את מסלול מעברו בין השלבים השונים ועד לגיוסו.
+
+
+
+---
+
+## 7. פרומפט להעתקה והפעלה ב-Claude Code
+
+ניתן להעתיק את הבלוק הבא ולשלוח בצירוף 3 הקבצים (`AAA13.HTML`, `פעילויות למחשבון.xlsx`, `גיוסים 20.8.xlsx`):
+
+```text
+You are tasked with building the updated, highly accurate Recruitment Funnel & Timeline Calculator application in a single HTML file (replacing AAA13.HTML).
+
+Files provided:
+1. AAA13.HTML (The legacy baseline UI)
+2. פעילויות למחשבון.xlsx (Activity raw data containing candidate IDs, activity types, dates, results)
+3. גיוסים 20.8.xlsx (Recruitment outcome data with candidate IDs and hire dates)
+
+Key Business Logic & Technical Rules:
+1. Stage Mapping:
+   - Submissions (הגשות): User manual input or future upload support.
+   - File Check (בדיקת קבצים): 'סוג פעילות' = 'בדיקת קבצים'
+   - Online Screening Day (יום מיון מקוון): 'סוג פעילות' = 'תוצאות מבחן דפ"ר'
+   - Screening Day (יום מיון): 'סוג פעילות' = 'ראיון התאמה'
+   - Assessment Center (מרכז הערכה): 'סוג פעילות' = 'תוצאות מרכז הערכה/מבדק'
+   - Yachbam (יחב"מ): 'סוג פעילות' = 'תשובת יחב"מ'
+   - Recruitment Target / Hires (יעד גיוס): Matches candidates in 'גיוסים 20.8.xlsx'
+
+2. Data Filtering & Right-Censoring Cutoff:
+   - Filter activities and hires up to 20.05.2026 by default to prevent pipeline distortion (due to average 3-month time-to-hire).
+   - Deduplicate candidates by unique ID ('מועמד(קוד)' / 'מספר מועמדד') per stage.
+
+3. Time-to-Hire Prediction Matrix:
+   - Integrate time-to-hire prediction rules derived from data:
+     - File Check -> Median 4 days, Avg 21.5 days
+     - DAPAR / Online Screening -> Median 42 days, Avg 43.7 days
+     - Interview / Screening Day -> Median 46 days, Avg 48.2 days
+     - Assessment Center -> Median 25.5 days, Avg 30.5 days
+     - Yachbam -> Median 15 days, Avg 20.1 days
+   - Show onboarding forecast in time buckets: Within 1 week, 1-2 weeks, 2-4 weeks, 1-2 months, 2-3 months, >3 months.
+
+4. Features to Implement in UI:
+   - Single-page application responsive HTML/CSS/JS with modern UI.
+   - Excel upload capabilities (via SheetJS CDN) to re-calculate dynamically when new files are supplied.
+   - Forward/Backward funnel calculator for gap analysis with surplus/deficit alerts.
+   - Time-to-hire timeline dashboard showing predicted onboarding dates.
+   - Candidate ID search inspector for verifying individual progression.
+
+Please generate the complete, self-contained HTML application code incorporating these requirements.
+
+```
