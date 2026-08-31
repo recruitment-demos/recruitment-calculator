@@ -364,6 +364,35 @@ class Engine:
             })
         return {"target": target_hires, "rows": rows}
 
+    def lead_time_anomalies(self):
+        """שלבים שמהם הדרך לגיוס ארוכה יותר מאשר משלב מוקדם יותר.
+
+        אפשר לצפות שככל שמתקדמים בתהליך הזמן שנותר עד הגיוס יתקצר, אבל
+        זה לא מה שקורה בנתונים. הזמנים נמדדים רק על מי שהתגייס בפועל,
+        והקבוצה שנמדדת בכל שלב היא אחרת. לכן ייתכן שלמי שהגיע לשלב
+        מסוים לוקח יותר זמן להתגייס מאשר לקבוצה שנמדדה בשלב שלפניו.
+
+        זה חשוב לתצוגה: המשמעות היא שהתאריך שבו צריך להיות בכל שלב
+        אינו בהכרח בסדר השלבים. בלי לומר את זה במפורש, הטבלה נראית
+        כאילו יש בה טעות.
+        """
+        ordered = [k for k in self.stage_keys() if self.has_rate(k)]
+        out = []
+        for i in range(1, len(ordered)):
+            key = ordered[i]
+            lead = self.stage(key)["days_to_hire"]["median"]
+            for j in range(i):
+                prev = ordered[j]
+                prev_lead = self.stage(prev)["days_to_hire"]["median"]
+                if lead > prev_lead:
+                    out.append({
+                        "key": key, "label": self.stage(key)["label"],
+                        "lead_days_median": lead,
+                        "earlier": prev, "earlier_label": self.stage(prev)["label"],
+                        "earlier_lead_days_median": prev_lead,
+                    })
+        return out
+
     def plan_from_target(self, key, target_hires):
         """משפך רציף אחד: מה צריך בשלב הכניסה, ומה יזרום ממנו לכל שלב הלאה.
 

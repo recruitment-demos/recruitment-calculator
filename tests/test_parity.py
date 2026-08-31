@@ -46,6 +46,8 @@ def build_scenarios(eng):
             scenarios.append({"op": "required_for_target", "stage": k, "target": t})
             scenarios.append({"op": "plan_from_target", "stage": k, "target": t})
 
+    scenarios.append({"op": "lead_time_anomalies"})
+
     for t in TARGETS:
         scenarios.append({"op": "required_funnel", "target": t})
         scenarios.append({"op": "required_plan", "target": t})
@@ -127,6 +129,8 @@ def python_result(eng, sc):
         return eng.combined_when(sc["counts"])
     if op == "combined_timeline":
         return eng.combined_timeline(sc["counts"])
+    if op == "lead_time_anomalies":
+        return eng.lead_time_anomalies()
     if op == "required_plan":
         return eng.required_plan(sc["target"])
     if op == "plan_from_target":

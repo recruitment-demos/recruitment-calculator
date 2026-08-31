@@ -657,6 +657,31 @@ const Engine = (() => {
     return { target: target, rows: rows };
   };
 
+  /* שלבים שמהם הדרך לגיוס ארוכה יותר מאשר משלב מוקדם יותר. הזמנים
+     נמדדים רק על מי שהתגייס בפועל, והקבוצה בכל שלב אחרת, ולכן הזמן
+     אינו יורד בהכרח לאורך התהליך. המשמעות: התאריך הנדרש בכל שלב אינו
+     בסדר השלבים, וצריך לומר את זה במפורש. */
+  const leadTimeAnomalies = () => {
+    const ordered = stageKeys().filter(hasRate);
+    const out = [];
+    for (let i = 1; i < ordered.length; i++) {
+      const key = ordered[i];
+      const lead = stage(key).days_to_hire.median;
+      for (let j = 0; j < i; j++) {
+        const prev = ordered[j];
+        const prevLead = stage(prev).days_to_hire.median;
+        if (lead > prevLead) {
+          out.push({
+            key: key, label: stage(key).label, lead_days_median: lead,
+            earlier: prev, earlier_label: stage(prev).label,
+            earlier_lead_days_median: prevLead
+          });
+        }
+      }
+    }
+    return out;
+  };
+
   /* משפך רציף אחד: מה צריך בשלב הכניסה, ומה יזרום ממנו לכל שלב הלאה.
      הכמות הנדרשת מחושבת מהיעד, ומשם הכול נגזר קדימה בדיוק כמו
      projectCohort - כך שהזנת המספר הנדרש במחשבון הרגיל תיתן אותו משפך.
@@ -689,7 +714,7 @@ const Engine = (() => {
   return { stage, hasRate, rate, label, stageKeys, forward, roundHalfUp, roundTo,
            projectCohort, timeline, combine, combinedWhen, combinedTimeline,
            crossCheck, requiredForTarget, requiredFunnel, requiredPlan,
-           planFromTarget, targetVerdict };
+           leadTimeAnomalies, planFromTarget, targetVerdict };
 })();
 /* __ENGINE_END__ */
 
@@ -1194,6 +1219,15 @@ function calculate() {
         "התאריכים מבוססים על חציון הזמן עד הגיוס. חציון פירושו שמחצית " +
         "מהמגויסים מגיעים מוקדם יותר ומחציתם מאוחר יותר, ולא שכולם מגיעים " +
         "באותו יום." });
+      Engine.leadTimeAnomalies().forEach(a => {
+        notes.push({ kind: "warn", text:
+          "הדרך לגיוס מ«" + a.label + "» ארוכה יותר מהדרך מ«" + a.earlier_label +
+          "»: חציון " + Math.round(a.lead_days_median) + " ימים לעומת " +
+          Math.round(a.earlier_lead_days_median) + ". לכן התאריך הנדרש ב«" +
+          a.label + "» מוקדם מזה של «" + a.earlier_label + "», למרות שהוא " +
+          "מאוחר יותר בתהליך. זו אינה טעות: הזמנים נמדדים רק על מי שהתגייס " +
+          "בפועל, והקבוצה שנמדדת בכל שלב היא אחרת." });
+      });
     }
     renderNotes(notes);
     revealResults(["heroCard", "planCard", "pipelineCard", "gapCard"]);
@@ -1326,6 +1360,8 @@ function renderBasis() {
     "הגזירה היא קדימה בלבד. ממספר שהוזן בשלב מסוים אי אפשר לדעת כמה מועמדים היו בשלבים שלפניו, ולכן הם אינם מוצגים.",
     "המשפך אינו סדרתי: לא כל מועמד עובר דרך כל השלבים. כל מעבר נמדד ישירות בין שני השלבים, ולא כמכפלה של אחוזי מעבר. לכן שיעור ההגעה לגיוס יכול להיות גבוה משיעור ההגעה לשלב שלפניו.",
     "מרכז הערכה הוא שלב סלקטיבי שרק חלק מהמועמדים עוברים בו.",
+    "הזמן שנותר עד הגיוס אינו יורד בהכרח ככל שמתקדמים בתהליך, כי הוא " +
+      "נמדד בכל שלב על קבוצה אחרת - רק על מי שהתגייס בפועל.",
     "הזמנים נמדדים רק על מועמדים שהגיעו בפועל לשלב היעד. מי שנעצר בדרך אינו נספר.",
     "הנתונים מכסים " + m.activity_first + " עד " + m.hire_last +
       " בלבד. מועמדים שהחלו את התהליך לפני תחילת התקופה נראים בקובץ כאילו התחילו בתוכה.",
@@ -1334,6 +1370,12 @@ function renderBasis() {
       "התהליך שלהם אינו מתועד, ולכן השיעורים שכאן אינם מכסים אותם.",
     "כשמוזן יותר משלב אחד, המערכת מניחה שמדובר בקבוצות נפרדות ומסכמת אותן. היא אינה יכולה לדעת אם אותם מועמדים מופיעים בכמה שלבים."
   ];
+  Engine.leadTimeAnomalies().forEach(a => {
+    limits.push("בפועל: מ«" + a.label + "» לוקח בחציון " +
+      Math.round(a.lead_days_median) + " ימים עד הגיוס, יותר מאשר מ«" +
+      a.earlier_label + "» שלוקח " + Math.round(a.earlier_lead_days_median) +
+      ", למרות שהוא מוקדם יותר בתהליך.");
+  });
   if (m.unmapped_activity_types && m.unmapped_activity_types.length) {
     limits.push("סוגי פעילות שקיימים בקובץ ואינם ממופים לשלב במחשבון: " +
                 m.unmapped_activity_types.join(", ") + ".");

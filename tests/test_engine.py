@@ -531,6 +531,20 @@ class TestPlanning(unittest.TestCase):
             self.assertNotIn('"low"', blob)
             self.assertNotIn('"high"', blob)
 
+    def test_lead_time_anomalies_are_detected_not_assumed(self):
+        """הזמן עד הגיוס אינו יורד לאורך התהליך, והמערכת מזהה את זה מהנתונים."""
+        found = self.eng.lead_time_anomalies()
+        ordered = [k for k in self.eng.stage_keys() if self.eng.has_rate(k)]
+        expected = 0
+        for i in range(1, len(ordered)):
+            lead = self.eng.stage(ordered[i])["days_to_hire"]["median"]
+            for j in range(i):
+                if lead > self.eng.stage(ordered[j])["days_to_hire"]["median"]:
+                    expected += 1
+        self.assertEqual(len(found), expected)
+        for a in found:
+            self.assertGreater(a["lead_days_median"], a["earlier_lead_days_median"])
+
     def test_no_target_means_no_plan(self):
         self.assertIsNone(self.eng.required_plan(None))
         self.assertIsNone(self.eng.plan_from_target("file_check", None))
