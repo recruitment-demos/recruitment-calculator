@@ -408,6 +408,12 @@ const Engine = (() => {
   // עיגול שמתנהג זהה בפייתון וב-JS. כל הערכים אינם שליליים.
   const roundHalfUp = x => Math.floor(x + 0.5);
 
+  // עיגול למספר ספרות. נחוץ כדי שממוצעים משוקללים לא יתפצלו מול פייתון.
+  const roundTo = (x, places) => {
+    const f = Math.pow(10, places);
+    return Math.floor(x * f + 0.5) / f;
+  };
+
   const stage = k => {
     if (!(k in byKey)) throw new Error("שלב לא מוכר: " + k);
     return byKey[k];
@@ -495,6 +501,62 @@ const Engine = (() => {
     };
   };
 
+  /* מתי צפויים להגיע לכל שלב - שורה אחת לכל שלב, לכל הקבוצות יחד.
+     המשתמש ביקש גרף אחד ולא גרף לכל שלב שהוזן. הכמות היא סכום ההגעות,
+     והזמן הוא ממוצע משוקלל של חציוני הימים לפי מספר המועמדים.
+     שלב שהוזן ידנית אינו נספר בעצמו - מי שכבר שם אינו "מגיע" לשם. */
+  const combinedWhen = (counts) => {
+    const result = combine(counts);
+    const rows = [];
+    result.per_stage.forEach((entry, idx) => {
+      const parts = entry.sources.filter(x => x.from !== entry.key);
+      if (!parts.length) return;
+      const total = parts.reduce((a, x) => a + x.count, 0);
+      let days;
+      if (total) {
+        days = roundTo(parts.reduce((a, x) => a + x.count * x.days_median, 0) / total, 1);
+      } else {
+        // כל הקבוצות תורמות אפס. אין משקל, ולכן ממוצע פשוט.
+        days = roundTo(parts.reduce((a, x) => a + x.days_median, 0) / parts.length, 1);
+      }
+      rows.push({
+        key: entry.key, label: entry.label, count: total,
+        days_median: days, weighted: parts.length > 1,
+        is_hire: entry.key === HIRE, sources: parts, order: idx
+      });
+    });
+    rows.sort((a, b) => (a.days_median - b.days_median) || (a.order - b.order));
+    rows.forEach(r => { delete r.order; });
+    return rows;
+  };
+
+  /* מתי צפויים להתגייס - חלון זמן אחד לכל הקבוצות יחד. כל קבוצה מפזרת
+     את המגויסים שלה לפי התפלגות השלב שלה, והשורות נסכמות. */
+  const combinedTimeline = (counts) => {
+    const result = combine(counts);
+    let rows = null;
+    result.cohorts.forEach(c => {
+      const tl = timeline(c.stage, c.count);
+      if (tl === null) return;
+      if (rows === null) {
+        rows = tl.map(b => ({ key: b.key, label: b.label, share: 0.0,
+                              hires: 0, sources: [] }));
+      }
+      tl.forEach((b, i) => {
+        if (b.hires === null) return;
+        rows[i].hires += b.hires;
+        rows[i].sources.push({
+          from: c.stage, from_label: c.label, from_count: c.count,
+          hires: b.hires, share: b.share
+        });
+      });
+    });
+    if (rows === null) return null;
+    const total = rows.reduce((a, r) => a + r.hires, 0);
+    rows.forEach(r => { r.share = total ? roundTo(r.hires / total, 6) : 0.0; });
+    return { rows: rows, total: total, buckets: rows.length };
+  };
+
   const crossCheck = (counts) => {
     const entered = stageKeys().filter(
       k => counts[k] !== undefined && counts[k] !== null && hasRate(k));
@@ -539,6 +601,47 @@ const Engine = (() => {
     return out;
   };
 
+  /* כמה מועמדים צריך בכל שלב כדי לגייס את היעד, ומתי הם צריכים להיות שם.
+     כל שורה עומדת בפני עצמה - שש תשובות חלופיות לאותה שאלה, לא משפך. */
+  const requiredPlan = (target) => {
+    if (target === null || target === undefined) return null;
+    const rows = stageKeys().map(k => {
+      const st = stage(k);
+      if (!hasRate(k)) {
+        return { key: k, label: st.label, has_data: false, required: null,
+                 rate: null, lead_days_median: null, lead_days_mean: null,
+                 measured_on: null, note: st.note };
+      }
+      const d = st.days_to_hire;
+      return {
+        key: k, label: st.label, has_data: true,
+        required: roundHalfUp(target / rate(k)), rate: rate(k),
+        lead_days_median: d.median, lead_days_mean: d.mean,
+        measured_on: d.n, note: ""
+      };
+    });
+    return { target: target, rows: rows };
+  };
+
+  /* משפך רציף אחד: מה צריך בשלב הכניסה, ומה יזרום ממנו לכל שלב הלאה.
+     הכמות הנדרשת מחושבת מהיעד, ומשם הכול נגזר קדימה בדיוק כמו
+     projectCohort - כך שהזנת המספר הנדרש במחשבון הרגיל תיתן אותו משפך.
+     בגלל העיגול, hires עשוי להיות שונה מהיעד במגויס או שניים. */
+  const planFromTarget = (k, target) => {
+    if (target === null || target === undefined || !hasRate(k)) return null;
+    const st = stage(k);
+    const exact = target / rate(k);
+    const required = roundHalfUp(exact);
+    const projection = projectCohort(k, required);
+    const d = st.days_to_hire;
+    return {
+      stage: k, label: st.label, target: target, required: required,
+      exact: roundTo(exact, 1), rate: rate(k),
+      lead_days_median: d.median, lead_days_mean: d.mean, measured_on: d.n,
+      projection: projection, hires: projection.hires
+    };
+  };
+
   const targetVerdict = (projected, target) => {
     if (target === null || target === undefined) return null;
     const allowed = Math.max(TOL.min_candidates, target * TOL.pct);
@@ -549,9 +652,10 @@ const Engine = (() => {
     return { kind: kind, gap: gap, projected: projected, target: target };
   };
 
-  return { stage, hasRate, rate, label, stageKeys, forward, roundHalfUp,
-           projectCohort, timeline, combine, crossCheck,
-           requiredForTarget, requiredFunnel, targetVerdict };
+  return { stage, hasRate, rate, label, stageKeys, forward, roundHalfUp, roundTo,
+           projectCohort, timeline, combine, combinedWhen, combinedTimeline,
+           crossCheck, requiredForTarget, requiredFunnel, requiredPlan,
+           planFromTarget, targetVerdict };
 })();
 /* __ENGINE_END__ */
 

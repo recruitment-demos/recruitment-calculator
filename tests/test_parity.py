@@ -44,9 +44,11 @@ def build_scenarios(eng):
             scenarios.append({"op": "timeline", "stage": k, "count": c})
         for t in TARGETS:
             scenarios.append({"op": "required_for_target", "stage": k, "target": t})
+            scenarios.append({"op": "plan_from_target", "stage": k, "target": t})
 
     for t in TARGETS:
         scenarios.append({"op": "required_funnel", "target": t})
+        scenarios.append({"op": "required_plan", "target": t})
         for projected in (0, t - 1, t, t + 1, t * 3):
             scenarios.append({"op": "target_verdict", "projected": projected, "target": t})
 
@@ -57,6 +59,8 @@ def build_scenarios(eng):
             counts[k] = c
             scenarios.append({"op": "combine", "counts": dict(counts)})
             scenarios.append({"op": "cross_check", "counts": dict(counts)})
+            scenarios.append({"op": "combined_when", "counts": dict(counts)})
+            scenarios.append({"op": "combined_timeline", "counts": dict(counts)})
 
     # כמה קבוצות יחד
     for i in range(len(with_data)):
@@ -67,6 +71,8 @@ def build_scenarios(eng):
                 counts[with_data[j]] = b
                 scenarios.append({"op": "combine", "counts": dict(counts)})
                 scenarios.append({"op": "cross_check", "counts": dict(counts)})
+                scenarios.append({"op": "combined_when", "counts": dict(counts)})
+                scenarios.append({"op": "combined_timeline", "counts": dict(counts)})
 
     # מקרי גבול של סף העקביות: בדיוק הכמות הצפויה ומעט סביבה
     for a in with_data:
@@ -85,6 +91,18 @@ def build_scenarios(eng):
     counts_all = {k: (500 if eng.has_rate(k) else 999) for k in keys}
     scenarios.append({"op": "combine", "counts": dict(counts_all)})
     scenarios.append({"op": "cross_check", "counts": dict(counts_all)})
+    scenarios.append({"op": "combined_when", "counts": dict(counts_all)})
+    scenarios.append({"op": "combined_timeline", "counts": dict(counts_all)})
+
+    # אפסים: המשקל בממוצע המשוקלל מתאפס, ויש לוודא שהמסלול הזה זהה בשניהם
+    for k in with_data:
+        counts = {x: None for x in keys}
+        counts[k] = 0
+        scenarios.append({"op": "combined_when", "counts": dict(counts)})
+        scenarios.append({"op": "combined_timeline", "counts": dict(counts)})
+    counts_zero = {k: (0 if eng.has_rate(k) else None) for k in keys}
+    scenarios.append({"op": "combined_when", "counts": dict(counts_zero)})
+    scenarios.append({"op": "combined_timeline", "counts": dict(counts_zero)})
 
     return scenarios
 
@@ -105,6 +123,14 @@ def python_result(eng, sc):
         return eng.combine(sc["counts"])
     if op == "cross_check":
         return eng.cross_check(sc["counts"])
+    if op == "combined_when":
+        return eng.combined_when(sc["counts"])
+    if op == "combined_timeline":
+        return eng.combined_timeline(sc["counts"])
+    if op == "required_plan":
+        return eng.required_plan(sc["target"])
+    if op == "plan_from_target":
+        return eng.plan_from_target(sc["stage"], sc["target"])
     if op == "required_for_target":
         return eng.required_for_target(sc["stage"], sc["target"])
     if op == "required_funnel":

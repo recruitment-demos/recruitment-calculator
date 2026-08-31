@@ -10,6 +10,11 @@ tests/test_parity.py מוודא שהשניים מחזירים את אותן תו
    ומתי, וכמה מהם יגויסו ומתי. לא נגזר מהם כמה היו בשלבים מוקדמים יותר -
    זה מידע שאין לנו.
 
+   תכנון מיעד הוא דבר אחר, ומותר. השאלה "כמה צריך בשלב X כדי לגייס Y"
+   אינה טענה על העבר של קבוצה קיימת אלא דרישה קדימה: איזו כמות בשלב X
+   תפיק, בגזירה קדימה, את Y. לכן plan_from_target מחזיר את הכמות הנדרשת
+   ואז גוזר ממנה קדימה בדיוק כמו project_cohort.
+
 2. כל מעבר נמדד ישירות מהנתונים. שיעור ההגעה משלב S לשלב T הוא החלק
    מהמועמדים שהיו ב-S והגיעו בפועל ל-T אחר כך. לא מכפלה של אחוזי מעבר
    ולא יחס של יחסים - מדידה ישירה של הזוג הזה.
@@ -41,6 +46,16 @@ def round_half_up(x):
     כל הערכים במערכת אינם שליליים.
     """
     return int(math.floor(x + 0.5))
+
+
+def round_to(x, places):
+    """עיגול למספר ספרות אחרי הנקודה, זהה בפייתון וב-JS.
+
+    נחוץ כדי שממוצעים משוקללים לא יתפצלו בין שני המנועים בגלל רעש
+    בספרה ה-15 של הנקודה הצפה.
+    """
+    f = 10 ** places
+    return round_half_up(x * f) / f
 
 
 class Engine:
@@ -187,6 +202,79 @@ class Engine:
             "overlap_warning": len(cohorts) > 1,
         }
 
+    def combined_when(self, counts):
+        """מתי צפויים להגיע לכל שלב - שורה אחת לכל שלב, לכל הקבוצות יחד.
+
+        המשתמש ביקש גרף אחד ולא גרף לכל שלב שהוזן. לכן כל שלב מקבל כאן
+        שורה אחת: הכמות היא סכום ההגעות מכל הקבוצות, והזמן הוא ממוצע
+        משוקלל של חציוני הימים, במשקל מספר המועמדים שכל קבוצה תורמת.
+
+        שלב שהוזן ידנית אינו נספר כאן בעצמו - מי שכבר נמצא שם אינו "מגיע"
+        לשם, ואין לו זמן הגעה. הוא נספר רק בשלבים שאחריו.
+        """
+        result = self.combine(counts)
+        rows = []
+        for idx, entry in enumerate(result["per_stage"]):
+            parts = [x for x in entry["sources"] if x["from"] != entry["key"]]
+            if not parts:
+                continue
+            total = sum(x["count"] for x in parts)
+            if total:
+                days = round_to(
+                    sum(x["count"] * x["days_median"] for x in parts) / total, 1)
+            else:
+                # כל הקבוצות תורמות אפס. אין משקל, ולכן ממוצע פשוט.
+                days = round_to(sum(x["days_median"] for x in parts) / len(parts), 1)
+            rows.append({
+                "key": entry["key"],
+                "label": entry["label"],
+                "count": total,
+                "days_median": days,
+                "weighted": len(parts) > 1,
+                "is_hire": entry["key"] == self.hire_key,
+                "sources": parts,
+                "order": idx,
+            })
+
+        rows.sort(key=lambda r: (r["days_median"], r["order"]))
+        for r in rows:
+            del r["order"]
+        return rows
+
+    def combined_timeline(self, counts):
+        """מתי צפויים להתגייס - חלון זמן אחד לכל הקבוצות יחד.
+
+        כל קבוצה מפזרת את המגויסים שלה לפי התפלגות הזמנים של השלב שממנו
+        היא נגזרת, והשורות נסכמות. הפיזור מדויק: אין כאן מיצוע של אחוזים
+        אלא חיבור של מספרי מגויסים.
+        """
+        result = self.combine(counts)
+        rows = None
+        for c in result["cohorts"]:
+            tl = self.timeline(c["stage"], c["count"])
+            if tl is None:
+                continue
+            if rows is None:
+                rows = [{"key": b["key"], "label": b["label"], "share": 0.0,
+                         "hires": 0, "sources": []} for b in tl]
+            for i, b in enumerate(tl):
+                if b["hires"] is None:
+                    continue
+                rows[i]["hires"] += b["hires"]
+                rows[i]["sources"].append({
+                    "from": c["stage"],
+                    "from_label": c["label"],
+                    "from_count": c["count"],
+                    "hires": b["hires"],
+                    "share": b["share"],
+                })
+        if rows is None:
+            return None
+        total = sum(r["hires"] for r in rows)
+        for r in rows:
+            r["share"] = round_to(r["hires"] / total, 6) if total else 0.0
+        return {"rows": rows, "total": total, "buckets": len(rows)}
+
     def cross_check(self, counts):
         """מה קבוצה מוקדמת חוזה לשלב שבו הוזנה קבוצה מאוחרת.
 
@@ -240,6 +328,75 @@ class Engine:
                 "value": round_half_up(req), "source": "derived"}
         out["hires"] = target_hires
         return out
+
+    def required_plan(self, target_hires):
+        """כמה מועמדים צריך בכל שלב כדי לגייס את היעד, ומתי הם צריכים להיות שם.
+
+        כל שורה עומדת בפני עצמה ועונה על שאלה אחת: אם הקבוצה היחידה שיש
+        לי נמצאת בשלב הזה, כמה מועמדים צריכים להיות בה. השורות אינן
+        מצטברות זו לזו - הן שש תשובות חלופיות לאותה שאלה, לא משפך.
+
+        lead_days_median הוא חציון הימים מאותו שלב ועד הגיוס. כדי לגייס
+        ביום מסוים, המועמדים צריכים להיות בשלב לפחות כך וכך ימים קודם.
+        """
+        if target_hires is None:
+            return None
+        rows = []
+        for k in self.stage_keys():
+            st = self.stage(k)
+            if not self.has_rate(k):
+                rows.append({
+                    "key": k, "label": st["label"], "has_data": False,
+                    "required": None, "rate": None,
+                    "lead_days_median": None, "lead_days_mean": None,
+                    "measured_on": None, "note": st["note"],
+                })
+                continue
+            d = st["days_to_hire"]
+            rows.append({
+                "key": k, "label": st["label"], "has_data": True,
+                "required": round_half_up(target_hires / self.rate(k)),
+                "rate": self.rate(k),
+                "lead_days_median": d["median"],
+                "lead_days_mean": d["mean"],
+                "measured_on": d["n"],
+                "note": "",
+            })
+        return {"target": target_hires, "rows": rows}
+
+    def plan_from_target(self, key, target_hires):
+        """משפך רציף אחד: מה צריך בשלב הכניסה, ומה יזרום ממנו לכל שלב הלאה.
+
+        זו התשובה לשאלה "כמה צריך בכל שלב כדי לגייס X" בקריאה המצטברת
+        שלה - קבוצה אחת שנכנסת בשלב אחד ועוברת את התהליך.
+
+        הכמות הנדרשת מחושבת מהיעד, ומיד אחריה הכול נגזר קדימה בדיוק כמו
+        project_cohort. כלומר: אם תזין את המספר הנדרש במחשבון הרגיל, תקבל
+        את אותו משפך בדיוק. זו הבטחה שאפשר לבדוק.
+
+        בגלל העיגול של הכמות הנדרשת, מספר המגויסים שיוצא עשוי להיות שונה
+        מהיעד במגויס או שניים. hires מחזיר את המספר האמיתי, לא את היעד.
+        """
+        if target_hires is None or not self.has_rate(key):
+            return None
+        st = self.stage(key)
+        exact = target_hires / self.rate(key)
+        required = round_half_up(exact)
+        projection = self.project_cohort(key, required)
+        d = st["days_to_hire"]
+        return {
+            "stage": key,
+            "label": st["label"],
+            "target": target_hires,
+            "required": required,
+            "exact": round_to(exact, 1),
+            "rate": self.rate(key),
+            "lead_days_median": d["median"],
+            "lead_days_mean": d["mean"],
+            "measured_on": d["n"],
+            "projection": projection,
+            "hires": projection["hires"],
+        }
 
     def target_verdict(self, projected_hires, target):
         """השוואת המגויסים הצפויים ליעד."""

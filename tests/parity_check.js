@@ -42,6 +42,14 @@ for (const sc of scenarios) {
     results.push(Engine.timeline(sc.stage, sc.count));
   } else if (sc.op === "combine") {
     results.push(Engine.combine(sc.counts));
+  } else if (sc.op === "combined_when") {
+    results.push(Engine.combinedWhen(sc.counts));
+  } else if (sc.op === "combined_timeline") {
+    results.push(Engine.combinedTimeline(sc.counts));
+  } else if (sc.op === "required_plan") {
+    results.push(Engine.requiredPlan(sc.target));
+  } else if (sc.op === "plan_from_target") {
+    results.push(Engine.planFromTarget(sc.stage, sc.target));
   } else if (sc.op === "cross_check") {
     results.push(Engine.crossCheck(sc.counts));
   } else if (sc.op === "required_for_target") {

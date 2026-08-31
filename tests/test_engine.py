@@ -376,5 +376,165 @@ class TestTarget(unittest.TestCase):
             self.eng.stage("no_such_stage")
 
 
+class TestCombinedCharts(unittest.TestCase):
+    """הגרפים המאוחדים: שורה אחת לכל שלב, ולא גרף נפרד לכל קבוצה שהוזנה."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.eng = load_engine()
+        cls.keys = cls.eng.stage_keys()
+
+    def counts(self, **kw):
+        c = {k: None for k in self.keys}
+        c.update(kw)
+        return c
+
+    def test_when_has_one_row_per_stage_even_with_several_cohorts(self):
+        rows = self.eng.combined_when(self.counts(file_check=5000, yachbam=300))
+        seen = [r["key"] for r in rows]
+        self.assertEqual(len(seen), len(set(seen)), "שלב הופיע יותר מפעם אחת")
+
+    def test_when_never_shows_a_stage_that_was_only_entered(self):
+        """מי שכבר נמצא בשלב אינו 'מגיע' אליו, ואין לו זמן הגעה."""
+        rows = self.eng.combined_when(self.counts(file_check=5000))
+        self.assertNotIn("file_check", [r["key"] for r in rows])
+
+    def test_when_counts_match_the_combined_funnel(self):
+        counts = self.counts(file_check=5000, screening_day=200)
+        combined = self.eng.combine(counts)
+        totals = {e["key"]: e["total"] for e in combined["per_stage"]}
+        for row in self.eng.combined_when(counts):
+            entered = counts.get(row["key"]) or 0
+            self.assertEqual(row["count"], totals[row["key"]] - entered, row["key"])
+
+    def test_when_is_ordered_by_time(self):
+        rows = self.eng.combined_when(self.counts(file_check=5000, yachbam=300))
+        days = [r["days_median"] for r in rows]
+        self.assertEqual(days, sorted(days))
+
+    def test_when_days_are_a_weighted_average_of_the_sources(self):
+        counts = self.counts(file_check=5000, online_day=800)
+        row = next(r for r in self.eng.combined_when(counts) if r["key"] == "hire")
+        self.assertTrue(row["weighted"])
+        lo = min(x["days_median"] for x in row["sources"])
+        hi = max(x["days_median"] for x in row["sources"])
+        self.assertGreaterEqual(row["days_median"], lo)
+        self.assertLessEqual(row["days_median"], hi)
+
+    def test_when_survives_a_cohort_of_zero(self):
+        rows = self.eng.combined_when(self.counts(file_check=0))
+        self.assertTrue(rows)
+        for r in rows:
+            self.assertEqual(r["count"], 0)
+            self.assertGreaterEqual(r["days_median"], 0)
+
+    def test_timeline_totals_equal_the_sum_of_the_cohorts(self):
+        counts = self.counts(file_check=5000, yachbam=300)
+        merged = self.eng.combined_timeline(counts)
+        apart = 0
+        for c in self.eng.combine(counts)["cohorts"]:
+            apart += sum(b["hires"] for b in self.eng.timeline(c["stage"], c["count"]))
+        self.assertEqual(merged["total"], apart)
+
+    def test_timeline_has_one_row_per_bucket(self):
+        merged = self.eng.combined_timeline(self.counts(file_check=5000, yachbam=300))
+        self.assertEqual([r["key"] for r in merged["rows"]],
+                         [b["key"] for b in self.eng.buckets])
+
+    def test_timeline_shares_sum_to_one(self):
+        merged = self.eng.combined_timeline(self.counts(file_check=5000))
+        self.assertAlmostEqual(sum(r["share"] for r in merged["rows"]), 1.0, places=4)
+
+    def test_every_merged_number_records_its_sources(self):
+        counts = self.counts(file_check=5000, yachbam=300)
+        for row in self.eng.combined_when(counts):
+            self.assertTrue(row["sources"], row["key"])
+            for src in row["sources"]:
+                self.assertIn("from_label", src)
+                self.assertIn("from_count", src)
+        for row in self.eng.combined_timeline(counts)["rows"]:
+            for src in row["sources"]:
+                self.assertIn("from_label", src)
+
+
+class TestPlanning(unittest.TestCase):
+    """תכנון מיעד: כמה צריך בכל שלב כדי לגייס X, ומתי."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.eng = load_engine()
+
+    def test_required_plan_covers_every_stage(self):
+        plan = self.eng.required_plan(500)
+        self.assertEqual([r["key"] for r in plan["rows"]], self.eng.stage_keys())
+
+    def test_required_plan_hits_the_target_from_every_stage(self):
+        target = 500
+        for row in self.eng.required_plan(target)["rows"]:
+            if not row["has_data"]:
+                continue
+            got = self.eng.project_cohort(row["key"], row["required"])["hires"]
+            self.assertAlmostEqual(got, target, delta=1, msg=row["key"])
+
+    def test_required_plan_invents_nothing_for_a_stage_without_data(self):
+        row = next(r for r in self.eng.required_plan(500)["rows"]
+                   if r["key"] == "submissions")
+        self.assertFalse(row["has_data"])
+        self.assertIsNone(row["required"])
+        self.assertIsNone(row["lead_days_median"])
+        self.assertTrue(row["note"])
+
+    def test_required_plan_carries_the_lead_time(self):
+        for row in self.eng.required_plan(500)["rows"]:
+            if not row["has_data"]:
+                continue
+            self.assertEqual(row["lead_days_median"],
+                             self.eng.stage(row["key"])["days_to_hire"]["median"])
+
+    def test_later_stages_need_fewer_candidates(self):
+        rows = [r for r in self.eng.required_plan(500)["rows"] if r["has_data"]]
+        needed = [r["required"] for r in rows]
+        self.assertEqual(needed, sorted(needed, reverse=True))
+
+    def test_plan_is_exactly_the_forward_projection_of_the_required_amount(self):
+        """הבטחה שאפשר לבדוק: הזנת הכמות הנדרשת במחשבון הרגיל נותנת אותו משפך."""
+        for key in self.eng.stage_keys(with_data_only=True):
+            plan = self.eng.plan_from_target(key, 500)
+            self.assertEqual(plan["projection"],
+                             self.eng.project_cohort(key, plan["required"]))
+
+    def test_plan_reaches_the_target_within_rounding(self):
+        for key in self.eng.stage_keys(with_data_only=True):
+            plan = self.eng.plan_from_target(key, 500)
+            self.assertAlmostEqual(plan["hires"], 500, delta=1, msg=key)
+
+    def test_plan_reports_the_real_hires_not_the_target(self):
+        plan = self.eng.plan_from_target("file_check", 500)
+        self.assertEqual(plan["hires"], plan["projection"]["hires"])
+
+    def test_plan_scales_with_the_target(self):
+        a = self.eng.plan_from_target("file_check", 100)["required"]
+        b = self.eng.plan_from_target("file_check", 1000)["required"]
+        self.assertAlmostEqual(b / a, 10, delta=0.05)
+
+    def test_plan_refuses_a_stage_without_data(self):
+        self.assertIsNone(self.eng.plan_from_target("submissions", 500))
+
+    def test_planning_returns_single_numbers_not_ranges(self):
+        """אין להחזיר טווח משום פונקציה במנוע - בקשה מפורשת של המשתמש."""
+        import json
+        blobs = [json.dumps(self.eng.required_plan(500), ensure_ascii=False)]
+        for key in self.eng.stage_keys(with_data_only=True):
+            blobs.append(json.dumps(self.eng.plan_from_target(key, 500),
+                                    ensure_ascii=False))
+        for blob in blobs:
+            self.assertNotIn('"low"', blob)
+            self.assertNotIn('"high"', blob)
+
+    def test_no_target_means_no_plan(self):
+        self.assertIsNone(self.eng.required_plan(None))
+        self.assertIsNone(self.eng.plan_from_target("file_check", None))
+
+
 if __name__ == "__main__":
     unittest.main()
