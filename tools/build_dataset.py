@@ -30,6 +30,8 @@
 
 import json
 import sys
+
+import numpy as np
 from datetime import datetime
 from pathlib import Path
 
@@ -85,11 +87,63 @@ def load_sources(cfg):
     return act, rec
 
 
-def days_between(cohort, event_dates):
-    """ימים מהאירוע בשלב המקור עד האירוע בשלב היעד, למי שהגיע."""
+def days_between(cohort, event_dates, window=None):
+    """ימים מהאירוע בשלב המקור עד האירוע בשלב היעד, למי שהגיע.
+
+    window - חלון (מ, עד) בימים. תצפית מחוצה לו אינה נספרת כהגעה.
+    """
     joined = cohort.to_frame("from").join(event_dates.rename("to"), how="inner")
     joined["days"] = (joined["to"] - joined["from"]).dt.days
-    return joined.loc[joined["days"] >= 0, "days"]
+    ok = joined["days"] >= 0
+    if window is not None:
+        ok &= (joined["days"] >= window[0]) & (joined["days"] <= window[1])
+    return joined.loc[ok, "days"]
+
+
+def duration_window(days, cfg):
+    """חלון סטיות התקן של מעבר אחד, או None אם לא מסננים.
+
+    התפלגות זמנים חסומה באפס ומשתרעת ימינה. בקנה מידה לינארי הגבול
+    התחתון יוצא לעתים קרובות שלילי, ואז אינו חוסם דבר בקצה המהיר -
+    בדיוק בקצה שבו נמצאת הבעיה. לכן ברירת המחדל היא חלון כפלי על
+    הלוג, שגבולו התחתון תמיד חיובי ומידתי לאורך האופייני של אותו מעבר.
+    """
+    f = cfg.get("duration_filter", {})
+    if not f.get("enabled") or len(days) < f.get("min_observations", 30):
+        return None
+
+    d = days.astype(float)
+    k = float(f.get("sigmas", 1.5))
+    if f.get("scale", "log") == "log":
+        lg = np.log(d + 1.0)
+        m, sd = float(lg.mean()), float(lg.std(ddof=1))
+        lo = float(np.exp(m - k * sd) - 1.0)
+        hi = float(np.exp(m + k * sd) - 1.0)
+    else:
+        m, sd = float(d.mean()), float(d.std(ddof=1))
+        lo, hi = m - k * sd, m + k * sd
+
+    sides = f.get("sides", "both")
+    if sides == "low":
+        hi = float("inf")
+    elif sides == "high":
+        lo = float("-inf")
+    return (max(lo, 0.0), hi)
+
+
+def window_record(window, days_before, days_after):
+    """תיעוד החלון לשקיפות. נשמר בנתונים ומוצג בעמוד."""
+    if window is None:
+        return None
+    n_before = int(len(days_before))
+    return {
+        "from_days": round(window[0], 1),
+        "to_days": None if window[1] == float("inf") else round(window[1], 1),
+        "observations_before": n_before,
+        "observations_after": int(len(days_after)),
+        "dropped_fast": int((days_before < window[0]).sum()),
+        "dropped_slow": int((days_before > window[1]).sum()),
+    }
 
 
 def mature_cutoff(source_dates, event_dates, horizon, percentile, iterations):
@@ -167,39 +221,50 @@ def hire_curve(days):
     return curve
 
 
-def reached_ids_after(cohort, event_dates):
+def reached_ids_after(cohort, event_dates, window=None):
     """מי מהקוהורט הגיע לשלב היעד *אחרי* השלב שממנו מודדים.
 
     מועמד שביצע את פעילות היעד לפני שלב המקור אינו "הגיע" - זו הגשה
     חוזרת או רישום קודם, ולא התקדמות במשפך.
+
+    window - כשהוא נתון, גם מי שהגיע מחוץ לחלון אינו נספר כמי שהגיע.
+    תצפית שנפסלה כלא-אמינה נפסלת בשלמותה: אין היגיון לפסול אותה
+    בזמנים ולספור אותה בשיעור ההגעה.
     """
     joined = cohort.to_frame("from").join(event_dates.rename("to"), how="inner")
-    return set(joined.index[joined["to"] >= joined["from"]])
+    days = (joined["to"] - joined["from"]).dt.days
+    ok = days >= 0
+    if window is not None:
+        ok &= (days >= window[0]) & (days <= window[1])
+    return set(joined.index[ok])
 
 
 def measure(source_dates, event_dates, horizon, conservative_date, cfg,
             want_buckets=False):
     """מדידת שיעור הגעה וזמן הגעה משלב מקור לשלב יעד, בשני בסיסים."""
-    cons_cohort = source_dates[source_dates <= conservative_date]
-    cons_n = int(len(cons_cohort))
-    cons_reached = int(len(reached_ids_after(cons_cohort, event_dates)))
-
     cut, p90 = mature_cutoff(
         source_dates, event_dates, horizon,
         cfg["cutoff"]["mature_percentile"], cfg["cutoff"]["mature_iterations"],
     )
     mat_cohort = source_dates[source_dates <= cut]
-    mat_n = int(len(mat_cohort))
-    mat_reached = int(len(reached_ids_after(mat_cohort, event_dates)))
-
+    cons_cohort = source_dates[source_dates <= conservative_date]
+    cons_n, mat_n = int(len(cons_cohort)), int(len(mat_cohort))
     if cons_n == 0 or mat_n == 0:
         return None
+
+    # החלון נקבע מהקוהורט הבשל, שהוא המדידה השלמה ביותר של המעבר הזה,
+    # ואז מוחל על שני הבסיסים כדי ששניהם ימדדו את אותו דבר.
+    raw_days = days_between(mat_cohort, event_dates)
+    window = duration_window(raw_days, cfg)
+
+    cons_reached = int(len(reached_ids_after(cons_cohort, event_dates, window)))
+    mat_reached = int(len(reached_ids_after(mat_cohort, event_dates, window)))
 
     cons_rate = cons_reached / cons_n
     mat_rate = mat_reached / mat_n
     low, high = sorted([cons_rate, mat_rate])
 
-    days = days_between(mat_cohort, event_dates)
+    days = days_between(mat_cohort, event_dates, window)
     stats = days_stats(days)
     if stats is None:
         return None
@@ -211,6 +276,7 @@ def measure(source_dates, event_dates, horizon, conservative_date, cfg,
             "mid": round((low + high) / 2, 6),
         },
         "days": stats,
+        "window": window_record(window, raw_days, days),
         "basis": {
             "conservative": {
                 "cutoff": conservative_date.date().isoformat(),
@@ -261,7 +327,7 @@ def main():
                 "key": s["key"], "label": s["label"], "activity_type": None,
                 "has_data": False, "note": s.get("note", ""),
                 "hire_rate": None, "days_to_hire": None,
-                "buckets": None, "hire_curve": None,
+                "buckets": None, "hire_curve": None, "hire_window": None,
                 "basis": None, "forward": None,
             })
             continue
@@ -279,7 +345,8 @@ def main():
             forward.append({
                 "key": other,
                 "label": next(x["label"] for x in cfg["stages"] if x["key"] == other),
-                "reach": m["reach"], "days": m["days"], "basis": m["basis"],
+                "reach": m["reach"], "days": m["days"],
+                "window": m["window"], "basis": m["basis"],
             })
 
         hire_m = measure(src, hire_date, last_hire, conservative_date, cfg,
@@ -292,7 +359,7 @@ def main():
         forward.append({
             "key": HIRE_KEY, "label": HIRE_LABEL,
             "reach": hire_m["reach"], "days": hire_m["days"],
-            "basis": hire_m["basis"],
+            "window": hire_m["window"], "basis": hire_m["basis"],
         })
 
         stages.append({
@@ -301,6 +368,7 @@ def main():
             "has_data": True, "note": s.get("note", ""),
             "hire_rate": hire_m["reach"],
             "days_to_hire": hire_m["days"],
+            "hire_window": hire_m["window"],
             "buckets": hire_m["buckets"],
             "hire_curve": hire_m["curve"],
             "basis": hire_m["basis"],
@@ -331,6 +399,7 @@ def main():
             "unmapped_activity_types": unmapped,
             "hires_without_activity": hires_without_activity,
         },
+        "duration_filter": cfg["duration_filter"],
         "time_buckets": cfg["time_buckets"],
         "stages": stages,
     }

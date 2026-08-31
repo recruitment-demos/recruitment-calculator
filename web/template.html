@@ -413,6 +413,13 @@
         לפי האחוזון ה-90 של זמן ההגעה. השיעור שבשימוש הוא הממוצע בין השניים, ושני
         הבסיסים מוצגים בטבלה שלמעלה.
       </p>
+      <p>
+        לכל מעבר מחושב גם חלון של סטיות תקן, ותצפית שנופלת מחוצה לו אינה נספרת
+        כלל - לא בזמנים ולא בשיעור ההגעה. הסיבה: גיוס יום או יומיים אחרי בדיקת
+        קבצים אינו התקדמות אמיתית במשפך אלא רישום שנעשה בדיעבד על מועמד שכבר היה
+        בסוף התהליך. ספירה של מקרים כאלה גורמת למחשבון להבטיח גיוסים מהירים שלא
+        יקרו. החלון של כל מעבר מוצג בטבלה שלמעלה.
+      </p>
     </details>
     <details>
       <summary>מגבלות שחשוב להכיר</summary>
@@ -1448,6 +1455,7 @@ function renderBasis() {
 
   let html = "<table><thead><tr><th>משלב</th><th>אל שלב</th><th>שיעור הגעה</th>" +
              "<th>שני הבסיסים</th><th>חציון ימים</th><th>ממוצע</th><th>נמדד על</th>" +
+             "<th>חלון הסינון</th><th>נפסלו</th>" +
              "</tr></thead><tbody>";
   DATA.stages.forEach(s => {
     if (!s.has_data) {
@@ -1455,12 +1463,20 @@ function renderBasis() {
       return;
     }
     s.forward.forEach((f, i) => {
+      const w = f.window;
+      const winTxt = !w ? "אין סינון"
+        : (w.to_days === null ? "מ־" + w.from_days + " ימים ומעלה"
+                              : w.from_days + " עד " + w.to_days + " ימים");
+      const dropped = !w ? "—" : nf(w.dropped_fast + w.dropped_slow) +
+        " מתוך " + nf(w.observations_before);
       html += "<tr><td>" + (i === 0 ? s.label : "") + "</td><td>" + f.label + "</td>" +
               "<td class='num'><strong>" + pct(f.reach.mid) + "</strong></td>" +
               "<td class='num'>" + pct(f.reach.low) + " / " + pct(f.reach.high) + "</td>" +
               "<td class='num'>" + f.days.median + "</td>" +
               "<td class='num'>" + f.days.mean + "</td>" +
-              "<td class='num'>" + nf(f.days.n) + "</td></tr>";
+              "<td class='num'>" + nf(f.days.n) + "</td>" +
+              "<td class='num'>" + winTxt + "</td>" +
+              "<td class='num'>" + dropped + "</td></tr>";
     });
   });
   html += "</tbody></table>";
@@ -1481,6 +1497,30 @@ function renderBasis() {
       "התהליך שלהם אינו מתועד, ולכן השיעורים שכאן אינם מכסים אותם.",
     "כשמוזן יותר משלב אחד, המערכת מניחה שמדובר בקבוצות נפרדות ומסכמת אותן. היא אינה יכולה לדעת אם אותם מועמדים מופיעים בכמה שלבים."
   ];
+  const df = DATA.duration_filter;
+  if (df && df.enabled) {
+    const sideTxt = df.sides === "both" ? "משני הצדדים"
+                  : df.sides === "low" ? "רק בקצה המהיר" : "רק בקצה האיטי";
+    let dropped = 0, before = 0;
+    DATA.stages.forEach(x => {
+      if (x.hire_window) {
+        dropped += x.hire_window.dropped_fast + x.hire_window.dropped_slow;
+        before += x.hire_window.observations_before;
+      }
+    });
+    limits.push("כל מעבר מסונן בחלון של " + df.sigmas + " סטיות תקן, " + sideTxt +
+      ". תצפית מחוץ לחלון אינה נספרת - לא בזמנים ולא בשיעור ההגעה. הסיבה: " +
+      "גיוס יום או יומיים אחרי בדיקת קבצים אינו התקדמות אמיתית במשפך אלא " +
+      "רישום שנעשה בדיעבד על מי שכבר היה בסופו. כך נפסלו " + nf(dropped) +
+      " מתוך " + nf(before) + " הגיוסים שנמדדו (" + pct(dropped / before) + ").");
+    limits.push("החלון מחושב על log(ימים+1) ולא על הימים עצמם. התפלגות זמנים " +
+      "חסומה באפס ומשתרעת ימינה, ולכן בקנה מידה רגיל הגבול התחתון יוצא שלילי " +
+      "ואינו חוסם דבר - בדיוק בקצה שבו הבעיה.");
+    limits.push("הסינון אינו מבחין בין רישום בדיעבד לבין תהליך מהיר אמיתי. " +
+      "הוא כלל אחיד לכל המעברים, ולכן ייתכן שבשלבים האחרונים - שבהם גיוס " +
+      "מהיר סביר - נפסלו גם תצפיות תקפות.");
+  }
+
   Engine.leadTimeAnomalies().forEach(a => {
     limits.push("בפועל: מ«" + a.label + "» לוקח בחציון " +
       Math.round(a.lead_days_median) + " ימים עד הגיוס, יותר מאשר מ«" +

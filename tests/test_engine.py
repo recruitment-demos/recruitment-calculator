@@ -457,6 +457,80 @@ class TestCombinedCharts(unittest.TestCase):
                 self.assertIn("from_label", src)
 
 
+class TestDurationFilter(unittest.TestCase):
+    """חלון סטיות התקן שמסנן תצפיות לא אמינות."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.eng = load_engine()
+        cls.data = cls.eng.data
+        cls.filt = cls.data["duration_filter"]
+
+    def test_filter_settings_are_in_the_dataset(self):
+        """ההגדרות נשמרות בנתונים, כדי שהעמוד יוכל להסביר מה נעשה."""
+        for field in ("enabled", "sigmas", "scale", "sides"):
+            self.assertIn(field, self.filt)
+
+    def test_every_measured_transition_records_its_window(self):
+        for st in self.data["stages"]:
+            if not st["has_data"]:
+                self.assertIsNone(st["hire_window"], st["key"])
+                continue
+            self.assertIsNotNone(st["hire_window"], st["key"])
+            for f in st["forward"]:
+                self.assertIn("window", f, f"{st['key']} -> {f['key']}")
+
+    def test_window_records_what_it_dropped(self):
+        for st in self.data["stages"]:
+            if not st["has_data"]:
+                continue
+            w = st["hire_window"]
+            self.assertEqual(
+                w["observations_after"],
+                w["observations_before"] - w["dropped_fast"] - w["dropped_slow"],
+                st["key"])
+            self.assertEqual(w["observations_after"], st["days_to_hire"]["n"],
+                             st["key"])
+
+    def test_lower_bound_is_never_negative(self):
+        """גבול שלילי אינו חוסם דבר, כי אין ימים שליליים."""
+        for st in self.data["stages"]:
+            if st["has_data"]:
+                self.assertGreaterEqual(st["hire_window"]["from_days"], 0,
+                                        st["key"])
+
+    def test_no_observation_survives_outside_its_window(self):
+        for st in self.data["stages"]:
+            if not st["has_data"]:
+                continue
+            w = st["hire_window"]
+            curve = st["hire_curve"]
+            self.assertGreaterEqual(curve[0][0], w["from_days"] - 1, st["key"])
+            if w["to_days"] is not None:
+                self.assertLessEqual(curve[-1][0], w["to_days"] + 1, st["key"])
+
+    def test_low_side_never_drops_slow_observations(self):
+        if self.filt["sides"] != "low":
+            self.skipTest("החלון אינו מוגדר לחסום רק את הקצה המהיר")
+        for st in self.data["stages"]:
+            if st["has_data"]:
+                self.assertEqual(st["hire_window"]["dropped_slow"], 0, st["key"])
+                self.assertIsNone(st["hire_window"]["to_days"], st["key"])
+
+    def test_the_reported_case_is_gone(self):
+        """המקרה שדווח: גיוס יום-יומיים אחרי בדיקת קבצים."""
+        st = self.eng.stage("file_check")
+        self.assertGreater(st["hire_window"]["from_days"], 2)
+        self.assertGreater(st["hire_window"]["dropped_fast"], 0)
+        # אף גיוס לא נספר עוד בתוך יומיים מבדיקת קבצים
+        self.assertEqual(self.eng.hires_by_day("file_check", 10000, 2), 0)
+
+    def test_filtering_makes_timing_more_conservative_not_less(self):
+        """הסינון מרחיק את הזמנים, ולא מקרב אותם. זה הכיוון הבטוח."""
+        st = self.eng.stage("file_check")
+        self.assertGreaterEqual(st["days_to_hire"]["median"], 71)
+
+
 class TestHiresByDay(unittest.TestCase):
     """כמה יתגייסו עד יום מסוים - תת-קבוצה של הגיוסים, לא מספר אחר."""
 
