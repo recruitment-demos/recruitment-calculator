@@ -900,6 +900,44 @@ class TestPlanning(unittest.TestCase):
             self.assertGreater(self.eng.observed_candidates(key), 0, key)
         self.assertIsNone(self.eng.observed_candidates("submissions"))
 
+    def test_the_pipeline_hire_row_answers_the_target_not_the_total(self):
+        """התקלה השנייה שדווחה: המשפך הראה 11,716 גיוסים ליעד של 400."""
+        plan = self.eng.plan_from_target("file_check", 400, 30)
+        self.assertEqual(plan["hires_in_time"], 400)
+        self.assertGreater(plan["hires"], plan["hires_in_time"])
+
+    def test_without_a_deadline_both_hire_numbers_agree(self):
+        for key in self.eng.stage_keys(with_data_only=True):
+            plan = self.eng.plan_from_target(key, 400)
+            self.assertEqual(plan["hires"], plan["hires_in_time"], key)
+
+    def test_an_unreachable_target_is_marked_not_feasible(self):
+        """400 תוך 30 יום דורש 152,470 בדיקות קבצים - כמות שמעולם לא היתה."""
+        row = next(r for r in self.eng.required_plan(400, 30)["rows"]
+                   if r["key"] == "file_check")
+        self.assertFalse(row["feasible"])
+        self.assertGreater(row["required"], row["observed"])
+
+    def test_only_the_last_stage_can_deliver_in_a_month(self):
+        self.assertEqual(self.eng.feasible_stages(400, 30), ["yachbam"])
+
+    def test_a_far_deadline_is_feasible_from_the_start_of_the_funnel(self):
+        self.assertIn("file_check", self.eng.feasible_stages(400, 122))
+
+    def test_an_open_target_is_feasible_everywhere(self):
+        self.assertEqual(self.eng.feasible_stages(400),
+                         self.eng.stage_keys(with_data_only=True))
+
+    def test_a_huge_target_is_feasible_nowhere(self):
+        self.assertEqual(self.eng.feasible_stages(100000, 30), [])
+
+    def test_a_feasible_requirement_never_exceeds_what_was_measured(self):
+        for days in (None, 30, 122, 400):
+            for row in self.eng.required_plan(400, days)["rows"]:
+                if row["has_data"] and row["feasible"] and row["required"]:
+                    self.assertLessEqual(row["required"], row["observed"],
+                                         f"{row['key']} days={days}")
+
     def test_effective_rate_is_the_rate_when_time_is_open(self):
         for key in self.eng.stage_keys(with_data_only=True):
             self.assertEqual(self.eng.effective_rate(key), self.eng.rate(key), key)

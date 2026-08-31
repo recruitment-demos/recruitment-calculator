@@ -54,6 +54,8 @@ for (const sc of scenarios) {
     results.push(Engine.combinedTimeline(sc.counts));
   } else if (sc.op === "lead_time_anomalies") {
     results.push(Engine.leadTimeAnomalies());
+  } else if (sc.op === "feasible_stages") {
+    results.push(Engine.feasibleStages(sc.target, sc.days));
   } else if (sc.op === "gap_plan") {
     results.push(Engine.gapPlan(sc.counts, sc.target, sc.days));
   } else if (sc.op === "gap_pipeline") {

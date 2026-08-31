@@ -337,7 +337,7 @@ check("דדליין קרוב מעלה את הכמות הנדרשת", () => {
   clearAll();
   setVal("target", "400");
   sandbox.calculate();
-  const open = num(planRows()[5].children
+  const open = num(planRows()[6].children
     .filter(c => c.classList.contains("fval"))[0].textContent);
 
   // חודש קדימה: רק חלק קטן ממי שנכנס יספיק להתגייס
@@ -347,11 +347,11 @@ check("דדליין קרוב מעלה את הכמות הנדרשת", () => {
     String(soon.getMonth() + 1).padStart(2, "0") + "-" +
     String(soon.getDate()).padStart(2, "0"));
   sandbox.calculate();
-  const tight = num(planRows()[5].children
+  const tight = num(planRows()[6].children
     .filter(c => c.classList.contains("fval"))[0].textContent);
 
   if (!(tight > open)) return "הדדליין לא העלה את הדרישה: " + tight + " מול " + open;
-  const expected = sandbox.Engine.requiredPlan(400, 30).rows[5].required;
+  const expected = sandbox.Engine.requiredPlan(400, 30).rows[6].required;
   return tight === expected ? null : "הכמות אינה תואמת את המנוע";
 });
 
@@ -364,25 +364,106 @@ check("שלב שלא יכול לספק את היעד בזמן מסומן ולא 
     String(soon.getMonth() + 1).padStart(2, "0") + "-" +
     String(soon.getDate()).padStart(2, "0"));
   sandbox.calculate();
-  // בדיקת קבצים אינה מגייסת תוך 10 ימים
+  // בדיקת קבצים אינה מגייסת כלל תוך 10 ימים - הרצפה שלה 21 ימים
   const row = planRows()[1];
   const val = row.children.filter(c => c.classList.contains("fval"))[0];
-  if (val.textContent !== "—") return "הוצג מספר לשלב שאינו יכול לספק";
-  return allText(row).includes("לא יספיק") ? null : "אין הסבר";
+  if (/[0-9]/.test(val.textContent))
+    return "הוצג מספר לשלב שאינו יכול לספק: " + val.textContent;
+  if (val.textContent !== "לא יספיק")
+    return "סימון לא צפוי: " + val.textContent;
+  return allText(row).includes("לא יספיק להתגייס") ? null : "אין הסבר";
 });
 
-check("דרישה גדולה מכל מה שנמדד מסומנת במפורש", () => {
+/* ---- המקרה שדווח: 400 גיוסים עד סוף ספטמבר ---- */
+const inDays = n => {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") +
+         "-" + String(d.getDate()).padStart(2, "0");
+};
+const valuesOf = body => body.children.map(r => {
+  const v = r.children.filter(c => c.classList.contains("fval"))[0];
+  return v ? v.textContent : "";
+});
+
+check("יעד בלתי אפשרי אינו מוצג כמספר ענק", () => {
   clearAll();
   setVal("target", "400");
-  const soon = new Date();
-  soon.setDate(soon.getDate() + 30);
-  setVal("targetDate", soon.getFullYear() + "-" +
-    String(soon.getMonth() + 1).padStart(2, "0") + "-" +
-    String(soon.getDate()).padStart(2, "0"));
+  setVal("targetDate", inDays(30));
+  sandbox.calculate();
+  // אף תא ערך לא יציג כמות שגדולה מכל מה שנמדד אי פעם
+  const plan = sandbox.Engine.requiredPlan(400, 30);
+  const shown = valuesOf(registry.planBody);
+  for (let i = 0; i < plan.rows.length; i++) {
+    const r = plan.rows[i];
+    if (r.has_data && !r.feasible && /[0-9]/.test(shown[i]))
+      return "הוצג מספר לשלב שאינו בר-השגה: " + shown[i];
+  }
+  return shown.some(v => v.includes("לא בר-השגה")) ? null : "אין סימון";
+});
+
+check("שורת הגיוס במשפך מציגה את היעד ולא את הגיוסים בסך הכול", () => {
+  clearAll();
+  setVal("target", "400");
+  setVal("targetDate", inDays(30));
+  sandbox.calculate();
+  const rows = registry.pipelineBody.children;
+  const hire = rows.filter(r => r.classList.contains("hire"))[0];
+  if (!hire) return "אין שורת גיוס";
+  const shown = num(hire.children.filter(c => c.classList.contains("fval"))[0].textContent);
+  const key = registry.planEntry.value;
+  const plan = sandbox.Engine.planFromTarget(key, 400, 30);
+  if (shown !== plan.hires_in_time)
+    return "שורת הגיוס מציגה " + shown + " ולא " + plan.hires_in_time;
+  if (shown !== 400) return "שורת הגיוס אינה היעד: " + shown;
+  return null;
+});
+
+check("המשפך נפתח בשלב שממנו היעד אפשרי", () => {
+  clearAll();
+  setVal("target", "400");
+  setVal("targetDate", inDays(30));
+  sandbox.calculate();
+  const feasible = sandbox.Engine.feasibleStages(400, 30);
+  if (!feasible.length) return "התרחיש אינו מתאים - אין שלב אפשרי";
+  return feasible.indexOf(registry.planEntry.value) !== -1
+    ? null : "נפתח בשלב שאינו אפשרי: " + registry.planEntry.value;
+});
+
+check("כשאין שום שלב אפשרי נאמר זאת במפורש", () => {
+  clearAll();
+  setVal("target", "100000");
+  setVal("targetDate", inDays(30));
+  sandbox.calculate();
+  if (sandbox.Engine.feasibleStages(100000, 30).length)
+    return "התרחיש אינו מתאים";
+  const txt = allText(registry.pipelineBody);
+  return txt.includes("אינו בר-השגה") ? null : "לא נאמר שהיעד בלתי אפשרי";
+});
+
+check("יעד רחוק כן מוצג עם מספרים אמיתיים", () => {
+  clearAll();
+  setVal("target", "400");
+  setVal("targetDate", inDays(122));
+  sandbox.calculate();
+  const rows = registry.pipelineBody.children;
+  const hire = rows.filter(r => r.classList.contains("hire"))[0];
+  const shown = num(hire.children.filter(c => c.classList.contains("fval"))[0].textContent);
+  if (shown !== 400) return "שורת הגיוס אינה 400 אלא " + shown;
+  const first = num(rows[0].children
+    .filter(c => c.classList.contains("fval"))[0].textContent);
+  const obs = sandbox.Engine.observedCandidates(registry.planEntry.value);
+  return first <= obs ? null : "הכמות גדולה מכל מה שנמדד: " + first;
+});
+
+check("דרישה גדולה מכל מה שנמדד מוסברת במפורש", () => {
+  clearAll();
+  setVal("target", "400");
+  setVal("targetDate", inDays(30));
   sandbox.calculate();
   const txt = allText(registry.planBody);
-  return txt.includes("הגדולה ביותר שנמדדה")
-    ? null : "לא נאמר שהכמות אינה מעשית";
+  return txt.includes("הגדולה ביותר שנמדדה") && txt.includes("מעולם לא היתה קיימת")
+    ? null : "לא הוסבר למה הכמות אינה בת-השגה";
 });
 
 check("תאריך יעד מוסיף גם תאריכים", () => {

@@ -434,7 +434,7 @@ class Engine:
                 rows.append({
                     "key": k, "label": st["label"], "has_data": False,
                     "rate": None, "share_in_time": None, "effective_rate": None,
-                    "required": None, "in_time": False,
+                    "required": None, "in_time": False, "feasible": False,
                     "lead_days_median": None, "lead_days_mean": None,
                     "measured_on": None, "observed": None, "note": st["note"],
                 })
@@ -450,6 +450,11 @@ class Engine:
             else:
                 required = None
 
+            observed = self.observed_candidates(k)
+            # דרישה שגדולה מכל קוהורט שנמדד אי פעם בשלב אינה בת-ביצוע.
+            # זו אמת מידה מהנתונים, לא סף שנקבע מראש.
+            feasible = (required is not None and
+                        (required == 0 or required <= observed))
             rows.append({
                 "key": k, "label": st["label"], "has_data": True,
                 "rate": self.rate(k),
@@ -457,13 +462,21 @@ class Engine:
                 "effective_rate": eff,
                 "required": required,
                 "in_time": eff > 0,
+                "feasible": feasible,
                 "lead_days_median": d["median"],
                 "lead_days_mean": d["mean"],
                 "measured_on": d["n"],
-                "observed": self.observed_candidates(k),
+                "observed": observed,
                 "note": "",
             })
         return rows
+
+    def feasible_stages(self, target_hires, days=None):
+        """השלבים שמהם היעד בר-השגה בזמן הנתון."""
+        plan = self.required_plan(target_hires, days)
+        if plan is None:
+            return []
+        return [r["key"] for r in plan["rows"] if r["has_data"] and r["feasible"]]
 
     def required_plan(self, target_hires, days=None):
         """כמה מועמדים צריך בכל שלב כדי לגייס את היעד, ומתי הם צריכים להיות שם.
@@ -536,12 +549,14 @@ class Engine:
                 "lead_days_mean": st["days_to_hire"]["mean"],
                 "measured_on": st["days_to_hire"]["n"],
                 "observed": self.observed_candidates(key),
-                "projection": None, "hires": 0,
+                "feasible": False,
+                "projection": None, "hires": 0, "hires_in_time": 0,
             }
         exact = target_hires / eff
         required = round_half_up(exact)
         projection = self.project_cohort(key, required)
         d = st["days_to_hire"]
+        observed = self.observed_candidates(key)
         return {
             "stage": key,
             "label": st["label"],
@@ -555,9 +570,15 @@ class Engine:
             "lead_days_median": d["median"],
             "lead_days_mean": d["mean"],
             "measured_on": d["n"],
-            "observed": self.observed_candidates(key),
+            "observed": observed,
+            "feasible": required <= observed,
             "projection": projection,
+            # מספר המגויסים בסך הכול, בלי הגבלת זמן. כשיש תאריך יעד זהו
+            # מספר אחר מהיעד, ואסור להציג אותו כאילו הוא התשובה.
             "hires": projection["hires"],
+            # מה שבאמת עונה על היעד: כמה מהם יגויסו עד התאריך
+            "hires_in_time": (projection["hires"] if days is None
+                              else self.hires_by_day(key, required, days)),
         }
 
     def gap_plan(self, counts, target_hires, days=None):

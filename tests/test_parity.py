@@ -61,6 +61,7 @@ def build_scenarios(eng):
         scenarios.append({"op": "required_funnel", "target": t})
         for d in (None, 10, 30, 122, 400):
             scenarios.append({"op": "required_plan", "target": t, "days": d})
+            scenarios.append({"op": "feasible_stages", "target": t, "days": d})
         for projected in (0, t - 1, t, t + 1, t * 3):
             scenarios.append({"op": "target_verdict", "projected": projected, "target": t})
 
@@ -167,6 +168,8 @@ def python_result(eng, sc):
         return eng.combined_timeline(sc["counts"])
     if op == "lead_time_anomalies":
         return eng.lead_time_anomalies()
+    if op == "feasible_stages":
+        return eng.feasible_stages(sc["target"], sc.get("days"))
     if op == "gap_plan":
         return eng.gap_plan(sc["counts"], sc["target"], sc["days"])
     if op == "gap_pipeline":
