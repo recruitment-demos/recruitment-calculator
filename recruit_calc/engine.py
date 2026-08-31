@@ -492,6 +492,85 @@ class Engine:
             "hires": projection["hires"],
         }
 
+    def gap_plan(self, counts, target_hires, days=None):
+        """כמה עוד צריך, אחרי שסופרים את מי שכבר נמצא בתהליך.
+
+        זו התשובה לשאלה המעשית: יש לי יעד, ויש לי כבר מועמדים בשלבים
+        שונים. כמה עוד אני צריך להכניס.
+
+        בלי החישוב הזה המחשבון דורש להתחיל הכול מאפס ומתעלם מכל מי
+        שכבר במסלול, ולכן מנפח את הדרישה.
+
+        days - כשהוא נתון, גם המלאי הקיים וגם התוספת נמדדים לפי מה
+        שיספיק עד אז. מועמד שייכנס עכשיו לשלב מוקדם לא יגויס בעוד
+        שלושה שבועות, ולכן הדרישה ממנו גדולה יותר - ולפעמים בלתי
+        אפשרית. שיעור הגיוס האפקטיבי הוא שיעור הגיוס של השלב כפול
+        החלק ממנו שמספיק להתגייס בזמן שנותר.
+        """
+        if target_hires is None:
+            return None
+
+        if days is None:
+            have = self.combine(counts)["hires"]
+            sources = [{"from": c["stage"], "from_label": c["label"],
+                        "from_count": c["count"], "hires": c["hires"]}
+                       for c in self.combine(counts)["cohorts"]]
+        else:
+            by_day = self.combined_by_day(counts, days)
+            have = 0 if by_day is None else by_day["hires"]
+            sources = [] if by_day is None else by_day["sources"]
+
+        gap = target_hires - have
+
+        rows = []
+        for k in self.stage_keys():
+            st = self.stage(k)
+            if not self.has_rate(k):
+                rows.append({
+                    "key": k, "label": st["label"], "has_data": False,
+                    "rate": None, "share_in_time": None, "effective_rate": None,
+                    "required": None, "in_time": False, "note": st["note"],
+                })
+                continue
+            share = 1.0 if days is None else self.curve_share(k, days)
+            eff = self.rate(k) * share
+            rows.append({
+                "key": k, "label": st["label"], "has_data": True,
+                "rate": self.rate(k),
+                "share_in_time": share,
+                "effective_rate": eff,
+                "required": (round_half_up(gap / eff)
+                             if gap > 0 and eff > 0 else 0 if gap <= 0 else None),
+                "in_time": eff > 0,
+                "note": "",
+            })
+
+        return {
+            "target": target_hires,
+            "have": have,
+            "gap": gap,
+            "days": days,
+            "sources": sources,
+            "rows": rows,
+        }
+
+    def gap_pipeline(self, counts, target_hires, key, days=None):
+        """אותה השלמה, כמשפך רציף אחד משלב כניסה נבחר."""
+        plan = self.gap_plan(counts, target_hires, days)
+        if plan is None or not self.has_rate(key):
+            return None
+        row = next(r for r in plan["rows"] if r["key"] == key)
+        if plan["gap"] <= 0 or not row["in_time"] or row["required"] is None:
+            return {"plan": plan, "stage": key, "label": self.stage(key)["label"],
+                    "required": row["required"], "projection": None}
+        return {
+            "plan": plan,
+            "stage": key,
+            "label": self.stage(key)["label"],
+            "required": row["required"],
+            "projection": self.project_cohort(key, row["required"]),
+        }
+
     def target_verdict(self, projected_hires, target):
         """השוואת המגויסים הצפויים ליעד."""
         if target is None:

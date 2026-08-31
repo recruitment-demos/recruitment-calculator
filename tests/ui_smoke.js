@@ -499,6 +499,71 @@ check("היעד נמדד מול מה שיתגייס עד התאריך", () => {
   return txt.includes("חסרים") ? null : "היעד נמדד מול המספר הכולל ולא עד התאריך";
 });
 
+check("יעד עם מלאי קיים מציג כמה עוד צריך", () => {
+  clearAll();
+  setVal("yachbam", "200");
+  setVal("target", "400");
+  sandbox.calculate();
+  if (!shown("gapCardPlan")) return "כרטיס ההשלמה מוסתר";
+  const plan = sandbox.Engine.gapPlan({ yachbam: 200 }, 400, null);
+  const rows = registry.gapPlanBody.children.filter(r => !r.classList.contains("msg"));
+  const nums = rows.map(r =>
+    num(r.children.filter(c => c.classList.contains("fval"))[0].textContent));
+  const expected = plan.rows.filter(r => r.has_data).map(r => r.required);
+  if (JSON.stringify(nums) !== JSON.stringify(expected))
+    return "הכמויות אינן תואמות את המנוע";
+  // חייב להיות קטן מהדרישה כשאין מלאי כלל
+  const bare = sandbox.Engine.gapPlan({}, 400, null);
+  const bareFirst = bare.rows.filter(r => r.has_data)[0].required;
+  return nums[0] < bareFirst ? null : "המלאי הקיים לא הקטין את הדרישה";
+});
+
+check("כמה כבר בדרך נאמר במפורש", () => {
+  clearAll();
+  setVal("yachbam", "200");
+  setVal("target", "400");
+  sandbox.calculate();
+  const plan = sandbox.Engine.gapPlan({ yachbam: 200 }, 400, null);
+  const sub = registry.gapPlanSub.textContent;
+  return sub.includes(String(plan.have)) && sub.includes(String(plan.gap))
+    ? null : "לא נאמר כמה כבר בדרך וכמה חסר";
+});
+
+check("יעד שכבר הושג אינו מבקש תוספת", () => {
+  clearAll();
+  setVal("yachbam", "1000");
+  setVal("target", "400");
+  sandbox.calculate();
+  const txt = allText(registry.gapPlanBody);
+  return txt.includes("אין צורך בתוספת") ? null : "לא נאמר שהיעד מושג";
+});
+
+check("שלב שלא יספיק עד התאריך מסומן", () => {
+  clearAll();
+  setVal("file_check", "100");
+  setVal("target", "400");
+  const soon = new Date();
+  soon.setDate(soon.getDate() + 10);
+  setVal("targetDate", soon.getFullYear() + "-" +
+    String(soon.getMonth() + 1).padStart(2, "0") + "-" +
+    String(soon.getDate()).padStart(2, "0"));
+  sandbox.calculate();
+  const rows = registry.gapPlanBody.children.filter(r => r.classList.contains("nodata"));
+  if (!rows.length) return "אף שלב לא סומן כלא מספיק";
+  return allText(rows[0]).includes("לא יספיק") ? null : "אין הסבר לסימון";
+});
+
+check("החלפת נקודת הכניסה בהשלמה מציירת מחדש", () => {
+  clearAll();
+  setVal("yachbam", "100");
+  setVal("target", "400");
+  sandbox.calculate();
+  const before = allText(registry.gapPipeBody);
+  registry.gapEntry.value = "screening_day";
+  registry.gapEntry._on.change();
+  return allText(registry.gapPipeBody) !== before ? null : "לא צויר מחדש";
+});
+
 check("איפוס מנקה הכל", () => {
   sandbox.reset();
   const cleared = stageKeys.every(k => registry["in_" + k].value === "");

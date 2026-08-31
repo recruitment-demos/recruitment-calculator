@@ -73,6 +73,12 @@ def build_scenarios(eng):
             for d in DAYS:
                 scenarios.append({"op": "combined_by_day",
                                   "counts": dict(counts), "days": d})
+            for t in TARGETS:
+                for d in (None, 30, 122, 400):
+                    scenarios.append({"op": "gap_plan", "counts": dict(counts),
+                                      "target": t, "days": d})
+                    scenarios.append({"op": "gap_pipeline", "counts": dict(counts),
+                                      "target": t, "stage": k, "days": d})
 
     # כמה קבוצות יחד
     for i in range(len(with_data)):
@@ -108,6 +114,14 @@ def build_scenarios(eng):
     scenarios.append({"op": "cross_check", "counts": dict(counts_all)})
     scenarios.append({"op": "combined_when", "counts": dict(counts_all)})
     scenarios.append({"op": "combined_timeline", "counts": dict(counts_all)})
+    # יעד שכבר הושג, יעד שווה בדיוק, ויעד רחוק - שלושת המסלולים בפער
+    for t in (1, 100, 5000):
+        for d in (None, 10, 122):
+            scenarios.append({"op": "gap_plan", "counts": dict(counts_all),
+                              "target": t, "days": d})
+            for k in with_data:
+                scenarios.append({"op": "gap_pipeline", "counts": dict(counts_all),
+                                  "target": t, "stage": k, "days": d})
 
     # אפסים: המשקל בממוצע המשוקלל מתאפס, ויש לוודא שהמסלול הזה זהה בשניהם
     for k in with_data:
@@ -150,6 +164,10 @@ def python_result(eng, sc):
         return eng.combined_timeline(sc["counts"])
     if op == "lead_time_anomalies":
         return eng.lead_time_anomalies()
+    if op == "gap_plan":
+        return eng.gap_plan(sc["counts"], sc["target"], sc["days"])
+    if op == "gap_pipeline":
+        return eng.gap_pipeline(sc["counts"], sc["target"], sc["stage"], sc["days"])
     if op == "required_plan":
         return eng.required_plan(sc["target"])
     if op == "plan_from_target":

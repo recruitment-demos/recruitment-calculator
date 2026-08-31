@@ -352,6 +352,17 @@
       <div class="from" id="heroFrom"></div>
     </div>
 
+    <div class="card reveal" id="gapCardPlan">
+      <h2>כמה עוד צריך, מעבר למי שכבר בתהליך</h2>
+      <p class="cardsub" id="gapPlanSub"></p>
+      <div class="funnel" id="gapPlanBody"></div>
+      <div class="pick">
+        <label for="gapEntry">נקודת הכניסה להשלמה</label>
+        <select id="gapEntry"></select>
+      </div>
+      <div class="funnel" id="gapPipeBody"></div>
+    </div>
+
     <div class="card reveal" id="planCard">
       <h2>כמה מועמדים צריך בכל שלב כדי להגיע ליעד</h2>
       <p class="cardsub" id="planSub"></p>
@@ -759,6 +770,61 @@ const Engine = (() => {
     };
   };
 
+  /* כמה עוד צריך, אחרי שסופרים את מי שכבר נמצא בתהליך.
+     בלי זה המחשבון דורש להתחיל הכול מאפס ומנפח את הדרישה. */
+  const gapPlan = (counts, target, days) => {
+    if (target === null || target === undefined) return null;
+    if (days === undefined) days = null;
+
+    let have, sources;
+    if (days === null) {
+      const c = combine(counts);
+      have = c.hires;
+      sources = c.cohorts.map(x => ({
+        from: x.stage, from_label: x.label,
+        from_count: x.count, hires: x.hires
+      }));
+    } else {
+      const bd = combinedByDay(counts, days);
+      have = bd === null ? 0 : bd.hires;
+      sources = bd === null ? [] : bd.sources;
+    }
+    const gap = target - have;
+
+    const rows = stageKeys().map(k => {
+      const st = stage(k);
+      if (!hasRate(k)) {
+        return { key: k, label: st.label, has_data: false, rate: null,
+                 share_in_time: null, effective_rate: null, required: null,
+                 in_time: false, note: st.note };
+      }
+      const share = days === null ? 1.0 : curveShare(k, days);
+      const eff = rate(k) * share;
+      return {
+        key: k, label: st.label, has_data: true, rate: rate(k),
+        share_in_time: share, effective_rate: eff,
+        required: gap > 0 ? (eff > 0 ? roundHalfUp(gap / eff) : null) : 0,
+        in_time: eff > 0, note: ""
+      };
+    });
+
+    return { target: target, have: have, gap: gap, days: days,
+             sources: sources, rows: rows };
+  };
+
+  const gapPipeline = (counts, target, k, days) => {
+    const plan = gapPlan(counts, target, days);
+    if (plan === null || !hasRate(k)) return null;
+    const row = plan.rows.filter(r => r.key === k)[0];
+    if (plan.gap <= 0 || !row.in_time || row.required === null) {
+      return { plan: plan, stage: k, label: stage(k).label,
+               required: row.required, projection: null };
+    }
+    return { plan: plan, stage: k, label: stage(k).label,
+             required: row.required,
+             projection: projectCohort(k, row.required) };
+  };
+
   const targetVerdict = (projected, target) => {
     if (target === null || target === undefined) return null;
     const allowed = Math.max(TOL.min_candidates, target * TOL.pct);
@@ -773,7 +839,8 @@ const Engine = (() => {
            projectCohort, timeline, combine, combinedWhen, combinedTimeline,
            curveShare, hiresByDay, combinedByDay,
            crossCheck, requiredForTarget, requiredFunnel, requiredPlan,
-           leadTimeAnomalies, planFromTarget, targetVerdict };
+           leadTimeAnomalies, planFromTarget, gapPlan, gapPipeline,
+           targetVerdict };
 })();
 /* __ENGINE_END__ */
 
@@ -866,14 +933,19 @@ function buildInputs() {
 }
 
 /* בורר נקודת הכניסה למשפך הרציף. רק שלבים שיש להם נתונים במקור. */
-function buildPlanEntry() {
-  const sel = $("planEntry");
+function fillEntrySelect(id) {
+  const sel = $(id);
   Engine.stageKeys(true).forEach(k => {
     const opt = el("option", null, Engine.stage(k).label);
     opt.value = k;
     sel.append(opt);
   });
   sel.value = Engine.stageKeys(true)[0];
+}
+
+function buildPlanEntry() {
+  fillEntrySelect("planEntry");
+  fillEntrySelect("gapEntry");
 }
 
 function readInputs() {
@@ -1211,6 +1283,128 @@ function renderPipeline(target, targetDate) {
   });
 }
 
+/* --- כמה עוד צריך, מעבר למי שכבר בתהליך --- *
+ * המחשבון היה דורש להתחיל הכול מאפס ומתעלם ממי שכבר במסלול. כאן
+ * נספר קודם מה כבר בדרך, ורק ההפרש מתורגם לדרישה חדשה.            */
+function renderGapPlan(counts, target, cutoffDays, targetDate) {
+  const plan = Engine.gapPlan(counts, target, cutoffDays);
+  const body = $("gapPlanBody");
+  body.innerHTML = "";
+  if (!plan) return false;
+
+  const until = targetDate ? " עד " + fmtDay(targetDate) : "";
+  const from = plan.sources.map(x =>
+    nf(x.hires) + " מ־" + nf(x.from_count) + " ב«" + x.from_label + "»").join("  +  ");
+
+  if (plan.gap <= 0) {
+    $("gapPlanSub").textContent =
+      "המועמדים שכבר בתהליך צפויים להניב " + nf(plan.have) + " מגויסים" +
+      until + ", והיעד הוא " + nf(target) + ". היעד מושג בלי להכניס אף מועמד " +
+      "חדש, עם עודף של " + nf(-plan.gap) + ". מקור המספר: " + from + ".";
+    body.append(el("div", "msg good",
+      "אין צורך בתוספת. " + nf(plan.have) + " צפויים מול יעד של " + nf(target) + "."));
+    $("gapPipeBody").innerHTML = "";
+    return true;
+  }
+
+  $("gapPlanSub").textContent =
+    "המועמדים שכבר בתהליך צפויים להניב " + nf(plan.have) + " מגויסים" + until +
+    " (" + from + "). היעד הוא " + nf(target) + ", ולכן חסרים " + nf(plan.gap) +
+    ". כל שורה למטה אומרת כמה מועמדים חדשים באותו שלב יסגרו את הפער הזה - " +
+    "לא את כל היעד." +
+    (cutoffDays !== null
+      ? " השיעור שבשימוש הוא שיעור הגיוס של השלב כפול החלק ממנו שמספיק " +
+        "להתגייס תוך " + nf(cutoffDays) + " הימים שנותרו."
+      : "");
+
+  const withData = plan.rows.filter(r => r.has_data && r.required !== null);
+  const max = Math.max.apply(null, withData.map(r => r.required).concat([1]));
+
+  plan.rows.forEach((r, i) => {
+    if (!r.has_data) return;
+
+    if (r.required === null) {
+      const row = el("div", "fstage nodata");
+      const head = el("div", "fhead");
+      head.append(el("span", "fname", r.label));
+      row.append(head, el("div", "ftrack"), el("div", "fval", "—"),
+        el("div", "fsrc", "מועמד שייכנס עכשיו ל«" + r.label + "» לא יספיק " +
+          "להתגייס תוך " + nf(cutoffDays) + " ימים. השלב הזה אינו יכול לתרום " +
+          "ליעד הזה בזמן שנותר."));
+      body.append(row);
+      return;
+    }
+
+    const row = el("div", "fstage");
+    const head = el("div", "fhead");
+    head.append(el("span", "fname", r.label));
+    head.append(el("span", "fpct", pct(r.effective_rate)));
+
+    const track = el("div", "ftrack");
+    const bar = el("div", "fbar");
+    track.append(bar);
+    later(() => { bar.style.width = ((r.required / max) * 100).toFixed(1) + "%"; },
+          70 + i * 60);
+
+    const val = el("div", "fval");
+    countUp(val, r.required, 850);
+
+    let src = nf(r.required) + " מועמדים חדשים ב«" + r.label + "» יניבו את " +
+              nf(plan.gap) + " המגויסים החסרים, לפי שיעור גיוס " + pct(r.rate);
+    if (cutoffDays !== null && r.share_in_time < 1) {
+      src += " שממנו " + pct(r.share_in_time) + " מספיקים להתגייס תוך " +
+             nf(cutoffDays) + " ימים, כלומר " + pct(r.effective_rate) + " בפועל";
+    }
+    row.append(head, track, val, el("div", "fsrc", src + "."));
+    body.append(row);
+  });
+
+  renderGapPipeline(plan, cutoffDays);
+  return true;
+}
+
+function renderGapPipeline(plan, cutoffDays) {
+  const body = $("gapPipeBody");
+  body.innerHTML = "";
+  const key = $("gapEntry").value || Engine.stageKeys(true)[0];
+  const row = plan.rows.filter(r => r.key === key)[0];
+  if (!row || row.required === null) {
+    body.append(el("div", "msg warn",
+      "מ«" + (row ? row.label : key) + "» אי אפשר להשלים את הפער בזמן שנותר."));
+    return;
+  }
+
+  const proj = Engine.projectCohort(key, row.required);
+  body.append(el("div", "cohort-title",
+    "כדי לסגור את הפער מ«" + row.label + "» צריך " + nf(row.required) +
+    " מועמדים חדשים, וזה מה שיזרום מהם"));
+
+  const max = Math.max.apply(null, proj.steps.map(x => x.count).concat([1]));
+  proj.steps.forEach((step, i) => {
+    const r = el("div", "fstage" +
+      (step.is_hire ? " hire" : step.is_source ? " source" : ""));
+    const head = el("div", "fhead");
+    head.append(el("span", "fname", step.label));
+    if (step.is_source) head.append(el("span", "chip", "נדרש"));
+    else head.append(el("span", "fpct", pct(step.reach)));
+
+    const track = el("div", "ftrack");
+    const bar = el("div", "fbar");
+    track.append(bar);
+    later(() => { bar.style.width = ((step.count / max) * 100).toFixed(1) + "%"; },
+          70 + i * 60);
+
+    const val = el("div", "fval");
+    countUp(val, step.count, 850);
+
+    r.append(head, track, val, el("div", "fsrc", step.is_source
+      ? "נקודת הכניסה של ההשלמה."
+      : nf(step.count) + " מתוך " + nf(row.required) + " (" + pct(step.reach) +
+        "), חציון " + Math.round(step.days_median) + " ימים אחרי הכניסה."));
+    body.append(r);
+  });
+}
+
 /* --- הערות ובדיקות --- */
 function renderNotes(messages) {
   const body = $("gapBody");
@@ -1222,8 +1416,8 @@ function renderNotes(messages) {
 }
 
 /* --- חשיפת התוצאות --- */
-const ALL_CARDS = ["heroCard", "planCard", "pipelineCard", "funnelCard",
-                   "whenCard", "timelineCard", "gapCard"];
+const ALL_CARDS = ["heroCard", "gapCardPlan", "planCard", "pipelineCard",
+                   "funnelCard", "whenCard", "timelineCard", "gapCard"];
 
 function revealResults(cards) {
   $("results").classList.remove("hidden");
@@ -1246,6 +1440,9 @@ function revealResults(cards) {
    שהמשתמש ילחץ שוב על «חשב». */
 let planTarget = null;
 let planDate = null;
+let gapCounts = null;
+let gapTarget = null;
+let gapDays = null;
 
 function calculate() {
   const { counts, target, targetDate, badDate } = readInputs();
@@ -1407,6 +1604,15 @@ function calculate() {
 
   /* היעד נמדד מול מה שנשאל: אם הוזן תאריך, מול מה שיתגייס עד אז. */
   const against = byDate ? byDate.hires : result.hires;
+  /* יעד יחד עם מלאי קיים: לחשב כמה עוד צריך, ולא כמה צריך מאפס */
+  let hasGapPlan = false;
+  if (target !== null) {
+    gapCounts = counts;
+    gapTarget = target;
+    gapDays = cutoffDays !== null && cutoffDays >= 0 ? cutoffDays : null;
+    hasGapPlan = renderGapPlan(counts, target, gapDays, gapDays === null ? null : targetDate);
+  }
+
   const v = Engine.targetVerdict(against, target);
   if (v) {
     const text = "יעד הגיוס הוא " + nf(v.target) +
@@ -1419,7 +1625,9 @@ function calculate() {
 
   renderNotes(notes);
 
-  const cards = ["heroCard", "funnelCard"];
+  const cards = ["heroCard"];
+  if (hasGapPlan) cards.push("gapCardPlan");
+  cards.push("funnelCard");
   if (hasWhen) cards.push("whenCard");
   if (hasTimeline) cards.push("timelineCard");
   cards.push("gapCard");
@@ -1432,6 +1640,9 @@ function reset() {
   $("in_targetDate").value = "";
   planTarget = null;
   planDate = null;
+  gapCounts = null;
+  gapTarget = null;
+  gapDays = null;
   $("results").classList.add("hidden");
   $("stickyBar").classList.remove("show");
   ALL_CARDS.forEach(id => $(id).classList.remove("in"));
@@ -1554,6 +1765,11 @@ $("calcBtn").addEventListener("click", calculate);
 $("resetBtn").addEventListener("click", reset);
 $("planEntry").addEventListener("change", () => {
   if (planTarget !== null) renderPipeline(planTarget, planDate);
+});
+$("gapEntry").addEventListener("change", () => {
+  if (gapCounts !== null && gapTarget !== null) {
+    renderGapPipeline(Engine.gapPlan(gapCounts, gapTarget, gapDays), gapDays);
+  }
 });
 document.addEventListener("keydown", e => { if (e.key === "Enter") calculate(); });
 </script>

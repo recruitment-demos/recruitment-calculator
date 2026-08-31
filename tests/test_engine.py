@@ -649,6 +649,111 @@ class TestHiresByDay(unittest.TestCase):
         self.assertIsNone(self.eng.hires_by_day("submissions", 1000, 30))
 
 
+class TestGapPlan(unittest.TestCase):
+    """כמה עוד צריך, אחרי שסופרים את מי שכבר בתהליך."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.eng = load_engine()
+        cls.keys = cls.eng.stage_keys()
+
+    def counts(self, **kw):
+        c = {k: None for k in self.keys}
+        c.update(kw)
+        return c
+
+    def test_existing_candidates_reduce_the_requirement(self):
+        """הטענה המרכזית: לא צריך להתחיל מאפס כשיש כבר מועמדים בדרך."""
+        target = 400
+        empty = self.eng.gap_plan(self.counts(), target)
+        stocked = self.eng.gap_plan(self.counts(yachbam=200), target)
+        for a, b in zip(empty["rows"], stocked["rows"]):
+            if a["has_data"]:
+                self.assertLess(b["required"], a["required"], a["key"])
+
+    def test_with_no_stock_the_gap_plan_equals_the_plain_plan(self):
+        plain = self.eng.required_plan(400)
+        gap = self.eng.gap_plan(self.counts(), 400)
+        for a, b in zip(plain["rows"], gap["rows"]):
+            self.assertEqual(a["required"], b["required"], a["key"])
+
+    def test_the_gap_is_the_target_minus_what_is_already_coming(self):
+        counts = self.counts(screening_day=300, assessment=150, yachbam=200)
+        plan = self.eng.gap_plan(counts, 400)
+        self.assertEqual(plan["have"], self.eng.combine(counts)["hires"])
+        self.assertEqual(plan["gap"], 400 - plan["have"])
+
+    def test_a_met_target_asks_for_nothing(self):
+        plan = self.eng.gap_plan(self.counts(yachbam=1000), 400)
+        self.assertLessEqual(plan["gap"], 0)
+        for row in plan["rows"]:
+            if row["has_data"]:
+                self.assertEqual(row["required"], 0, row["key"])
+
+    def test_each_required_amount_closes_exactly_the_gap(self):
+        counts = self.counts(yachbam=200)
+        plan = self.eng.gap_plan(counts, 400)
+        for row in plan["rows"]:
+            if not row["has_data"]:
+                continue
+            added = self.eng.project_cohort(row["key"], row["required"])["hires"]
+            self.assertAlmostEqual(plan["have"] + added, 400, delta=2,
+                                   msg=row["key"])
+
+    def test_a_deadline_raises_the_requirement(self):
+        """מועמד שנכנס עכשיו לא בהכרח יגויס עד התאריך, ולכן צריך יותר."""
+        counts = self.counts(yachbam=100)
+        far = self.eng.gap_plan(counts, 400, 3650)
+        near = self.eng.gap_plan(counts, 400, 60)
+        for a, b in zip(far["rows"], near["rows"]):
+            if a["has_data"] and a["required"] and b["required"]:
+                self.assertGreaterEqual(b["required"], a["required"], a["key"])
+
+    def test_a_stage_that_cannot_deliver_in_time_says_so(self):
+        """בדיקת קבצים לא מגייסת תוך 10 ימים, ולכן אינה יכולה לתרום."""
+        plan = self.eng.gap_plan(self.counts(), 400, 10)
+        row = next(r for r in plan["rows"] if r["key"] == "file_check")
+        self.assertFalse(row["in_time"])
+        self.assertIsNone(row["required"])
+
+    def test_the_effective_rate_is_the_rate_times_what_arrives_in_time(self):
+        plan = self.eng.gap_plan(self.counts(), 400, 90)
+        for row in plan["rows"]:
+            if not row["has_data"]:
+                continue
+            self.assertAlmostEqual(
+                row["effective_rate"],
+                row["rate"] * self.eng.curve_share(row["key"], 90), places=9,
+                msg=row["key"])
+
+    def test_stage_without_data_never_gets_a_requirement(self):
+        row = next(r for r in self.eng.gap_plan(self.counts(), 400)["rows"]
+                   if r["key"] == "submissions")
+        self.assertFalse(row["has_data"])
+        self.assertIsNone(row["required"])
+
+    def test_the_pipeline_is_the_forward_projection_of_the_requirement(self):
+        counts = self.counts(yachbam=100)
+        pipe = self.eng.gap_pipeline(counts, 400, "file_check")
+        self.assertEqual(pipe["projection"],
+                         self.eng.project_cohort("file_check", pipe["required"]))
+
+    def test_the_pipeline_has_no_projection_when_nothing_is_needed(self):
+        pipe = self.eng.gap_pipeline(self.counts(yachbam=1000), 400, "file_check")
+        self.assertIsNone(pipe["projection"])
+
+    def test_sources_say_where_the_existing_hires_come_from(self):
+        counts = self.counts(screening_day=300, yachbam=200)
+        plan = self.eng.gap_plan(counts, 400)
+        self.assertEqual(len(plan["sources"]), 2)
+        for src in plan["sources"]:
+            self.assertIn("from_label", src)
+            self.assertIn("from_count", src)
+
+    def test_no_target_means_no_plan(self):
+        self.assertIsNone(self.eng.gap_plan(self.counts(yachbam=100), None))
+
+
 class TestPlanning(unittest.TestCase):
     """תכנון מיעד: כמה צריך בכל שלב כדי לגייס X, ומתי."""
 
