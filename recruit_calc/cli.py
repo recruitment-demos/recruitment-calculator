@@ -6,15 +6,34 @@
     python3 -m recruit_calc.cli --from file_check 5000
     python3 -m recruit_calc.cli --from file_check 5000 --from yachbam 300 --target 400
     python3 -m recruit_calc.cli --target 400
+    python3 -m recruit_calc.cli --target 400 --by 2027-01-15
+    python3 -m recruit_calc.cli --target 400 --entry file_check
 """
 
 import argparse
+import datetime
 
 from .engine import load_engine
 
 
 def pct(x):
     return f"{x * 100:.1f}%"
+
+
+def parse_day(raw):
+    """תאריך יעד בפורמט YYYY-MM-DD, או None."""
+    if raw is None:
+        return None
+    return datetime.date.fromisoformat(raw)
+
+
+def day_before(target_date, days):
+    """התאריך שבו צריך להיות בשלב, כדי לגייס בתאריך היעד."""
+    return target_date - datetime.timedelta(days=round(days))
+
+
+def fmt_day(d):
+    return f"{d.day}.{d.month}.{d.year}"
 
 
 def print_basis(eng):
@@ -41,7 +60,13 @@ def main():
                    metavar=("STAGE", "COUNT"),
                    help="קבוצת מועמדים בשלב. אפשר לחזור על הדגל כמה פעמים.")
     p.add_argument("--target", type=int, help="יעד גיוס")
+    p.add_argument("--by", metavar="YYYY-MM-DD",
+                   help="תאריך היעד. מוסיף עד מתי צריך להיות בכל שלב.")
+    p.add_argument("--entry", metavar="STAGE",
+                   help="נקודת הכניסה למשפך הרציף. ברירת המחדל: השלב הראשון "
+                        "שיש לו נתונים.")
     args = p.parse_args()
+    by = parse_day(args.by)
 
     eng = load_engine()
 
@@ -91,12 +116,43 @@ def main():
             print(f"\n  יעד {v['target']:,} | צפוי {v['projected']:,} | {verdict}")
 
     elif args.target is not None:
-        filled = eng.required_funnel(args.target)
-        print(f"כמה מועמדים נדרשים בכל שלב כדי להגיע ל-{args.target:,} מגויסים")
-        for k in eng.stage_keys():
-            cell = filled.get(k)
-            print(f"  {eng.stage(k)['label']:<22} " +
-                  ("אין נתונים" if cell is None else f"{cell['value']:,}"))
+        plan = eng.required_plan(args.target)
+
+        print(f"כמה מועמדים צריך בכל שלב כדי לגייס {args.target:,}")
+        print("כל שורה עומדת בפני עצמה. השורות אינן מצטברות זו לזו.\n")
+        for row in plan["rows"]:
+            if not row["has_data"]:
+                print(f"  {row['label']:<22}{'אין נתונים':>10}   {row['note']}")
+                continue
+            when = (f"   עד {fmt_day(day_before(by, row['lead_days_median']))}"
+                    if by else "")
+            print(f"  {row['label']:<22}{row['required']:>10,}   "
+                  f"שיעור {pct(row['rate'])}   "
+                  f"חציון {row['lead_days_median']:>5.0f} ימים{when}")
+
+        entry = args.entry or next(k for k in eng.stage_keys() if eng.has_rate(k))
+        pipe = eng.plan_from_target(entry, args.target)
+        if pipe is None:
+            print(f"\n  אין נתונים לשלב «{entry}», ולכן אין ממנו משפך.")
+            return
+
+        entry_date = day_before(by, pipe["lead_days_median"]) if by else None
+        print(f"\nאותו יעד כמשפך אחד רציף, מ«{pipe['label']}»")
+        print(f"  צריך {pipe['required']:,} מועמדים ב«{pipe['label']}»" +
+              (f", עד {fmt_day(entry_date)}" if entry_date else "") + ".")
+        print(f"  הזנת {pipe['required']:,} ב«{pipe['label']}» במחשבון הרגיל "
+              f"תיתן בדיוק את המשפך הזה.\n")
+        for step in pipe["projection"]["steps"]:
+            if step["is_source"]:
+                continue
+            when = (f"   סביב {fmt_day(entry_date + datetime.timedelta(days=round(step['days_median'])))}"
+                    if entry_date else "")
+            print(f"  {step['label']:<22}{step['count']:>10,}   "
+                  f"({pct(step['reach'])})   "
+                  f"חציון {step['days_median']:>5.0f} ימים{when}")
+        if pipe["hires"] != args.target:
+            print(f"\n  בגלל עיגול הכמות הנדרשת, התחזית בפועל היא "
+                  f"{pipe['hires']:,} מגויסים ולא {args.target:,}.")
 
 
 if __name__ == "__main__":
