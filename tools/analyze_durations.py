@@ -112,10 +112,11 @@ HEAD = [
 
 
 IMPACT_HEAD = [
-    ("שלב", 20), ("רצפת החלון (ימים)", 17), ("תצפיות לפני", 12),
-    ("נפסלו כמהיר מדי", 15), ("תצפיות אחרי", 12),
-    ("שיעור גיוס אחרי הסינון", 20), ("חציון ימים אחרי", 15),
-    ("ממוצע ימים אחרי", 15),
+    ("שלב", 20), ("רצפה שנמצאה (ימים)", 17),
+    ("רצפת 1.5σ להשוואה", 17), ("תצפיות לפני", 12),
+    ("נפסלו", 10), ("תצפיות אחרי", 12),
+    ("שיעור גיוס", 12), ("חציון ימים", 12), ("ממוצע ימים", 12),
+    ("הנימוק", 60),
 ]
 
 
@@ -134,9 +135,11 @@ def impact_sheet(wb):
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
     head = ws.cell(row=1, column=1, value=(
-        f"הסינון שבשימוש: {f.get('sigmas')} סטיות תקן, קנה מידה "
-        f"{f.get('scale')}, חוסם {f.get('sides')}. "
-        "תצפית מחוץ לחלון אינה נספרת - לא בזמנים ולא בשיעור ההגעה."))
+        f"השיטה: {f.get('method')}. הרצפה נמצאת מצורת ההתפלגות - בליטה "
+        f"בימים הראשונים, שקע אחריה, ואז האוכלוסייה האמיתית - ונקבעת בשקע. "
+        f"תא בהיסטוגרמה {f.get('bin_days')} ימים, יחס בליטה לשקע "
+        f"{f.get('spike_ratio')}. שלב שההתפלגות שלו חלקה אינו נחתך כלל. "
+        "תצפית שנפסלה אינה נספרת לא בזמנים ולא בשיעור ההגעה."))
     head.font = Font(bold=True, size=11)
     head.alignment = Alignment(wrap_text=True, vertical="center")
     ws.merge_cells(start_row=1, start_column=1, end_row=2,
@@ -159,35 +162,42 @@ def impact_sheet(wb):
         w = st["hire_window"]
         vals = [
             st["label"],
-            None if w is None else w["from_days"],
-            None if w is None else w["observations_before"],
-            None if w is None else w["dropped_fast"],
-            None if w is None else w["observations_after"],
+            w["from_days"] if w["from_days"] is not None else "לא נמצאה",
+            w["sigma_floor_days"],
+            w["observations_before"],
+            w["dropped_fast"],
+            w["observations_after"],
             st["hire_rate"]["mid"],
             st["days_to_hire"]["median"],
             st["days_to_hire"]["mean"],
+            w["reason"],
         ]
         for c, v in enumerate(vals, start=1):
             cell = ws.cell(row=r, column=c, value=v)
             cell.border = border
-            if c == 6:
+            if c == 7:
                 cell.number_format = "0.00%"
-            elif c in (2, 7, 8):
+            elif c in (2, 3, 8, 9):
                 cell.number_format = "0.0"
-            elif c >= 3:
+            elif c in (4, 5, 6):
                 cell.number_format = "#,##0"
+            if c == 10:
+                cell.alignment = Alignment(wrap_text=True, vertical="center")
         r += 1
 
     note = ws.cell(row=r + 2, column=1, value=(
-        "למה החלון מחושב על הלוג ולא על הימים עצמם: התפלגות זמנים חסומה "
-        "באפס ומשתרעת ימינה. בקנה מידה רגיל, «ממוצע פחות 1.5 סטיות תקן» "
-        "יוצא שלילי בחלק מהמעברים - ואז הוא אינו חוסם דבר בקצה המהיר, "
-        "שהוא בדיוק הקצה שבו הבעיה. הגיליון הראשון מציג את שני החלונות "
-        "זה לצד זה, והגבולות השליליים מסומנים שם בצהוב.\n\n"
-        "למה נחסם רק הקצה המהיר: בקצה האיטי אין ממצא דומה, ולבדיקת קבצים "
-        "נפסלות שם אפס תצפיות. חסימה דו-צדדית היתה מוחקת גיוסים איטיים "
-        "אמיתיים בשלבים המאוחרים ומושכת את הזמן הממוצע כלפי מטה - כלומר "
-        "גורמת למחשבון להבטיח גיוס מהיר מהמציאות."))
+        "למה סטיית תקן נפסלה כשיטת סינון: בבדיקת קבצים היא נותנת רצפה של "
+        "4.6 ימים בלבד, ומשאירה גיוסים תוך שבוע מבדיקת קבצים - שאינם "
+        "אפשריים בתהליך הזה. הסיבה היא שהתפלגות זמנים חסומה באפס ומשתרעת "
+        "ימינה, ולכן «ממוצע פחות 1.5 סטיות תקן» יוצא שלילי או נמוך מאוד "
+        "דווקא במעברים הארוכים. עמודת «רצפת 1.5σ להשוואה» מציגה מה היא "
+        "היתה נותנת, לצד הרצפה שנמצאה בפועל.\n\n"
+        "למה נחתך רק הקצה המהיר: בקצה האיטי אין בליטה מלאכותית. חיתוך שם "
+        "היה מוחק גיוסים איטיים אמיתיים ומושך את הזמן הממוצע כלפי מטה - "
+        "כלומר גורם למחשבון להבטיח גיוס מהיר מהמציאות.\n\n"
+        "שלב שכתוב בו «לא נמצאה» הוא שלב שההתפלגות שלו חלקה, בלי שתי "
+        "אוכלוסיות, ולכן לא נחתך בו דבר. כך נשמר למשל המעבר מיחב\"מ אל "
+        "הגיוס, שבו גיוס תוך יומיים סביר לגמרי."))
     note.alignment = Alignment(wrap_text=True, vertical="top")
     ws.merge_cells(start_row=r + 2, start_column=1,
                    end_row=r + 9, end_column=len(IMPACT_HEAD))

@@ -100,49 +100,107 @@ def days_between(cohort, event_dates, window=None):
     return joined.loc[ok, "days"]
 
 
-def duration_window(days, cfg):
-    """חלון סטיות התקן של מעבר אחד, או None אם לא מסננים.
+def sigma_floor(days, cfg):
+    """רצפת סטיות תקן על log(ימים+1). מדווחת בלבד, אינה מסננת.
 
-    התפלגות זמנים חסומה באפס ומשתרעת ימינה. בקנה מידה לינארי הגבול
-    התחתון יוצא לעתים קרובות שלילי, ואז אינו חוסם דבר בקצה המהיר -
-    בדיוק בקצה שבו נמצאת הבעיה. לכן ברירת המחדל היא חלון כפלי על
-    הלוג, שגבולו התחתון תמיד חיובי ומידתי לאורך האופייני של אותו מעבר.
+    נשמרת כדי שאפשר יהיה לראות מדוע היא נפסלה כשיטה: היא נותנת
+    לבדיקת קבצים רצפה של כ-4.6 ימים ומשאירה גיוסים תוך שבוע.
+    """
+    k = cfg.get("duration_filter", {}).get("report_sigmas")
+    if not k or len(days) < 2:
+        return None
+    lg = np.log(days.astype(float) + 1.0)
+    return round(float(np.exp(lg.mean() - k * lg.std(ddof=1)) - 1.0), 1)
+
+
+def antimode_floor(days, cfg):
+    """הרצפה, לפי השקע בין האוכלוסייה המזויפת לאמיתית.
+
+    רישום שנעשה בדיעבד יוצר בליטה בימים הראשונים. אחריה יש שקע, ואז
+    מתחילה האוכלוסייה שבאמת עברה את התהליך. הרצפה נקבעת בסוף השקע.
+
+    שלוש הגנות מפני זיהוי שווא:
+      1. החיפוש נעצר בחציון. בלי זה הוא נתקע ברעש הזנב הדליל.
+      2. הבליטה חייבת להיות גדולה פי spike_ratio מהשקע.
+      3. גם מה שאחרי השקע חייב להיות גדול פי spike_ratio ממנו.
+    בלי שלושתן, התפלגות חלקה אחת נחתכת בטעות. זה בדיוק מה שמונע
+    חיתוך של מעבר מהיר אמיתי כמו יחב"מ אל גיוס.
+
+    מחזיר (רצפה, הסבר). רצפה None פירושה שלא נמצאו שתי אוכלוסיות.
     """
     f = cfg.get("duration_filter", {})
-    if not f.get("enabled") or len(days) < f.get("min_observations", 30):
-        return None
+    if len(days) < f.get("min_observations", 100):
+        return None, "מעט מדי תצפיות לזיהוי אמין"
 
     d = days.astype(float)
-    k = float(f.get("sigmas", 1.5))
-    if f.get("scale", "log") == "log":
-        lg = np.log(d + 1.0)
-        m, sd = float(lg.mean()), float(lg.std(ddof=1))
-        lo = float(np.exp(m - k * sd) - 1.0)
-        hi = float(np.exp(m + k * sd) - 1.0)
-    else:
-        m, sd = float(d.mean()), float(d.std(ddof=1))
-        lo, hi = m - k * sd, m + k * sd
+    bin_days = f.get("bin_days", 3)
+    ratio = f.get("spike_ratio", 2.0)
+    top = float(np.median(d)) if f.get("search_to_median", True) else float(d.max())
 
-    sides = f.get("sides", "both")
-    if sides == "low":
-        hi = float("inf")
-    elif sides == "high":
-        lo = float("-inf")
-    return (max(lo, 0.0), hi)
+    edges = np.arange(0, top + bin_days, bin_days)
+    if len(edges) < 6:
+        return None, "טווח קצר מדי לזיהוי שקע"
+    cnt = np.array([int(((d >= edges[i]) & (d < edges[i + 1])).sum())
+                    for i in range(len(edges) - 1)])
+
+    inner = cnt[1:-1]
+    if not len(inner):
+        return None, "אין אזור פנימי לחפש בו"
+    v = int(np.argmin(inner)) + 1
+    low = max(int(cnt[v]), 1)
+    before = int(cnt[:v].max())
+    after = int(cnt[v + 1:].max())
+
+    if before < ratio * low:
+        return None, (f"אין בליטה בהתחלה: {before} מול שקע {cnt[v]}, "
+                      f"פחות מפי {ratio}")
+    if after < ratio * low:
+        return None, (f"אין עלייה אחרי השקע: {after} מול {cnt[v]}, "
+                      f"פחות מפי {ratio}")
+
+    floor = float(edges[v + 1])
+    return floor, (f"בליטה {before} בהתחלה, שקע {cnt[v]} סביב יום "
+                   f"{edges[v]:.0f}, ואחריו {after}")
 
 
-def window_record(window, days_before, days_after):
+def duration_window(days, cfg, pair=None):
+    """חלון התצפיות הקבילות של מעבר אחד, או None אם לא מסננים."""
+    f = cfg.get("duration_filter", {})
+    if not f.get("enabled"):
+        return None, None
+
+    floor, why = antimode_floor(days, cfg)
+
+    # ידע מקצועי שאינו בקבצים גובר על מה שנמצא בהם
+    manual = f.get("min_days", {}).get(pair) if pair else None
+    if manual is not None and (floor is None or manual > floor):
+        floor, why = float(manual), f"רצפה ידנית של {manual} ימים מקובץ ההגדרות"
+
+    if floor is None:
+        return None, why
+    return (floor, float("inf")), why
+
+
+def window_record(window, why, days_before, days_after, cfg):
     """תיעוד החלון לשקיפות. נשמר בנתונים ומוצג בעמוד."""
+    sig = sigma_floor(days_before, cfg)
     if window is None:
-        return None
-    n_before = int(len(days_before))
+        return {
+            "from_days": None, "to_days": None, "reason": why,
+            "observations_before": int(len(days_before)),
+            "observations_after": int(len(days_after)),
+            "dropped_fast": 0, "dropped_slow": 0,
+            "sigma_floor_days": sig,
+        }
     return {
         "from_days": round(window[0], 1),
         "to_days": None if window[1] == float("inf") else round(window[1], 1),
-        "observations_before": n_before,
+        "reason": why,
+        "observations_before": int(len(days_before)),
         "observations_after": int(len(days_after)),
         "dropped_fast": int((days_before < window[0]).sum()),
         "dropped_slow": int((days_before > window[1]).sum()),
+        "sigma_floor_days": sig,
     }
 
 
@@ -240,7 +298,7 @@ def reached_ids_after(cohort, event_dates, window=None):
 
 
 def measure(source_dates, event_dates, horizon, conservative_date, cfg,
-            want_buckets=False):
+            want_buckets=False, pair=None):
     """מדידת שיעור הגעה וזמן הגעה משלב מקור לשלב יעד, בשני בסיסים."""
     cut, p90 = mature_cutoff(
         source_dates, event_dates, horizon,
@@ -255,7 +313,7 @@ def measure(source_dates, event_dates, horizon, conservative_date, cfg,
     # החלון נקבע מהקוהורט הבשל, שהוא המדידה השלמה ביותר של המעבר הזה,
     # ואז מוחל על שני הבסיסים כדי ששניהם ימדדו את אותו דבר.
     raw_days = days_between(mat_cohort, event_dates)
-    window = duration_window(raw_days, cfg)
+    window, why = duration_window(raw_days, cfg, pair)
 
     cons_reached = int(len(reached_ids_after(cons_cohort, event_dates, window)))
     mat_reached = int(len(reached_ids_after(mat_cohort, event_dates, window)))
@@ -276,7 +334,7 @@ def measure(source_dates, event_dates, horizon, conservative_date, cfg,
             "mid": round((low + high) / 2, 6),
         },
         "days": stats,
-        "window": window_record(window, raw_days, days),
+        "window": window_record(window, why, raw_days, days, cfg),
         "basis": {
             "conservative": {
                 "cutoff": conservative_date.date().isoformat(),
@@ -339,7 +397,8 @@ def main():
         # הסדר שב-config תואם את הסדר שנמדד בפועל לפי חציון הימים.
         later = data_keys[data_keys.index(s["key"]) + 1:]
         for other in later:
-            m = measure(src, first[other], last_activity, conservative_date, cfg)
+            m = measure(src, first[other], last_activity, conservative_date, cfg,
+                        pair=f"{s['key']}->{other}")
             if m is None or m["days"]["n"] < cfg["min_transition_n"]:
                 continue
             forward.append({
@@ -350,7 +409,7 @@ def main():
             })
 
         hire_m = measure(src, hire_date, last_hire, conservative_date, cfg,
-                         want_buckets=True)
+                         want_buckets=True, pair=f"{s['key']}->hire")
         if hire_m is None:
             sys.exit(f"אין נתוני גיוס לשלב {s['label']}")
 
