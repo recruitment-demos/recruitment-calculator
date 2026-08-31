@@ -239,6 +239,8 @@
     transition: width .8s cubic-bezier(.2, .7, .3, 1);
   }
   .bar-val { text-align: left; font-variant-numeric: tabular-nums; font-weight: 700; }
+  .bar-row.late { opacity: .5; }
+  .bar-row.late .bar-fill { background: linear-gradient(90deg, #8a99ad, #b9c4d3); }
 
   .cohort { margin-bottom: 22px; }
   .cohort:last-child { margin-bottom: 0; }
@@ -535,6 +537,49 @@ const Engine = (() => {
     };
   };
 
+  /* איזה חלק מהמגויסים מאותו שלב כבר התגייס בתוך מספר ימים נתון.
+     נקרא מהעקומה המדודה שנבנתה יום ביום מקובצי המקור, ולא מחלונות
+     הזמן, כדי שתאריך שנופל באמצע חלון יקבל תשובה מדודה. */
+  const curveShare = (k, days) => {
+    if (days === null || days === undefined || !hasRate(k)) return null;
+    const curve = stage(k).hire_curve;
+    if (!curve) return null;
+    let share = 0.0;
+    for (let i = 0; i < curve.length; i++) {
+      if (curve[i][0] <= days) share = curve[i][1];
+      else break;
+    }
+    return share;
+  };
+
+  /* כמה מהקבוצה יתגייסו בתוך מספר ימים. זו תת-קבוצה של הגיוסים
+     הצפויים בסך הכול, ולא מספר אחר. */
+  const hiresByDay = (k, count, days) => {
+    if (count === null || days === null || days === undefined || !hasRate(k))
+      return null;
+    const share = curveShare(k, days);
+    if (share === null) return null;
+    return roundHalfUp(count * rate(k) * share);
+  };
+
+  const combinedByDay = (counts, days) => {
+    if (days === null || days === undefined) return null;
+    const result = combine(counts);
+    const sources = [];
+    let total = 0;
+    result.cohorts.forEach(c => {
+      const n = hiresByDay(c.stage, c.count, days);
+      if (n === null) return;
+      total += n;
+      sources.push({
+        from: c.stage, from_label: c.label, from_count: c.count,
+        hires: n, eventual: c.hires, share: curveShare(c.stage, days)
+      });
+    });
+    if (!sources.length) return null;
+    return { days: days, hires: total, eventual: result.hires, sources: sources };
+  };
+
   /* מתי צפויים להגיע לכל שלב - שורה אחת לכל שלב, לכל הקבוצות יחד.
      המשתמש ביקש גרף אחד ולא גרף לכל שלב שהוזן. הכמות היא סכום ההגעות,
      והזמן הוא ממוצע משוקלל של חציוני הימים לפי מספר המועמדים.
@@ -713,6 +758,7 @@ const Engine = (() => {
 
   return { stage, hasRate, rate, label, stageKeys, forward, roundHalfUp, roundTo,
            projectCohort, timeline, combine, combinedWhen, combinedTimeline,
+           curveShare, hiresByDay, combinedByDay,
            crossCheck, requiredForTarget, requiredFunnel, requiredPlan,
            leadTimeAnomalies, planFromTarget, targetVerdict };
 })();
@@ -736,8 +782,14 @@ const el = (tag, cls, text) => {
 function parseDay(raw) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(raw || "").trim());
   if (!m) return null;
-  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-  return isNaN(d.getTime()) ? null : d;
+  const y = Number(m[1]), mo = Number(m[2]), day = Number(m[3]);
+  const d = new Date(y, mo - 1, day);
+  if (isNaN(d.getTime())) return null;
+  // ל-31 בספטמבר אין קיום, ו-new Date מגלגל אותו בשקט ל-1 באוקטובר.
+  // בלי הבדיקה הזו תאריך שגוי היה מתקבל כאילו כלום.
+  if (d.getFullYear() !== y || d.getMonth() !== mo - 1 || d.getDate() !== day)
+    return null;
+  return d;
 }
 function shiftDays(base, days) {
   const out = new Date(base.getFullYear(), base.getMonth(), base.getDate());
@@ -746,6 +798,9 @@ function shiftDays(base, days) {
 }
 function fmtDay(d) {
   return d.getDate() + "." + (d.getMonth() + 1) + "." + d.getFullYear();
+}
+function daysBetween(from, to) {
+  return Math.round((to.getTime() - from.getTime()) / 86400000);
 }
 function todayDay() {
   const n = new Date();
@@ -817,10 +872,13 @@ function readInputs() {
   });
   const rawT = $("in_target").value.trim();
   const t = rawT === "" ? null : Number(rawT);
+  const rawDate = String($("in_targetDate").value || "").trim();
   return {
     counts: counts,
     target: Number.isFinite(t) ? t : null,
-    targetDate: parseDay($("in_targetDate").value)
+    targetDate: parseDay(rawDate),
+    // תאריך שהוזן ולא נקרא. בלי זה הוא היה נבלע בשקט.
+    badDate: rawDate !== "" && parseDay(rawDate) === null ? rawDate : null
   };
 }
 
@@ -968,7 +1026,7 @@ function timelineSourceText(row) {
     "» (" + pct(x.share) + " ממי שיתגייס מהם)").join("  +  ");
 }
 
-function renderTimeline(counts) {
+function renderTimeline(counts, cutoffDays) {
   const body = $("timelineBody");
   body.innerHTML = "";
   const merged = Engine.combinedTimeline(counts);
@@ -986,11 +1044,17 @@ function renderTimeline(counts) {
   const maxHires = Math.max.apply(null, merged.rows.map(r => r.hires).concat([1]));
 
   merged.rows.forEach((r, i) => {
-    const row = el("div", "bar-row");
+    // חלון שכולו אחרי תאריך היעד מסומן ככזה, כדי שיהיה ברור מה
+    // נספר בתוך התאריך ומה כבר מאוחר ממנו.
+    const b = byKey[r.key];
+    const late = cutoffDays !== null && cutoffDays !== undefined &&
+                 b.min_days > cutoffDays;
+    const row = el("div", "bar-row" + (late ? " late" : ""));
 
     const name = el("div");
     name.append(el("div", null, r.label));
-    name.append(el("small", "tlcount", bucketDate(byKey[r.key], start)));
+    name.append(el("small", "tlcount", bucketDate(b, start) +
+                   (late ? " · אחרי תאריך היעד" : "")));
 
     const track = el("div", "bar-track");
     const fill = el("div", "bar-fill");
@@ -1171,7 +1235,7 @@ let planTarget = null;
 let planDate = null;
 
 function calculate() {
-  const { counts, target, targetDate } = readInputs();
+  const { counts, target, targetDate, badDate } = readInputs();
   const entered = Engine.stageKeys().filter(k => counts[k] !== null && Engine.hasRate(k));
   const notes = [];
 
@@ -1185,6 +1249,13 @@ function calculate() {
 
   const manual = {};
   DATA.stages.forEach(s => { manual[s.key] = counts[s.key]; });
+
+  if (badDate) {
+    notes.push({ kind: "warn", text:
+      "«" + badDate + "» אינו תאריך תקין ולכן לא נלקח בחשבון. " +
+      "שים לב שיש חודשים בני 30 יום: ל-31 בספטמבר, באפריל, ביוני " +
+      "ובנובמבר אין קיום." });
+  }
 
   if (!entered.length && target === null) {
     $("results").classList.add("hidden");
@@ -1237,13 +1308,33 @@ function calculate() {
   /* --- מצב גזירה קדימה --- */
   const result = Engine.combine(counts);
 
+  /* תאריך יעד בזרימה קדימה: השאלה משתנה מ"כמה יתגייסו בסוף" ל"כמה
+     יתגייסו עד התאריך הזה". אלה שני מספרים שונים, והמספר הגדול צריך
+     לענות על מה שנשאל בפועל. */
+  const cutoffDays = targetDate === null ? null : daysBetween(todayDay(), targetDate);
+  const byDate = cutoffDays !== null && cutoffDays >= 0
+    ? Engine.combinedByDay(counts, cutoffDays) : null;
+
   const heroFrom = result.cohorts.map(c =>
     nf(c.hires) + " מתוך " + nf(c.count) + " ב«" + c.label + "»").join("  +  ");
   const heroNote = result.cohorts.length === 1
     ? "מתוך " + nf(result.cohorts[0].count) + " מועמדים ב«" + result.cohorts[0].label + "»"
     : "מסך " + result.cohorts.length + " הקבוצות שהוזנו";
 
-  renderHero("מגויסים צפויים", result.hires, heroNote, heroFrom);
+  if (byDate) {
+    renderHero(
+      "מגויסים עד " + fmtDay(targetDate),
+      byDate.hires,
+      nf(byDate.hires) + " מתוך " + nf(byDate.eventual) +
+        " שיתגייסו בסופו של דבר, כלומר " + pct(byDate.hires / byDate.eventual) +
+        " מהם, בתוך " + nf(cutoffDays) + " ימים",
+      byDate.sources.map(x =>
+        nf(x.hires) + " מתוך " + nf(x.eventual) + " שיתגייסו מ-" +
+        nf(x.from_count) + " ב«" + x.from_label + "» (" + pct(x.share) +
+        " מהם מתגייסים תוך " + nf(cutoffDays) + " ימים)").join("  +  "));
+  } else {
+    renderHero("מגויסים צפויים", result.hires, heroNote, heroFrom);
+  }
 
   $("funnelSub").textContent = result.cohorts.length === 1
     ? "הכול נגזר מ-" + nf(result.cohorts[0].count) + " המועמדים שהוזנו ב«" +
@@ -1259,10 +1350,12 @@ function calculate() {
     "המסלול בפועל. התאריכים מניחים שהמועמדים נמצאים היום בשלב שהוזן.";
   $("timelineSub").textContent =
     "כל המגויסים הצפויים מכל הקבוצות, בגרף אחד. התאריכים מניחים שהמועמדים " +
-    "נמצאים היום בשלב שהוזן.";
+    "נמצאים היום בשלב שהוזן." +
+    (byDate ? " החלונות שמאוחרים מ-" + fmtDay(targetDate) + " מסומנים " +
+              "בהיר: הם אינם נספרים ב-" + nf(byDate.hires) + " שלמעלה." : "");
 
   const hasWhen = renderWhen(counts);
-  const hasTimeline = renderTimeline(counts);
+  const hasTimeline = renderTimeline(counts, cutoffDays);
 
   if (result.overlap_warning) {
     notes.push({ kind: "warn", text:
@@ -1285,9 +1378,27 @@ function calculate() {
     }
   });
 
-  const v = Engine.targetVerdict(result.hires, target);
+  if (byDate) {
+    notes.unshift({ kind: "flat", text:
+      "עד " + fmtDay(targetDate) + " צפויים " + nf(byDate.hires) + " מגויסים, " +
+      "ולא " + nf(byDate.eventual) + ". " + nf(byDate.eventual) + " הוא מספר " +
+      "המגויסים בסופו של דבר, בלי הגבלת זמן; חלק מהם יתגייסו אחרי התאריך " +
+      "שהוזן. החלק שמתגייס בתוך " + nf(cutoffDays) + " ימים נמדד מעקומת " +
+      "הגיוס שנבנתה יום ביום מקובצי המקור." });
+  } else if (cutoffDays !== null && cutoffDays < 0) {
+    notes.push({ kind: "warn", text:
+      "תאריך היעד שהוזן, " + fmtDay(targetDate) + ", כבר עבר. " +
+      "לא ניתן לחשב כמה יתגייסו עד תאריך שחלף, ולכן מוצג מספר המגויסים " +
+      "בסופו של דבר." });
+  }
+
+  /* היעד נמדד מול מה שנשאל: אם הוזן תאריך, מול מה שיתגייס עד אז. */
+  const against = byDate ? byDate.hires : result.hires;
+  const v = Engine.targetVerdict(against, target);
   if (v) {
-    const text = "יעד הגיוס הוא " + nf(v.target) + ", והתחזית היא " + nf(v.projected) + ". ";
+    const text = "יעד הגיוס הוא " + nf(v.target) +
+      (byDate ? ", והתחזית עד " + fmtDay(targetDate) + " היא " : ", והתחזית היא ") +
+      nf(v.projected) + ". ";
     if (v.kind === "target_miss") notes.push({ kind: "bad", text: text + "חסרים " + nf(v.gap) + "." });
     else if (v.kind === "target_over") notes.push({ kind: "good", text: text + "עודף של " + nf(v.gap) + "." });
     else notes.push({ kind: "good", text: text + "היעד מושג." });

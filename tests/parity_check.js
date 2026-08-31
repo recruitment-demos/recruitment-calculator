@@ -42,6 +42,12 @@ for (const sc of scenarios) {
     results.push(Engine.timeline(sc.stage, sc.count));
   } else if (sc.op === "combine") {
     results.push(Engine.combine(sc.counts));
+  } else if (sc.op === "curve_share") {
+    results.push(Engine.curveShare(sc.stage, sc.days));
+  } else if (sc.op === "hires_by_day") {
+    results.push(Engine.hiresByDay(sc.stage, sc.count, sc.days));
+  } else if (sc.op === "combined_by_day") {
+    results.push(Engine.combinedByDay(sc.counts, sc.days));
   } else if (sc.op === "combined_when") {
     results.push(Engine.combinedWhen(sc.counts));
   } else if (sc.op === "combined_timeline") {

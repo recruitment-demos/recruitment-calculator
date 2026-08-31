@@ -457,6 +457,105 @@ class TestCombinedCharts(unittest.TestCase):
                 self.assertIn("from_label", src)
 
 
+class TestHiresByDay(unittest.TestCase):
+    """כמה יתגייסו עד יום מסוים - תת-קבוצה של הגיוסים, לא מספר אחר."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.eng = load_engine()
+        cls.keys = cls.eng.stage_keys()
+
+    def counts(self, **kw):
+        c = {k: None for k in self.keys}
+        c.update(kw)
+        return c
+
+    def test_every_stage_with_data_has_a_measured_curve(self):
+        for s in self.eng.stages:
+            if s["has_data"]:
+                self.assertTrue(s["hire_curve"], s["key"])
+            else:
+                self.assertIsNone(s["hire_curve"], s["key"])
+
+    def test_curve_is_sorted_and_cumulative(self):
+        for key in self.eng.stage_keys(with_data_only=True):
+            curve = self.eng.stage(key)["hire_curve"]
+            days = [d for d, _ in curve]
+            shares = [x for _, x in curve]
+            self.assertEqual(days, sorted(days), key)
+            self.assertEqual(shares, sorted(shares), key)
+            self.assertGreater(shares[0], 0, key)
+            self.assertAlmostEqual(shares[-1], 1.0, places=4, msg=key)
+
+    def test_curve_agrees_with_the_buckets(self):
+        """אימות צולב: העקומה והחלונות נמדדו בנפרד וחייבים להסכים."""
+        for key in self.eng.stage_keys(with_data_only=True):
+            cum = 0.0
+            for b in self.eng.stage(key)["buckets"]:
+                cum += b["share"]
+                if b["max_days"] is None:
+                    continue
+                self.assertAlmostEqual(
+                    self.eng.curve_share(key, b["max_days"]), cum, places=4,
+                    msg=f"{key} ביום {b['max_days']}")
+
+    def test_share_before_the_first_hire_is_zero(self):
+        for key in self.eng.stage_keys(with_data_only=True):
+            first = self.eng.stage(key)["hire_curve"][0][0]
+            self.assertEqual(self.eng.curve_share(key, first - 1), 0.0, key)
+            self.assertEqual(self.eng.curve_share(key, -5), 0.0, key)
+
+    def test_share_never_decreases(self):
+        for key in self.eng.stage_keys(with_data_only=True):
+            prev = -1.0
+            for day in range(0, 400, 3):
+                got = self.eng.curve_share(key, day)
+                self.assertGreaterEqual(got, prev, f"{key} ביום {day}")
+                prev = got
+
+    def test_by_day_never_exceeds_the_eventual_hires(self):
+        for key in self.eng.stage_keys(with_data_only=True):
+            eventual = self.eng.project_cohort(key, 1000)["hires"]
+            for day in (0, 7, 30, 90, 365, 5000):
+                got = self.eng.hires_by_day(key, 1000, day)
+                self.assertLessEqual(got, eventual, f"{key} ביום {day}")
+
+    def test_by_day_reaches_the_eventual_hires_in_the_end(self):
+        for key in self.eng.stage_keys(with_data_only=True):
+            eventual = self.eng.project_cohort(key, 1000)["hires"]
+            self.assertEqual(self.eng.hires_by_day(key, 1000, 100000), eventual, key)
+
+    def test_a_month_is_far_less_than_the_eventual_total(self):
+        """המקרה שהמשתמש דיווח עליו: 1,000 בבדיקת קבצים, חודש קדימה."""
+        eventual = self.eng.project_cohort("file_check", 1000)["hires"]
+        month = self.eng.hires_by_day("file_check", 1000, 30)
+        self.assertLess(month, eventual / 2)
+
+    def test_combined_by_day_sums_the_cohorts(self):
+        counts = self.counts(file_check=1000, yachbam=300)
+        merged = self.eng.combined_by_day(counts, 30)
+        apart = (self.eng.hires_by_day("file_check", 1000, 30) +
+                 self.eng.hires_by_day("yachbam", 300, 30))
+        self.assertEqual(merged["hires"], apart)
+        self.assertEqual(merged["eventual"], self.eng.combine(counts)["hires"])
+
+    def test_combined_by_day_records_its_sources(self):
+        merged = self.eng.combined_by_day(self.counts(file_check=1000, yachbam=300), 30)
+        self.assertEqual(len(merged["sources"]), 2)
+        for src in merged["sources"]:
+            self.assertIn("from_label", src)
+            self.assertIn("eventual", src)
+            self.assertLessEqual(src["hires"], src["eventual"])
+
+    def test_no_day_means_no_answer(self):
+        self.assertIsNone(self.eng.combined_by_day(self.counts(file_check=1000), None))
+        self.assertIsNone(self.eng.hires_by_day("file_check", 1000, None))
+
+    def test_stage_without_data_gets_no_curve_answer(self):
+        self.assertIsNone(self.eng.curve_share("submissions", 30))
+        self.assertIsNone(self.eng.hires_by_day("submissions", 1000, 30))
+
+
 class TestPlanning(unittest.TestCase):
     """תכנון מיעד: כמה צריך בכל שלב כדי לגייס X, ומתי."""
 

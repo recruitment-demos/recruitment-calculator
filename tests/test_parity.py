@@ -18,6 +18,8 @@ from recruit_calc.engine import load_engine  # noqa: E402
 
 COUNTS = [1, 3, 7, 25, 100, 407, 999, 1000, 12345, 50000]
 TARGETS = [1, 12, 250, 900, 4321]
+# ימים: לפני העקומה, על נקודות מדויקות, באמצע חלונות, ומעבר לסופה
+DAYS = [-5, 0, 1, 7, 14, 15, 30, 31, 45, 60, 71, 90, 120, 200, 365, 5000]
 
 
 def node_available():
@@ -39,9 +41,14 @@ def build_scenarios(eng):
     for k in keys:
         scenarios.append({"op": "rate", "stage": k})
         scenarios.append({"op": "forward", "stage": k})
+        for d in DAYS:
+            scenarios.append({"op": "curve_share", "stage": k, "days": d})
         for c in COUNTS:
             scenarios.append({"op": "project_cohort", "stage": k, "count": c})
             scenarios.append({"op": "timeline", "stage": k, "count": c})
+            for d in DAYS:
+                scenarios.append({"op": "hires_by_day", "stage": k,
+                                  "count": c, "days": d})
         for t in TARGETS:
             scenarios.append({"op": "required_for_target", "stage": k, "target": t})
             scenarios.append({"op": "plan_from_target", "stage": k, "target": t})
@@ -63,6 +70,9 @@ def build_scenarios(eng):
             scenarios.append({"op": "cross_check", "counts": dict(counts)})
             scenarios.append({"op": "combined_when", "counts": dict(counts)})
             scenarios.append({"op": "combined_timeline", "counts": dict(counts)})
+            for d in DAYS:
+                scenarios.append({"op": "combined_by_day",
+                                  "counts": dict(counts), "days": d})
 
     # כמה קבוצות יחד
     for i in range(len(with_data)):
@@ -75,6 +85,9 @@ def build_scenarios(eng):
                 scenarios.append({"op": "cross_check", "counts": dict(counts)})
                 scenarios.append({"op": "combined_when", "counts": dict(counts)})
                 scenarios.append({"op": "combined_timeline", "counts": dict(counts)})
+                for d in DAYS:
+                    scenarios.append({"op": "combined_by_day",
+                                      "counts": dict(counts), "days": d})
 
     # מקרי גבול של סף העקביות: בדיוק הכמות הצפויה ומעט סביבה
     for a in with_data:
@@ -125,6 +138,12 @@ def python_result(eng, sc):
         return eng.combine(sc["counts"])
     if op == "cross_check":
         return eng.cross_check(sc["counts"])
+    if op == "curve_share":
+        return eng.curve_share(sc["stage"], sc["days"])
+    if op == "hires_by_day":
+        return eng.hires_by_day(sc["stage"], sc["count"], sc["days"])
+    if op == "combined_by_day":
+        return eng.combined_by_day(sc["counts"], sc["days"])
     if op == "combined_when":
         return eng.combined_when(sc["counts"])
     if op == "combined_timeline":

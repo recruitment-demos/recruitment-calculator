@@ -202,6 +202,71 @@ class Engine:
             "overlap_warning": len(cohorts) > 1,
         }
 
+    def curve_share(self, key, days):
+        """איזה חלק מהמגויסים מאותו שלב כבר התגייס בתוך מספר ימים נתון.
+
+        נקרא מהעקומה המדודה שנבנתה יום ביום מקובצי המקור, ולא מחלונות
+        הזמן. תאריך שנופל באמצע חלון מקבל כאן תשובה מדודה ולא משוערת.
+
+        בין שתי נקודות בעקומה הערך שטוח, ולכן לוקחים את הנקודה
+        האחרונה שאינה מאוחרת מהיום המבוקש.
+        """
+        if days is None or not self.has_rate(key):
+            return None
+        curve = self.stage(key)["hire_curve"]
+        if not curve:
+            return None
+        share = 0.0
+        for day, cum in curve:
+            if day <= days:
+                share = cum
+            else:
+                break
+        return share
+
+    def hires_by_day(self, key, count, days):
+        """כמה מהקבוצה צפויים להתגייס בתוך מספר ימים נתון.
+
+        זה תת-קבוצה של הגיוסים הצפויים בסך הכול, לא מספר אחר. הקבוצה
+        שתתגייס בסוף היא count * hire_rate, ומתוכה החלק שכבר הספיק
+        להתגייס עד היום המבוקש הוא curve_share.
+        """
+        if count is None or days is None or not self.has_rate(key):
+            return None
+        share = self.curve_share(key, days)
+        if share is None:
+            return None
+        return round_half_up(count * self.rate(key) * share)
+
+    def combined_by_day(self, counts, days):
+        """כמה יתגייסו עד יום מסוים, מכל הקבוצות יחד, עם מקור לכל חלק."""
+        if days is None:
+            return None
+        result = self.combine(counts)
+        sources = []
+        total = 0
+        for c in result["cohorts"]:
+            n = self.hires_by_day(c["stage"], c["count"], days)
+            if n is None:
+                continue
+            total += n
+            sources.append({
+                "from": c["stage"],
+                "from_label": c["label"],
+                "from_count": c["count"],
+                "hires": n,
+                "eventual": c["hires"],
+                "share": self.curve_share(c["stage"], days),
+            })
+        if not sources:
+            return None
+        return {
+            "days": days,
+            "hires": total,
+            "eventual": result["hires"],
+            "sources": sources,
+        }
+
     def combined_when(self, counts):
         """מתי צפויים להגיע לכל שלב - שורה אחת לכל שלב, לכל הקבוצות יחד.
 

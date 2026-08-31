@@ -86,7 +86,11 @@ const D = sandbox.DATA;
 const stageKeys = D.stages.map(s => s.key);
 const withData = D.stages.filter(s => s.has_data).map(s => s.key);
 const setVal = (id, v) => { registry["in_" + id].value = v; };
-const clearAll = () => { stageKeys.forEach(k => setVal(k, "")); setVal("target", ""); };
+const clearAll = () => {
+  stageKeys.forEach(k => setVal(k, ""));
+  setVal("target", "");
+  setVal("targetDate", "");
+};
 const shown = id => !registry[id].classList.contains("hidden");
 const revealed = id => registry[id].classList.contains("in");
 const num = s => Number(String(s).replace(/[^0-9]/g, ""));
@@ -409,6 +413,90 @@ check("הסרגל הדביק מקבל את המספר", () => {
   sandbox.calculate();
   const hires = sandbox.Engine.projectCohort("file_check", 5000).hires;
   return num(registry.stickyValue.textContent) === hires ? null : "הסרגל לא עודכן";
+});
+
+check("תאריך יעד בזרימה קדימה מקטין את המספר הגדול", () => {
+  clearAll();
+  setVal("file_check", "1000");
+  sandbox.calculate();
+  const eventual = sandbox.Engine.projectCohort("file_check", 1000).hires;
+  if (num(registry.heroValue.textContent) !== eventual)
+    return "בלי תאריך המספר אינו מספר הגיוסים הכולל";
+
+  // תאריך עתידי קרוב: רק חלק מהמגויסים יספיקו עד אז
+  const soon = new Date();
+  soon.setDate(soon.getDate() + 30);
+  const iso = soon.getFullYear() + "-" +
+    String(soon.getMonth() + 1).padStart(2, "0") + "-" +
+    String(soon.getDate()).padStart(2, "0");
+  setVal("targetDate", iso);
+  sandbox.calculate();
+
+  const expected = sandbox.Engine.hiresByDay("file_check", 1000, 30);
+  const got = num(registry.heroValue.textContent);
+  if (got !== expected) return "המספר " + got + " אינו " + expected;
+  if (got >= eventual) return "התאריך לא הקטין את המספר";
+  if (!registry.heroCap.textContent.includes("עד ")) return "הכותרת לא מזכירה תאריך";
+  return allText(registry.gapBody).includes(String(eventual))
+    ? null : "לא נאמר מהו מספר הגיוסים הכולל";
+});
+
+check("חלונות שמאוחרים מתאריך היעד מסומנים", () => {
+  clearAll();
+  setVal("file_check", "1000");
+  const soon = new Date();
+  soon.setDate(soon.getDate() + 30);
+  setVal("targetDate", soon.getFullYear() + "-" +
+    String(soon.getMonth() + 1).padStart(2, "0") + "-" +
+    String(soon.getDate()).padStart(2, "0"));
+  sandbox.calculate();
+  const rows = registry.timelineBody.children[0].children
+    .filter(c => c.classList.contains("bars"))[0].children;
+  const late = rows.filter(r => r.classList.contains("late"));
+  // החלונות "חודש עד חודשיים" ואילך מתחילים אחרי יום 30
+  if (late.length !== 3) return "סומנו " + late.length + " חלונות במקום 3";
+  return allText(late[0]).includes("אחרי תאריך היעד") ? null : "אין הסבר לסימון";
+});
+
+check("תאריך שעבר אינו משנה את המספר ומפיק אזהרה", () => {
+  clearAll();
+  setVal("file_check", "1000");
+  setVal("targetDate", "2020-01-01");
+  sandbox.calculate();
+  const eventual = sandbox.Engine.projectCohort("file_check", 1000).hires;
+  if (num(registry.heroValue.textContent) !== eventual)
+    return "תאריך שעבר שינה את המספר";
+  return registry.gapBody.children.some(
+    c => c.classList.contains("warn") && c.textContent.includes("כבר עבר"))
+    ? null : "אין אזהרה על תאריך שעבר";
+});
+
+check("תאריך לא תקין מפיק אזהרה ואינו נבלע", () => {
+  clearAll();
+  setVal("file_check", "1000");
+  setVal("targetDate", "2026-09-31");
+  sandbox.calculate();
+  const eventual = sandbox.Engine.projectCohort("file_check", 1000).hires;
+  if (num(registry.heroValue.textContent) !== eventual)
+    return "תאריך לא תקין השפיע על החישוב";
+  return registry.gapBody.children.some(
+    c => c.classList.contains("warn") && c.textContent.includes("אינו תאריך תקין"))
+    ? null : "אין אזהרה על תאריך לא תקין";
+});
+
+check("היעד נמדד מול מה שיתגייס עד התאריך", () => {
+  clearAll();
+  setVal("file_check", "1000");
+  setVal("target", "50");
+  const soon = new Date();
+  soon.setDate(soon.getDate() + 30);
+  setVal("targetDate", soon.getFullYear() + "-" +
+    String(soon.getMonth() + 1).padStart(2, "0") + "-" +
+    String(soon.getDate()).padStart(2, "0"));
+  sandbox.calculate();
+  // 99 בסך הכול עוברים את היעד 50, אבל עד 30 יום רק 25 - כלומר חוסר
+  const txt = allText(registry.gapBody);
+  return txt.includes("חסרים") ? null : "היעד נמדד מול המספר הכולל ולא עד התאריך";
 });
 
 check("איפוס מנקה הכל", () => {

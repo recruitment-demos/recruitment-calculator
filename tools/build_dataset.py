@@ -142,6 +142,31 @@ def bucket_shares(days, buckets):
     return out
 
 
+def hire_curve(days):
+    """עקומת גיוס מצטברת: איזה חלק מהמגויסים התגייס תוך X ימים.
+
+    נמדדת ישירות מהנתונים, יום ביום, ולא נגזרת מחלונות הזמן. הסיבה:
+    שאלה כמו "כמה יתגייסו עד 30.9" נופלת באמצע חלון, וחלוקה יחסית
+    בתוך החלון היתה ניחוש על משהו שאפשר פשוט למדוד.
+
+    נשמרות רק הנקודות שבהן העקומה משתנה - כלומר ימים שבהם התגייס
+    לפחות מועמד אחד. בין שתי נקודות העקומה שטוחה, ולכן זה מדויק
+    לחלוטין ולא דחיסה מאבדת.
+
+    כל איבר הוא [יום, חלק מצטבר].
+    """
+    n = len(days)
+    if n == 0:
+        return None
+    counts = days.value_counts().sort_index()
+    curve = []
+    seen = 0
+    for day, c in counts.items():
+        seen += int(c)
+        curve.append([int(day), round(seen / n, 6)])
+    return curve
+
+
 def reached_ids_after(cohort, event_dates):
     """מי מהקוהורט הגיע לשלב היעד *אחרי* השלב שממנו מודדים.
 
@@ -202,6 +227,7 @@ def measure(source_dates, event_dates, horizon, conservative_date, cfg,
     }
     if want_buckets:
         out["buckets"] = bucket_shares(days, cfg["time_buckets"])
+        out["curve"] = hire_curve(days)
     return out
 
 
@@ -235,7 +261,8 @@ def main():
                 "key": s["key"], "label": s["label"], "activity_type": None,
                 "has_data": False, "note": s.get("note", ""),
                 "hire_rate": None, "days_to_hire": None,
-                "buckets": None, "basis": None, "forward": None,
+                "buckets": None, "hire_curve": None,
+                "basis": None, "forward": None,
             })
             continue
 
@@ -275,6 +302,7 @@ def main():
             "hire_rate": hire_m["reach"],
             "days_to_hire": hire_m["days"],
             "buckets": hire_m["buckets"],
+            "hire_curve": hire_m["curve"],
             "basis": hire_m["basis"],
             "forward": forward,
         })

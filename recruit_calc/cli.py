@@ -24,7 +24,12 @@ def parse_day(raw):
     """תאריך יעד בפורמט YYYY-MM-DD, או None."""
     if raw is None:
         return None
-    return datetime.date.fromisoformat(raw)
+    try:
+        return datetime.date.fromisoformat(raw)
+    except ValueError:
+        raise SystemExit(
+            f"«{raw}» אינו תאריך תקין. הפורמט הוא YYYY-MM-DD, ויש חודשים "
+            f"בני 30 יום - ל-31 בספטמבר, באפריל, ביוני ובנובמבר אין קיום.")
 
 
 def day_before(target_date, days):
@@ -108,8 +113,30 @@ def main():
                   f"צפויים {cc['expected']:,} ב«{eng.label(cc['late'])}», "
                   f"הוזנו {cc['actual']:,} - {verdict}.")
 
+        if by is not None:
+            cutoff = (by - datetime.date.today()).days
+            if cutoff < 0:
+                print(f"\n  התאריך {fmt_day(by)} כבר עבר, ולכן לא ניתן לחשב "
+                      f"כמה יתגייסו עד אליו.")
+            else:
+                bd = eng.combined_by_day(counts, cutoff)
+                if bd is not None:
+                    print(f"\n  עד {fmt_day(by)} (בעוד {cutoff:,} ימים) צפויים "
+                          f"{bd['hires']:,} מגויסים, מתוך {bd['eventual']:,} "
+                          f"שיתגייסו בסופו של דבר.")
+                    for src in bd["sources"]:
+                        print(f"    {src['hires']:>6,} מתוך {src['eventual']:,} "
+                              f"שיתגייסו מ-{src['from_count']:,} "
+                              f"ב«{src['from_label']}»   ({pct(src['share'])} מהם)")
+
         if args.target is not None:
-            v = eng.target_verdict(result["hires"], args.target)
+            against = result["hires"]
+            if by is not None:
+                cutoff = (by - datetime.date.today()).days
+                bd = eng.combined_by_day(counts, cutoff) if cutoff >= 0 else None
+                if bd is not None:
+                    against = bd["hires"]
+            v = eng.target_verdict(against, args.target)
             verdict = {"target_miss": f"חסרים {v['gap']:,}",
                        "target_over": f"עודף של {v['gap']:,}",
                        "target_ok": "היעד מושג"}[v["kind"]]
