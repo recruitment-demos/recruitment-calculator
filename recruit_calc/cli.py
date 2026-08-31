@@ -143,24 +143,44 @@ def main():
             print(f"\n  יעד {v['target']:,} | צפוי {v['projected']:,} | {verdict}")
 
     elif args.target is not None:
-        plan = eng.required_plan(args.target)
+        days = None
+        if by is not None:
+            left = (by - datetime.date.today()).days
+            if left < 0:
+                raise SystemExit(f"התאריך {fmt_day(by)} כבר עבר.")
+            days = left
 
-        print(f"כמה מועמדים צריך בכל שלב כדי לגייס {args.target:,}")
+        plan = eng.required_plan(args.target, days)
+
+        print(f"כמה מועמדים צריך בכל שלב כדי לגייס {args.target:,}" +
+              (f" עד {fmt_day(by)} (בעוד {days:,} ימים)" if days is not None else ""))
         print("כל שורה עומדת בפני עצמה. השורות אינן מצטברות זו לזו.\n")
         for row in plan["rows"]:
             if not row["has_data"]:
                 print(f"  {row['label']:<22}{'אין נתונים':>10}   {row['note']}")
                 continue
+            if row["required"] is None:
+                print(f"  {row['label']:<22}{'לא יספיק':>10}   "
+                      f"אף מועמד שייכנס עכשיו לא יתגייס תוך {days:,} ימים")
+                continue
             when = (f"   עד {fmt_day(day_before(by, row['lead_days_median']))}"
                     if by else "")
+            flag = ("   [לא מעשי: גדול מ-"
+                    f"{row['observed']:,} שנמדדו אי פעם]"
+                    if row["observed"] and row["required"] > row["observed"] else "")
             print(f"  {row['label']:<22}{row['required']:>10,}   "
-                  f"שיעור {pct(row['rate'])}   "
-                  f"חציון {row['lead_days_median']:>5.0f} ימים{when}")
+                  f"שיעור {pct(row['effective_rate'])}   "
+                  f"חציון {row['lead_days_median']:>5.0f} ימים{when}{flag}")
 
         entry = args.entry or next(k for k in eng.stage_keys() if eng.has_rate(k))
-        pipe = eng.plan_from_target(entry, args.target)
+        pipe = eng.plan_from_target(entry, args.target, days)
         if pipe is None:
             print(f"\n  אין נתונים לשלב «{entry}», ולכן אין ממנו משפך.")
+            return
+
+        if pipe["required"] is None:
+            print(f"\n  מ«{pipe['label']}» אי אפשר לגייס {args.target:,} "
+                  f"תוך {days:,} ימים. צריך להתחיל משלב מאוחר יותר.")
             return
 
         entry_date = day_before(by, pipe["lead_days_median"]) if by else None
