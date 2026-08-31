@@ -363,20 +363,20 @@
       <div class="funnel" id="gapPipeBody"></div>
     </div>
 
-    <div class="card reveal" id="planCard">
-      <h2>כמה מועמדים צריך בכל שלב כדי להגיע ליעד</h2>
-      <p class="cardsub" id="planSub"></p>
-      <div class="funnel" id="planBody"></div>
-    </div>
-
     <div class="card reveal" id="pipelineCard">
-      <h2>אותו יעד, כמשפך אחד רציף</h2>
+      <h2>כמה צריך שיעברו בכל שלב</h2>
       <p class="cardsub" id="pipelineSub"></p>
       <div class="pick">
         <label for="planEntry">נקודת הכניסה לתהליך</label>
         <select id="planEntry"></select>
       </div>
       <div class="funnel" id="pipelineBody"></div>
+    </div>
+
+    <div class="card reveal" id="planCard">
+      <h2>לחלופין: אם כל המועמדים נמצאים בשלב אחד בלבד</h2>
+      <p class="cardsub" id="planSub"></p>
+      <div class="funnel" id="planBody"></div>
     </div>
 
     <div class="card reveal" id="funnelCard">
@@ -1181,9 +1181,11 @@ function renderPlan(target, targetDate) {
   body.innerHTML = "";
 
   $("planSub").textContent =
-    "כל שורה עומדת בפני עצמה ועונה על שאלה אחת: אם כל המועמדים שיש לי " +
-    "נמצאים בשלב הזה, כמה מהם צריכים להיות שם כדי לגייס " + nf(target) + ". " +
-    "השורות אינן מצטברות זו לזו - הן תשובות חלופיות, לא משפך." +
+    "הטבלה שלמעלה מתארת קבוצה אחת שעוברת את כל התהליך. כאן שאלה אחרת: " +
+    "אם המועמדים שיש לי נמצאים כולם בשלב אחד בלבד, כמה צריכים להיות שם " +
+    "כדי לגייס " + nf(target) + ". שש תשובות חלופיות, שאינן מצטברות זו לזו " +
+    "ואינן משפך. שים לב שהמספרים כאן גבוהים מאלה שלמעלה, כי כאן אין " +
+    "מועמדים בשום שלב אחר." +
     (targetDate ? " התאריכים נגזרים מיעד הגיוס " + fmtDay(targetDate) +
                   " פחות חציון הזמן עד הגיוס מאותו שלב." : "");
 
@@ -1247,8 +1249,10 @@ function renderPipeline(target, targetDate) {
     ? shiftDays(targetDate, -plan.lead_days_median) : null;
 
   $("pipelineSub").textContent =
-    "כדי לגייס " + nf(target) + " מגויסים צריך " + nf(plan.required) +
-    " מועמדים ב«" + plan.label + "», וזה מה שיזרום מהם הלאה. " +
+    "אלה אותם אנשים בכל השורות, בזמנים שונים: כדי לגייס " + nf(target) +
+    " צריך ש-" + nf(plan.required) + " יעברו ב«" + plan.label +
+    "», ומהם יעברו הכמויות שלמטה בכל שלב הלאה. השורות אינן מצטברות זו " +
+    "לזו אלא עוקבות זו אחר זו. " +
     "אם תזין " + nf(plan.required) + " בשדה «" + plan.label +
     "» שלמעלה, תקבל בדיוק את המשפך הזה." +
     (plan.hires !== target
@@ -1416,7 +1420,7 @@ function renderNotes(messages) {
 }
 
 /* --- חשיפת התוצאות --- */
-const ALL_CARDS = ["heroCard", "gapCardPlan", "planCard", "pipelineCard",
+const ALL_CARDS = ["heroCard", "gapCardPlan", "pipelineCard", "planCard",
                    "funnelCard", "whenCard", "timelineCard", "gapCard"];
 
 function revealResults(cards) {
@@ -1488,8 +1492,8 @@ function calculate() {
         : "כל כמות נגזרת משיעור הגיוס הנמדד של אותו שלב. " +
           "מילוי «תאריך היעד» יוסיף גם עד מתי הם צריכים להיות שם.");
 
-    renderPlan(target, targetDate);
     renderPipeline(target, targetDate);
+    renderPlan(target, targetDate);
 
     notes.unshift({ kind: "flat", text:
       "שתי הטבלאות עונות על אותה שאלה בשתי דרכים. הראשונה מתייחסת לכל שלב " +
@@ -1511,7 +1515,7 @@ function calculate() {
       });
     }
     renderNotes(notes);
-    revealResults(["heroCard", "planCard", "pipelineCard", "gapCard"]);
+    revealResults(["heroCard", "pipelineCard", "planCard", "gapCard"]);
     return;
   }
 
