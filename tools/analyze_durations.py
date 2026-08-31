@@ -111,6 +111,88 @@ HEAD = [
 ]
 
 
+IMPACT_HEAD = [
+    ("שלב", 20), ("רצפת החלון (ימים)", 17), ("תצפיות לפני", 12),
+    ("נפסלו כמהיר מדי", 15), ("תצפיות אחרי", 12),
+    ("שיעור גיוס אחרי הסינון", 20), ("חציון ימים אחרי", 15),
+    ("ממוצע ימים אחרי", 15),
+]
+
+
+def impact_sheet(wb):
+    """מה הסינון עשה בפועל, לפי מאגר הנתונים הבנוי."""
+    path = ROOT / "data" / "recruitment_data.json"
+    if not path.exists():
+        return
+    import json
+    data = json.loads(path.read_text(encoding="utf-8"))
+    f = data.get("duration_filter", {})
+
+    ws = wb.create_sheet("השפעת הסינון")
+    ws.sheet_view.rightToLeft = True
+    thin = Side(style="thin", color="D0D7E5")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    head = ws.cell(row=1, column=1, value=(
+        f"הסינון שבשימוש: {f.get('sigmas')} סטיות תקן, קנה מידה "
+        f"{f.get('scale')}, חוסם {f.get('sides')}. "
+        "תצפית מחוץ לחלון אינה נספרת - לא בזמנים ולא בשיעור ההגעה."))
+    head.font = Font(bold=True, size=11)
+    head.alignment = Alignment(wrap_text=True, vertical="center")
+    ws.merge_cells(start_row=1, start_column=1, end_row=2,
+                   end_column=len(IMPACT_HEAD))
+
+    for c, (name, width) in enumerate(IMPACT_HEAD, start=1):
+        cell = ws.cell(row=4, column=c, value=name)
+        cell.font = Font(bold=True, color="FFFFFF", size=10)
+        cell.fill = PatternFill("solid", fgColor="1F4E79")
+        cell.alignment = Alignment(horizontal="center", vertical="center",
+                                   wrap_text=True)
+        cell.border = border
+        ws.column_dimensions[get_column_letter(c)].width = width
+    ws.row_dimensions[4].height = 40
+
+    r = 5
+    for st in data["stages"]:
+        if not st["has_data"]:
+            continue
+        w = st["hire_window"]
+        vals = [
+            st["label"],
+            None if w is None else w["from_days"],
+            None if w is None else w["observations_before"],
+            None if w is None else w["dropped_fast"],
+            None if w is None else w["observations_after"],
+            st["hire_rate"]["mid"],
+            st["days_to_hire"]["median"],
+            st["days_to_hire"]["mean"],
+        ]
+        for c, v in enumerate(vals, start=1):
+            cell = ws.cell(row=r, column=c, value=v)
+            cell.border = border
+            if c == 6:
+                cell.number_format = "0.00%"
+            elif c in (2, 7, 8):
+                cell.number_format = "0.0"
+            elif c >= 3:
+                cell.number_format = "#,##0"
+        r += 1
+
+    note = ws.cell(row=r + 2, column=1, value=(
+        "למה החלון מחושב על הלוג ולא על הימים עצמם: התפלגות זמנים חסומה "
+        "באפס ומשתרעת ימינה. בקנה מידה רגיל, «ממוצע פחות 1.5 סטיות תקן» "
+        "יוצא שלילי בחלק מהמעברים - ואז הוא אינו חוסם דבר בקצה המהיר, "
+        "שהוא בדיוק הקצה שבו הבעיה. הגיליון הראשון מציג את שני החלונות "
+        "זה לצד זה, והגבולות השליליים מסומנים שם בצהוב.\n\n"
+        "למה נחסם רק הקצה המהיר: בקצה האיטי אין ממצא דומה, ולבדיקת קבצים "
+        "נפסלות שם אפס תצפיות. חסימה דו-צדדית היתה מוחקת גיוסים איטיים "
+        "אמיתיים בשלבים המאוחרים ומושכת את הזמן הממוצע כלפי מטה - כלומר "
+        "גורמת למחשבון להבטיח גיוס מהיר מהמציאות."))
+    note.alignment = Alignment(wrap_text=True, vertical="top")
+    ws.merge_cells(start_row=r + 2, start_column=1,
+                   end_row=r + 9, end_column=len(IMPACT_HEAD))
+
+
 def main():
     rows = collect()
     wb = Workbook()
@@ -163,6 +245,8 @@ def main():
     note.alignment = Alignment(wrap_text=True, vertical="top")
     ws.merge_cells(start_row=len(rows) + 3, start_column=1,
                    end_row=len(rows) + 5, end_column=len(HEAD))
+
+    impact_sheet(wb)
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     wb.save(OUT)
