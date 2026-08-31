@@ -704,26 +704,53 @@ const Engine = (() => {
     return out;
   };
 
-  /* כמה מועמדים צריך בכל שלב כדי לגייס את היעד, ומתי הם צריכים להיות שם.
-     כל שורה עומדת בפני עצמה - שש תשובות חלופיות לאותה שאלה, לא משפך. */
-  const requiredPlan = (target) => {
+  /* שיעור הגיוס שאפשר לממש בזמן שנותר. מי שיתגייס אחרי התאריך
+     אינו עונה על היעד, ולכן אינו נספר. */
+  const effectiveRate = (k, days) => {
+    if (!hasRate(k)) return null;
+    if (days === null || days === undefined) return rate(k);
+    const share = curveShare(k, days);
+    return share === null ? null : rate(k) * share;
+  };
+
+  /* הקוהורט הגדול ביותר שנמדד אי פעם בשלב. אמת מידה לדרישה ענקית. */
+  const observedCandidates = (k) => {
+    if (!hasRate(k)) return null;
+    const b = stage(k).basis;
+    return Math.max(b.conservative.candidates, b.mature.candidates);
+  };
+
+  /* שורות הדרישה - מקור האמת היחיד. משמש גם את requiredPlan וגם את
+     gapPlan. בעבר היו שני מימושים ורק אחד התחשב בזמן, וכך «400
+     גיוסים תוך חודש» החזיר 5,205 בדיקות קבצים - כמות שמניבה כ-13
+     גיוסים בחודש ולא 400. */
+  const requirementRows = (needed, days) => stageKeys().map(k => {
+    const st = stage(k);
+    if (!hasRate(k)) {
+      return { key: k, label: st.label, has_data: false, rate: null,
+               share_in_time: null, effective_rate: null, required: null,
+               in_time: false, lead_days_median: null, lead_days_mean: null,
+               measured_on: null, observed: null, note: st.note };
+    }
+    const d = st.days_to_hire;
+    const share = (days === null || days === undefined) ? 1.0 : curveShare(k, days);
+    const eff = rate(k) * share;
+    let required;
+    if (needed <= 0) required = 0;
+    else if (eff > 0) required = roundHalfUp(needed / eff);
+    else required = null;
+    return {
+      key: k, label: st.label, has_data: true, rate: rate(k),
+      share_in_time: share, effective_rate: eff, required: required,
+      in_time: eff > 0, lead_days_median: d.median, lead_days_mean: d.mean,
+      measured_on: d.n, observed: observedCandidates(k), note: ""
+    };
+  });
+
+  const requiredPlan = (target, days) => {
     if (target === null || target === undefined) return null;
-    const rows = stageKeys().map(k => {
-      const st = stage(k);
-      if (!hasRate(k)) {
-        return { key: k, label: st.label, has_data: false, required: null,
-                 rate: null, lead_days_median: null, lead_days_mean: null,
-                 measured_on: null, note: st.note };
-      }
-      const d = st.days_to_hire;
-      return {
-        key: k, label: st.label, has_data: true,
-        required: roundHalfUp(target / rate(k)), rate: rate(k),
-        lead_days_median: d.median, lead_days_mean: d.mean,
-        measured_on: d.n, note: ""
-      };
-    });
-    return { target: target, rows: rows };
+    if (days === undefined) days = null;
+    return { target: target, days: days, rows: requirementRows(target, days) };
   };
 
   /* שלבים שמהם הדרך לגיוס ארוכה יותר מאשר משלב מוקדם יותר. הזמנים
@@ -755,17 +782,30 @@ const Engine = (() => {
      הכמות הנדרשת מחושבת מהיעד, ומשם הכול נגזר קדימה בדיוק כמו
      projectCohort - כך שהזנת המספר הנדרש במחשבון הרגיל תיתן אותו משפך.
      בגלל העיגול, hires עשוי להיות שונה מהיעד במגויס או שניים. */
-  const planFromTarget = (k, target) => {
+  const planFromTarget = (k, target, days) => {
     if (target === null || target === undefined || !hasRate(k)) return null;
+    if (days === undefined) days = null;
     const st = stage(k);
-    const exact = target / rate(k);
+    const d = st.days_to_hire;
+    const eff = effectiveRate(k, days);
+    if (!eff) {
+      return {
+        stage: k, label: st.label, target: target, required: null, exact: null,
+        rate: rate(k), effective_rate: eff, share_in_time: curveShare(k, days),
+        days: days, lead_days_median: d.median, lead_days_mean: d.mean,
+        measured_on: d.n, observed: observedCandidates(k),
+        projection: null, hires: 0
+      };
+    }
+    const exact = target / eff;
     const required = roundHalfUp(exact);
     const projection = projectCohort(k, required);
-    const d = st.days_to_hire;
     return {
       stage: k, label: st.label, target: target, required: required,
-      exact: roundTo(exact, 1), rate: rate(k),
+      exact: roundTo(exact, 1), rate: rate(k), effective_rate: eff,
+      share_in_time: days === null ? 1.0 : curveShare(k, days), days: days,
       lead_days_median: d.median, lead_days_mean: d.mean, measured_on: d.n,
+      observed: observedCandidates(k),
       projection: projection, hires: projection.hires
     };
   };
@@ -791,22 +831,7 @@ const Engine = (() => {
     }
     const gap = target - have;
 
-    const rows = stageKeys().map(k => {
-      const st = stage(k);
-      if (!hasRate(k)) {
-        return { key: k, label: st.label, has_data: false, rate: null,
-                 share_in_time: null, effective_rate: null, required: null,
-                 in_time: false, note: st.note };
-      }
-      const share = days === null ? 1.0 : curveShare(k, days);
-      const eff = rate(k) * share;
-      return {
-        key: k, label: st.label, has_data: true, rate: rate(k),
-        share_in_time: share, effective_rate: eff,
-        required: gap > 0 ? (eff > 0 ? roundHalfUp(gap / eff) : null) : 0,
-        in_time: eff > 0, note: ""
-      };
-    });
+    const rows = requirementRows(gap, days);
 
     return { target: target, have: have, gap: gap, days: days,
              sources: sources, rows: rows };
@@ -839,6 +864,7 @@ const Engine = (() => {
            projectCohort, timeline, combine, combinedWhen, combinedTimeline,
            curveShare, hiresByDay, combinedByDay,
            crossCheck, requiredForTarget, requiredFunnel, requiredPlan,
+           effectiveRate, observedCandidates,
            leadTimeAnomalies, planFromTarget, gapPlan, gapPipeline,
            targetVerdict };
 })();
@@ -1163,50 +1189,76 @@ function renderTimeline(counts, cutoffDays) {
  * שתי קריאות לאותה שאלה, ושתיהן מוצגות.
  *   planBody     - כל שלב לבדו. שש תשובות חלופיות, שאינן מצטברות.
  *   pipelineBody - משפך אחד רציף מנקודת כניסה נבחרת.                    */
-function planSourceText(r, target, targetDate) {
-  let t = nf(r.required) + " מועמדים ב«" + r.label + "» לבדם מניבים " +
-          nf(target) + " מגויסים, לפי שיעור גיוס " + pct(r.rate) +
-          " שנמדד על " + nf(r.measured_on) + " מועמדים שהתגייסו בפועל. " +
-          "חציון " + Math.round(r.lead_days_median) + " ימים מהשלב הזה ועד הגיוס";
-  if (targetDate) {
-    t += ", ולכן הם צריכים להיות בשלב הזה עד " +
-         fmtDay(shiftDays(targetDate, -r.lead_days_median));
-  }
-  return t + ".";
+/* דרישה שגדולה מכל קוהורט שנמדד אי פעם בשלב אינה מעשית. זו עובדה
+   מדידה ולא הערכה, ולכן אפשר לומר אותה במפורש. */
+function unrealistic(r) {
+  return r.required !== null && r.observed && r.required > r.observed;
 }
 
-function renderPlan(target, targetDate) {
-  const plan = Engine.requiredPlan(target);
+function planSourceText(r, target, targetDate, days) {
+  const timed = days !== null && days !== undefined;
+
+  let t = nf(r.required) + " מועמדים ב«" + r.label + "» לבדם מניבים " +
+          nf(target) + " מגויסים, לפי שיעור גיוס " + pct(r.rate) +
+          " שנמדד על " + nf(r.measured_on) + " מועמדים שהתגייסו בפועל";
+
+  if (timed && r.share_in_time < 1) {
+    t += ". מתוכם רק " + pct(r.share_in_time) + " מספיקים להתגייס תוך " +
+         nf(days) + " ימים, ולכן השיעור שבשימוש הוא " + pct(r.effective_rate);
+  }
+
+  t += ". חציון " + Math.round(r.lead_days_median) + " ימים מהשלב הזה ועד הגיוס";
+  if (targetDate) {
+    t += ", כלומר צריך להיות שם עד " +
+         fmtDay(shiftDays(targetDate, -r.lead_days_median));
+  }
+  t += ".";
+
+  if (unrealistic(r)) {
+    t += "  לתשומת לבך: הכמות הזו גדולה מ־" + nf(r.observed) +
+         ", הקבוצה הגדולה ביותר שנמדדה אי פעם ב«" + r.label +
+         "». אין דרך מעשית להשיג את היעד מהשלב הזה בזמן הנתון.";
+  }
+  return t;
+}
+
+function renderPlan(target, targetDate, days) {
+  const plan = Engine.requiredPlan(target, days);
   const body = $("planBody");
   body.innerHTML = "";
+  const timed = days !== null && days !== undefined;
 
   $("planSub").textContent =
     "הטבלה שלמעלה מתארת קבוצה אחת שעוברת את כל התהליך. כאן שאלה אחרת: " +
     "אם המועמדים שיש לי נמצאים כולם בשלב אחד בלבד, כמה צריכים להיות שם " +
     "כדי לגייס " + nf(target) + ". שש תשובות חלופיות, שאינן מצטברות זו לזו " +
-    "ואינן משפך. שים לב שהמספרים כאן גבוהים מאלה שלמעלה, כי כאן אין " +
-    "מועמדים בשום שלב אחר." +
-    (targetDate ? " התאריכים נגזרים מיעד הגיוס " + fmtDay(targetDate) +
-                  " פחות חציון הזמן עד הגיוס מאותו שלב." : "");
+    "ואינן משפך." +
+    (timed
+      ? " הכמויות מחושבות לפי מה שמספיק להתגייס תוך " + nf(days) +
+        " הימים שנותרו עד " + fmtDay(targetDate) + ", ולכן הן גבוהות בהרבה " +
+        "מאשר בלי הגבלת זמן."
+      : "");
 
-  const withData = plan.rows.filter(r => r.has_data);
-  const max = Math.max.apply(null, withData.map(r => r.required).concat([1]));
+  const usable = plan.rows.filter(r => r.has_data && r.required !== null);
+  const max = Math.max.apply(null, usable.map(r => r.required).concat([1]));
 
   plan.rows.forEach((r, i) => {
-    if (!r.has_data) {
+    if (!r.has_data || r.required === null) {
       const row = el("div", "fstage nodata");
       const head = el("div", "fhead");
       head.append(el("span", "fname", r.label));
       row.append(head, el("div", "ftrack"), el("div", "fval", "—"),
-                 el("div", "fsrc", r.note));
+        el("div", "fsrc", !r.has_data ? r.note
+          : "אף מועמד שייכנס עכשיו ל«" + r.label + "» לא יספיק להתגייס תוך " +
+            nf(days) + " ימים. השלב הזה אינו יכול לספק את היעד בזמן הזה."));
       body.append(row);
       return;
     }
 
-    const row = el("div", "fstage");
+    const row = el("div", "fstage" + (unrealistic(r) ? " nodata" : ""));
     const head = el("div", "fhead");
     head.append(el("span", "fname", r.label));
-    head.append(el("span", "fpct", pct(r.rate)));
+    head.append(el("span", "fpct", pct(r.effective_rate)));
 
     const track = el("div", "ftrack");
     const bar = el("div", "fbar");
@@ -1218,16 +1270,20 @@ function renderPlan(target, targetDate) {
     countUp(val, r.required, 850);
 
     row.append(head, track, val,
-               el("div", "fsrc", planSourceText(r, target, targetDate)));
+               el("div", "fsrc", planSourceText(r, target, targetDate, days)));
     body.append(row);
   });
 }
 
 function pipelineSourceText(plan, step, entryDate) {
   if (step.is_source) {
-    return "נקודת הכניסה. שיעור הגיוס מ«" + plan.label + "» הוא " +
-           pct(plan.rate) + ", ולכן " + nf(plan.target) + " חלקי " +
-           pct(plan.rate) + " הם " + nf(plan.exact) + ", ובעיגול " +
+    const basis = plan.days === null
+      ? "שיעור הגיוס מ«" + plan.label + "» הוא " + pct(plan.rate)
+      : "שיעור הגיוס מ«" + plan.label + "» הוא " + pct(plan.rate) +
+        ", ומתוכו " + pct(plan.share_in_time) + " מספיקים להתגייס תוך " +
+        nf(plan.days) + " ימים, כלומר " + pct(plan.effective_rate) + " בפועל";
+    return "נקודת הכניסה. " + basis + ", ולכן " + nf(plan.target) + " חלקי " +
+           pct(plan.effective_rate) + " הם " + nf(plan.exact) + ", ובעיגול " +
            nf(plan.required) + " מועמדים" +
            (entryDate ? ", שצריכים להיות שם עד " + fmtDay(entryDate) : "") + ".";
   }
@@ -1238,23 +1294,47 @@ function pipelineSourceText(plan, step, entryDate) {
                     : "") + ".";
 }
 
-function renderPipeline(target, targetDate) {
+function renderPipeline(target, targetDate, days) {
   const key = $("planEntry").value || Engine.stageKeys(true)[0];
-  const plan = Engine.planFromTarget(key, target);
+  const plan = Engine.planFromTarget(key, target, days);
   const body = $("pipelineBody");
   body.innerHTML = "";
   if (!plan) return;
+  const timed = days !== null && days !== undefined;
+
+  /* השלב אינו יכול לספק את היעד בזמן שנותר - אין משפך להציג */
+  if (plan.required === null) {
+    $("pipelineSub").textContent =
+      "אף מועמד שייכנס עכשיו ל«" + plan.label + "» לא יספיק להתגייס תוך " +
+      nf(days) + " הימים שנותרו עד " + fmtDay(targetDate) + ". כדי להגיע " +
+      "ליעד בזמן הזה צריך להתחיל משלב מאוחר יותר בתהליך, ואפשר לבחור " +
+      "אותו בבורר שלמעלה.";
+    body.append(el("div", "msg bad",
+      "מ«" + plan.label + "» אי אפשר לגייס " + nf(target) + " עד " +
+      fmtDay(targetDate) + "."));
+    return;
+  }
 
   const entryDate = targetDate
     ? shiftDays(targetDate, -plan.lead_days_median) : null;
+  const tooBig = plan.observed && plan.required > plan.observed;
 
   $("pipelineSub").textContent =
     "אלה אותם אנשים בכל השורות, בזמנים שונים: כדי לגייס " + nf(target) +
+    (timed ? " עד " + fmtDay(targetDate) : "") +
     " צריך ש-" + nf(plan.required) + " יעברו ב«" + plan.label +
-    "», ומהם יעברו הכמויות שלמטה בכל שלב הלאה. השורות אינן מצטברות זו " +
-    "לזו אלא עוקבות זו אחר זו. " +
-    "אם תזין " + nf(plan.required) + " בשדה «" + plan.label +
-    "» שלמעלה, תקבל בדיוק את המשפך הזה." +
+    "», ומהם יעברו הכמויות שלמטה בכל שלב הלאה. השורות אינן מצטברות זו לזו " +
+    "אלא עוקבות זו אחר זו." +
+    (timed && plan.share_in_time < 1
+      ? " רק " + pct(plan.share_in_time) + " ממי שמתגייס מ«" + plan.label +
+        "» מספיק לעשות זאת תוך " + nf(days) + " ימים, ולכן הכמות הנדרשת " +
+        "גבוהה בהרבה מאשר בלי הגבלת זמן."
+      : "") +
+    (tooBig
+      ? " לתשומת לבך: " + nf(plan.required) + " גדול מ־" + nf(plan.observed) +
+        ", הקבוצה הגדולה ביותר שנמדדה אי פעם בשלב הזה. היעד אינו בר-השגה " +
+        "מכאן בזמן הנתון."
+      : "") +
     (plan.hires !== target
       ? " בגלל עיגול הכמות הנדרשת, התחזית בפועל היא " + nf(plan.hires) +
         " מגויסים ולא " + nf(target) + "."
@@ -1444,6 +1524,7 @@ function revealResults(cards) {
    שהמשתמש ילחץ שוב על «חשב». */
 let planTarget = null;
 let planDate = null;
+let planDays = null;
 let gapCounts = null;
 let gapTarget = null;
 let gapDays = null;
@@ -1480,8 +1561,15 @@ function calculate() {
    * זו אינה גזירה לאחור על קבוצה קיימת. זו דרישה קדימה: איזו כמות בשלב
    * מסוים תפיק את היעד כשגוזרים ממנה קדימה.                             */
   if (!entered.length) {
+    /* היעד בלבד: התאריך חייב להשפיע על הכמויות עצמן, לא רק על
+       התאריכים המוצגים. זו היתה התקלה - «400 תוך חודש» החזיר 5,205
+       בדיקות קבצים, כמות שמניבה כ-13 גיוסים בחודש ולא 400. */
+    const onlyDays = targetDate === null
+      ? null : daysBetween(todayDay(), targetDate);
+
     planTarget = target;
     planDate = targetDate;
+    planDays = onlyDays !== null && onlyDays >= 0 ? onlyDays : null;
 
     renderHero("יעד גיוס", target,
       "כמה מועמדים צריך בכל שלב כדי להגיע ליעד הזה" +
@@ -1492,8 +1580,8 @@ function calculate() {
         : "כל כמות נגזרת משיעור הגיוס הנמדד של אותו שלב. " +
           "מילוי «תאריך היעד» יוסיף גם עד מתי הם צריכים להיות שם.");
 
-    renderPipeline(target, targetDate);
-    renderPlan(target, targetDate);
+    renderPipeline(target, targetDate, planDays);
+    renderPlan(target, targetDate, planDays);
 
     notes.unshift({ kind: "flat", text:
       "שתי הטבלאות עונות על אותה שאלה בשתי דרכים. הראשונה מתייחסת לכל שלב " +
@@ -1644,6 +1732,7 @@ function reset() {
   $("in_targetDate").value = "";
   planTarget = null;
   planDate = null;
+  planDays = null;
   gapCounts = null;
   gapTarget = null;
   gapDays = null;
@@ -1768,7 +1857,7 @@ watchHero();
 $("calcBtn").addEventListener("click", calculate);
 $("resetBtn").addEventListener("click", reset);
 $("planEntry").addEventListener("change", () => {
-  if (planTarget !== null) renderPipeline(planTarget, planDate);
+  if (planTarget !== null) renderPipeline(planTarget, planDate, planDays);
 });
 $("gapEntry").addEventListener("change", () => {
   if (gapCounts !== null && gapTarget !== null) {

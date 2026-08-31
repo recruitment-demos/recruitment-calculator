@@ -846,6 +846,64 @@ class TestPlanning(unittest.TestCase):
         self.assertIsNone(self.eng.required_plan(None))
         self.assertIsNone(self.eng.plan_from_target("file_check", None))
 
+    # --- התקלה שדווחה: היעד בלבד התעלם מהתאריך ---
+
+    def test_a_deadline_raises_the_requirement_in_target_only_mode(self):
+        """«400 גיוסים תוך חודש» החזיר 5,205 בדיקות קבצים - כמות שמניבה
+        כ-13 גיוסים בחודש. הדרישה חייבת לגדול כשהזמן קצר."""
+        open_ended = self.eng.required_plan(400)
+        month = self.eng.required_plan(400, 30)
+        for a, b in zip(open_ended["rows"], month["rows"]):
+            if not a["has_data"]:
+                continue
+            if b["required"] is None:
+                continue
+            self.assertGreater(b["required"], a["required"], a["key"])
+
+    def test_the_old_number_would_not_have_met_the_target(self):
+        """אימות ישיר: 5,205 בדיקות קבצים אינן 400 גיוסים תוך חודש."""
+        old_answer = self.eng.required_plan(400)["rows"][1]["required"]
+        actual = self.eng.hires_by_day("file_check", old_answer, 30)
+        self.assertLess(actual, 50)
+
+    def test_the_new_number_does_meet_the_target(self):
+        row = next(r for r in self.eng.required_plan(400, 30)["rows"]
+                   if r["key"] == "file_check")
+        got = self.eng.hires_by_day("file_check", row["required"], 30)
+        self.assertAlmostEqual(got, 400, delta=5)
+
+    def test_both_plan_paths_agree(self):
+        """required_plan ו-gap_plan בלי מלאי חייבים להיות זהים בכל זמן.
+
+        שני מימושים נפרדים היו הסיבה לתקלה. עכשיו יש עוזר אחד, והבדיקה
+        הזו אוכפת שהם לא יתפצלו שוב.
+        """
+        empty = {k: None for k in self.eng.stage_keys()}
+        for days in (None, 10, 30, 122, 400):
+            a = self.eng.required_plan(400, days)["rows"]
+            b = self.eng.gap_plan(empty, 400, days)["rows"]
+            self.assertEqual(a, b, f"days={days}")
+
+    def test_plan_from_target_respects_the_deadline(self):
+        open_ended = self.eng.plan_from_target("file_check", 400)
+        month = self.eng.plan_from_target("file_check", 400, 30)
+        self.assertGreater(month["required"], open_ended["required"])
+
+    def test_a_stage_that_cannot_deliver_returns_no_pipeline(self):
+        plan = self.eng.plan_from_target("file_check", 400, 10)
+        self.assertIsNone(plan["required"])
+        self.assertIsNone(plan["projection"])
+
+    def test_every_stage_reports_the_largest_cohort_ever_measured(self):
+        """אמת המידה שמאפשרת לומר שדרישה אינה מעשית."""
+        for key in self.eng.stage_keys(with_data_only=True):
+            self.assertGreater(self.eng.observed_candidates(key), 0, key)
+        self.assertIsNone(self.eng.observed_candidates("submissions"))
+
+    def test_effective_rate_is_the_rate_when_time_is_open(self):
+        for key in self.eng.stage_keys(with_data_only=True):
+            self.assertEqual(self.eng.effective_rate(key), self.eng.rate(key), key)
+
 
 if __name__ == "__main__":
     unittest.main()

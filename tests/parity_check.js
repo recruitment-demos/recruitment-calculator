@@ -59,9 +59,9 @@ for (const sc of scenarios) {
   } else if (sc.op === "gap_pipeline") {
     results.push(Engine.gapPipeline(sc.counts, sc.target, sc.stage, sc.days));
   } else if (sc.op === "required_plan") {
-    results.push(Engine.requiredPlan(sc.target));
+    results.push(Engine.requiredPlan(sc.target, sc.days));
   } else if (sc.op === "plan_from_target") {
-    results.push(Engine.planFromTarget(sc.stage, sc.target));
+    results.push(Engine.planFromTarget(sc.stage, sc.target, sc.days));
   } else if (sc.op === "cross_check") {
     results.push(Engine.crossCheck(sc.counts));
   } else if (sc.op === "required_for_target") {

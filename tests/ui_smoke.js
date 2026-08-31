@@ -333,20 +333,63 @@ check("החלפת נקודת הכניסה מציירת מחדש", () => {
   return first === plan.required ? null : "הכמות הנדרשת לא התעדכנה";
 });
 
-check("תאריך יעד מוסיף תאריכים ולא משנה כמויות", () => {
+check("דדליין קרוב מעלה את הכמות הנדרשת", () => {
   clearAll();
   setVal("target", "400");
   sandbox.calculate();
-  const without = planRows().map(r =>
-    r.children.filter(c => c.classList.contains("fval"))[0].textContent);
+  const open = num(planRows()[5].children
+    .filter(c => c.classList.contains("fval"))[0].textContent);
 
-  registry.in_targetDate.value = "2027-01-15";
+  // חודש קדימה: רק חלק קטן ממי שנכנס יספיק להתגייס
+  const soon = new Date();
+  soon.setDate(soon.getDate() + 30);
+  setVal("targetDate", soon.getFullYear() + "-" +
+    String(soon.getMonth() + 1).padStart(2, "0") + "-" +
+    String(soon.getDate()).padStart(2, "0"));
   sandbox.calculate();
-  const withDate = planRows().map(r =>
-    r.children.filter(c => c.classList.contains("fval"))[0].textContent);
+  const tight = num(planRows()[5].children
+    .filter(c => c.classList.contains("fval"))[0].textContent);
 
-  if (JSON.stringify(without) !== JSON.stringify(withDate))
-    return "התאריך שינה את הכמויות";
+  if (!(tight > open)) return "הדדליין לא העלה את הדרישה: " + tight + " מול " + open;
+  const expected = sandbox.Engine.requiredPlan(400, 30).rows[5].required;
+  return tight === expected ? null : "הכמות אינה תואמת את המנוע";
+});
+
+check("שלב שלא יכול לספק את היעד בזמן מסומן ולא מקבל מספר", () => {
+  clearAll();
+  setVal("target", "400");
+  const soon = new Date();
+  soon.setDate(soon.getDate() + 10);
+  setVal("targetDate", soon.getFullYear() + "-" +
+    String(soon.getMonth() + 1).padStart(2, "0") + "-" +
+    String(soon.getDate()).padStart(2, "0"));
+  sandbox.calculate();
+  // בדיקת קבצים אינה מגייסת תוך 10 ימים
+  const row = planRows()[1];
+  const val = row.children.filter(c => c.classList.contains("fval"))[0];
+  if (val.textContent !== "—") return "הוצג מספר לשלב שאינו יכול לספק";
+  return allText(row).includes("לא יספיק") ? null : "אין הסבר";
+});
+
+check("דרישה גדולה מכל מה שנמדד מסומנת במפורש", () => {
+  clearAll();
+  setVal("target", "400");
+  const soon = new Date();
+  soon.setDate(soon.getDate() + 30);
+  setVal("targetDate", soon.getFullYear() + "-" +
+    String(soon.getMonth() + 1).padStart(2, "0") + "-" +
+    String(soon.getDate()).padStart(2, "0"));
+  sandbox.calculate();
+  const txt = allText(registry.planBody);
+  return txt.includes("הגדולה ביותר שנמדדה")
+    ? null : "לא נאמר שהכמות אינה מעשית";
+});
+
+check("תאריך יעד מוסיף גם תאריכים", () => {
+  clearAll();
+  setVal("target", "400");
+  setVal("targetDate", "2027-01-15");
+  sandbox.calculate();
   const txt = allText(registry.planBody);
   if (!txt.includes("2026") && !txt.includes("2027")) return "לא הופיעו תאריכים";
   return allText(registry.pipelineBody).includes("2026") ||

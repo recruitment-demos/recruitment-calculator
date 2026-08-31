@@ -394,40 +394,92 @@ class Engine:
         out["hires"] = target_hires
         return out
 
-    def required_plan(self, target_hires):
-        """כמה מועמדים צריך בכל שלב כדי לגייס את היעד, ומתי הם צריכים להיות שם.
+    def effective_rate(self, key, days=None):
+        """שיעור הגיוס שאפשר לממש בזמן שנותר.
 
-        כל שורה עומדת בפני עצמה ועונה על שאלה אחת: אם הקבוצה היחידה שיש
-        לי נמצאת בשלב הזה, כמה מועמדים צריכים להיות בה. השורות אינן
-        מצטברות זו לזו - הן שש תשובות חלופיות לאותה שאלה, לא משפך.
-
-        lead_days_median הוא חציון הימים מאותו שלב ועד הגיוס. כדי לגייס
-        ביום מסוים, המועמדים צריכים להיות בשלב לפחות כך וכך ימים קודם.
+        בלי הגבלת זמן זהו שיעור הגיוס של השלב. עם הגבלה, רק החלק
+        מהמגויסים שמספיק להתגייס עד אז נחשב - כי מי שיתגייס אחרי
+        התאריך אינו עונה על היעד.
         """
-        if target_hires is None:
+        if not self.has_rate(key):
             return None
+        if days is None:
+            return self.rate(key)
+        share = self.curve_share(key, days)
+        return None if share is None else self.rate(key) * share
+
+    def observed_candidates(self, key):
+        """הקוהורט הגדול ביותר שנמדד אי פעם בשלב הזה.
+
+        משמש כאמת מידה: דרישה שגדולה בהרבה מכל מה שנמדד אינה מעשית,
+        וזו עובדה שאפשר להצביע עליה במקום להשאיר מספר ענק בלי הקשר.
+        """
+        if not self.has_rate(key):
+            return None
+        b = self.stage(key)["basis"]
+        return max(b["conservative"]["candidates"], b["mature"]["candidates"])
+
+    def _requirement_rows(self, needed, days):
+        """שורות הדרישה לכל שלב. מקור האמת היחיד לחישוב הזה.
+
+        משמש גם את required_plan וגם את gap_plan. בעבר היו לזה שני
+        מימושים נפרדים, ורק אחד מהם התחשב בזמן - כך נוצר מצב שבו
+        «400 גיוסים תוך חודש» החזיר 5,205 בדיקות קבצים, כמות שמניבה
+        כ-13 גיוסים בחודש ולא 400.
+        """
         rows = []
         for k in self.stage_keys():
             st = self.stage(k)
             if not self.has_rate(k):
                 rows.append({
                     "key": k, "label": st["label"], "has_data": False,
-                    "required": None, "rate": None,
+                    "rate": None, "share_in_time": None, "effective_rate": None,
+                    "required": None, "in_time": False,
                     "lead_days_median": None, "lead_days_mean": None,
-                    "measured_on": None, "note": st["note"],
+                    "measured_on": None, "observed": None, "note": st["note"],
                 })
                 continue
+
             d = st["days_to_hire"]
+            share = 1.0 if days is None else self.curve_share(k, days)
+            eff = self.rate(k) * share
+            if needed <= 0:
+                required = 0
+            elif eff > 0:
+                required = round_half_up(needed / eff)
+            else:
+                required = None
+
             rows.append({
                 "key": k, "label": st["label"], "has_data": True,
-                "required": round_half_up(target_hires / self.rate(k)),
                 "rate": self.rate(k),
+                "share_in_time": share,
+                "effective_rate": eff,
+                "required": required,
+                "in_time": eff > 0,
                 "lead_days_median": d["median"],
                 "lead_days_mean": d["mean"],
                 "measured_on": d["n"],
+                "observed": self.observed_candidates(k),
                 "note": "",
             })
-        return {"target": target_hires, "rows": rows}
+        return rows
+
+    def required_plan(self, target_hires, days=None):
+        """כמה מועמדים צריך בכל שלב כדי לגייס את היעד, ומתי הם צריכים להיות שם.
+
+        כל שורה עומדת בפני עצמה ועונה על שאלה אחת: אם הקבוצה היחידה שיש
+        לי נמצאת בשלב הזה, כמה מועמדים צריכים להיות בה. השורות אינן
+        מצטברות זו לזו - הן שש תשובות חלופיות לאותה שאלה, לא משפך.
+
+        days - כשהוא נתון, הדרישה מחושבת לפי מה שמספיק להתגייס בזמן
+        שנותר. שלב מוקדם דורש אז כמות גדולה בהרבה, ולפעמים כמות שאינה
+        מעשית - וזו התשובה הנכונה, לא תקלה.
+        """
+        if target_hires is None:
+            return None
+        return {"target": target_hires, "days": days,
+                "rows": self._requirement_rows(target_hires, days)}
 
     def lead_time_anomalies(self):
         """שלבים שמהם הדרך לגיוס ארוכה יותר מאשר משלב מוקדם יותר.
@@ -458,7 +510,7 @@ class Engine:
                     })
         return out
 
-    def plan_from_target(self, key, target_hires):
+    def plan_from_target(self, key, target_hires, days=None):
         """משפך רציף אחד: מה צריך בשלב הכניסה, ומה יזרום ממנו לכל שלב הלאה.
 
         זו התשובה לשאלה "כמה צריך בכל שלב כדי לגייס X" בקריאה המצטברת
@@ -474,7 +526,19 @@ class Engine:
         if target_hires is None or not self.has_rate(key):
             return None
         st = self.stage(key)
-        exact = target_hires / self.rate(key)
+        eff = self.effective_rate(key, days)
+        if not eff:
+            return {
+                "stage": key, "label": st["label"], "target": target_hires,
+                "required": None, "exact": None, "rate": self.rate(key),
+                "effective_rate": eff, "share_in_time": self.curve_share(key, days),
+                "days": days, "lead_days_median": st["days_to_hire"]["median"],
+                "lead_days_mean": st["days_to_hire"]["mean"],
+                "measured_on": st["days_to_hire"]["n"],
+                "observed": self.observed_candidates(key),
+                "projection": None, "hires": 0,
+            }
+        exact = target_hires / eff
         required = round_half_up(exact)
         projection = self.project_cohort(key, required)
         d = st["days_to_hire"]
@@ -485,9 +549,13 @@ class Engine:
             "required": required,
             "exact": round_to(exact, 1),
             "rate": self.rate(key),
+            "effective_rate": eff,
+            "share_in_time": 1.0 if days is None else self.curve_share(key, days),
+            "days": days,
             "lead_days_median": d["median"],
             "lead_days_mean": d["mean"],
             "measured_on": d["n"],
+            "observed": self.observed_candidates(key),
             "projection": projection,
             "hires": projection["hires"],
         }
@@ -522,28 +590,7 @@ class Engine:
 
         gap = target_hires - have
 
-        rows = []
-        for k in self.stage_keys():
-            st = self.stage(k)
-            if not self.has_rate(k):
-                rows.append({
-                    "key": k, "label": st["label"], "has_data": False,
-                    "rate": None, "share_in_time": None, "effective_rate": None,
-                    "required": None, "in_time": False, "note": st["note"],
-                })
-                continue
-            share = 1.0 if days is None else self.curve_share(k, days)
-            eff = self.rate(k) * share
-            rows.append({
-                "key": k, "label": st["label"], "has_data": True,
-                "rate": self.rate(k),
-                "share_in_time": share,
-                "effective_rate": eff,
-                "required": (round_half_up(gap / eff)
-                             if gap > 0 and eff > 0 else 0 if gap <= 0 else None),
-                "in_time": eff > 0,
-                "note": "",
-            })
+        rows = self._requirement_rows(gap, days)
 
         return {
             "target": target_hires,

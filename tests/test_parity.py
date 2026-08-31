@@ -51,13 +51,16 @@ def build_scenarios(eng):
                                   "count": c, "days": d})
         for t in TARGETS:
             scenarios.append({"op": "required_for_target", "stage": k, "target": t})
-            scenarios.append({"op": "plan_from_target", "stage": k, "target": t})
+            for d in (None, 10, 30, 122, 400):
+                scenarios.append({"op": "plan_from_target", "stage": k,
+                                  "target": t, "days": d})
 
     scenarios.append({"op": "lead_time_anomalies"})
 
     for t in TARGETS:
         scenarios.append({"op": "required_funnel", "target": t})
-        scenarios.append({"op": "required_plan", "target": t})
+        for d in (None, 10, 30, 122, 400):
+            scenarios.append({"op": "required_plan", "target": t, "days": d})
         for projected in (0, t - 1, t, t + 1, t * 3):
             scenarios.append({"op": "target_verdict", "projected": projected, "target": t})
 
@@ -169,9 +172,9 @@ def python_result(eng, sc):
     if op == "gap_pipeline":
         return eng.gap_pipeline(sc["counts"], sc["target"], sc["stage"], sc["days"])
     if op == "required_plan":
-        return eng.required_plan(sc["target"])
+        return eng.required_plan(sc["target"], sc.get("days"))
     if op == "plan_from_target":
-        return eng.plan_from_target(sc["stage"], sc["target"])
+        return eng.plan_from_target(sc["stage"], sc["target"], sc.get("days"))
     if op == "required_for_target":
         return eng.required_for_target(sc["stage"], sc["target"])
     if op == "required_funnel":
