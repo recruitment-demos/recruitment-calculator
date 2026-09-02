@@ -8,7 +8,29 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from recruit_calc.engine import load_engine, round_half_up  # noqa: E402
+from recruit_calc.engine import Engine, load_engine, round_half_up  # noqa: E402
+
+BLANK = "no_source"
+
+
+def blank_engine():
+    """מנוע עם שלב מלאכותי שאין לו מקור נתונים.
+
+    עד שהתקבל קובץ ההגשות, «הגשות» היה השלב חסר הנתונים והבדיקות
+    נשענו עליו. עכשיו יש לו מקור, ולכן הכלל «לא לנחש נתונים שאינם
+    במקור» נבדק על שלב מלאכותי - כך הוא נאכף גם כשכל השלבים
+    האמיתיים מקבלים נתונים.
+    """
+    import copy
+    data = copy.deepcopy(load_engine().data)
+    data["stages"].insert(0, {
+        "key": BLANK, "label": "שלב ללא מקור", "activity_type": None,
+        "has_data": False, "note": "אין מקור נתונים לשלב זה.",
+        "hire_rate": None, "days_to_hire": None, "buckets": None,
+        "hire_curve": None, "hire_window": None, "basis": None,
+        "forward": None,
+    })
+    return Engine(data)
 
 
 class TestDataset(unittest.TestCase):
@@ -36,11 +58,60 @@ class TestDataset(unittest.TestCase):
                 self.assertIsNone(s["forward"], s["key"])
                 self.assertTrue(s["note"], s["key"])
 
-    def test_submissions_stage_has_no_invented_data(self):
-        self.assertFalse(self.eng.stage("submissions")["has_data"])
-        self.assertFalse(self.eng.has_rate("submissions"))
-        self.assertIsNone(self.eng.rate("submissions"))
-        self.assertIsNone(self.eng.forward("submissions"))
+    def test_submissions_stage_is_measured_from_the_source(self):
+        """שלב ההגשות קיבל מקור נתונים, ולכן הוא נמדד ככל שלב אחר.
+
+        עד קובץ «הגשות חציון א 2026» לא היה לו מקור והוא סומן
+        has_data=false. הכלל שלא לנחש נתונים שאינם במקור נאכף עכשיו
+        על שלב מלאכותי, ב-test_a_stage_without_a_source_invents_nothing.
+        """
+        st = self.eng.stage("submissions")
+        self.assertTrue(st["has_data"])
+        self.assertTrue(self.eng.has_rate("submissions"))
+        self.assertGreater(self.eng.rate("submissions"), 0)
+        self.assertTrue(self.eng.forward("submissions"))
+        with (ROOT / "config" / "params.json").open(encoding="utf-8") as fh:
+            cfg = json.load(fh)
+        types = next(x for x in cfg["stages"]
+                     if x["key"] == "submissions")["activity_type"]
+        self.assertIsInstance(types, list)
+        self.assertGreater(len(types), 1)
+
+    def test_a_stage_without_a_source_invents_nothing(self):
+        eng = blank_engine()
+        self.assertFalse(eng.stage(BLANK)["has_data"])
+        self.assertFalse(eng.has_rate(BLANK))
+        self.assertIsNone(eng.rate(BLANK))
+        self.assertIsNone(eng.forward(BLANK))
+        self.assertIsNone(eng.observed_candidates(BLANK))
+        self.assertIsNone(eng.project_cohort(BLANK, 500))
+        self.assertIsNone(eng.timeline(BLANK, 500))
+        self.assertIsNone(eng.required_for_target(BLANK, 50))
+        self.assertIsNone(eng.curve_share(BLANK, 30))
+        self.assertIsNone(eng.hires_by_day(BLANK, 1000, 30))
+        self.assertIsNone(eng.plan_from_target(BLANK, 500))
+        self.assertIsNone(eng.required_funnel(400)[BLANK])
+        for plan in (eng.required_plan(500), eng.gap_plan({}, 400)):
+            row = next(r for r in plan["rows"] if r["key"] == BLANK)
+            self.assertFalse(row["has_data"])
+            self.assertIsNone(row["required"])
+            self.assertIsNone(row["lead_days_median"])
+            self.assertTrue(row["note"])
+        row = next(r for r in eng.manager_plan({}, 400, 90)["rows"]
+                   if r["key"] == BLANK)
+        self.assertIsNone(row["required_now"])
+        self.assertIsNone(row["required_by"])
+        self.assertIsNone(row["deadline_days"])
+
+    def test_a_stage_without_a_source_is_left_out_of_the_projection(self):
+        eng = blank_engine()
+        counts = {s["key"]: None for s in eng.stages}
+        counts[BLANK] = 9999
+        counts["yachbam"] = 100
+        result = eng.combine(counts)
+        self.assertEqual(len(result["cohorts"]), 1)
+        for entry in result["per_stage"]:
+            self.assertNotEqual(entry["key"], BLANK)
 
     def test_forward_only_contains_later_stages(self):
         """שלב לא יכול להוביל אל עצמו או אל שלב שקדם לו."""
@@ -217,11 +288,6 @@ class TestProjection(unittest.TestCase):
             self.assertEqual(proj["hires"],
                              round_half_up(3000 * self.eng.rate(key)), key)
 
-    def test_no_projection_for_stage_without_data(self):
-        self.assertIsNone(self.eng.project_cohort("submissions", 500))
-        self.assertIsNone(self.eng.timeline("submissions", 500))
-        self.assertIsNone(self.eng.required_for_target("submissions", 50))
-
     def test_timeline_sums_to_projected_hires(self):
         rows = self.eng.timeline("online_day", 1000)
         hires = self.eng.project_cohort("online_day", 1000)["hires"]
@@ -281,15 +347,6 @@ class TestCombine(unittest.TestCase):
         expected = (self.eng.project_cohort("file_check", 5000)["hires"] +
                     self.eng.project_cohort("yachbam", 300)["hires"])
         self.assertEqual(result["hires"], expected)
-
-    def test_stage_without_data_is_ignored(self):
-        counts = self.none_counts()
-        counts["submissions"] = 9999
-        counts["yachbam"] = 100
-        result = self.eng.combine(counts)
-        self.assertEqual(len(result["cohorts"]), 1)
-        for entry in result["per_stage"]:
-            self.assertNotEqual(entry["key"], "submissions")
 
     def test_empty_input_produces_nothing(self):
         result = self.eng.combine(self.none_counts())
@@ -354,7 +411,6 @@ class TestTarget(unittest.TestCase):
         for key in self.eng.stage_keys(with_data_only=True):
             got = self.eng.project_cohort(key, funnel[key]["value"])["hires"]
             self.assertAlmostEqual(got, target, delta=1, msg=key)
-        self.assertIsNone(funnel["submissions"])
 
     def test_verdicts(self):
         self.assertEqual(self.eng.target_verdict(100, 500)["kind"], "target_miss")
@@ -644,10 +700,6 @@ class TestHiresByDay(unittest.TestCase):
         self.assertIsNone(self.eng.combined_by_day(self.counts(file_check=1000), None))
         self.assertIsNone(self.eng.hires_by_day("file_check", 1000, None))
 
-    def test_stage_without_data_gets_no_curve_answer(self):
-        self.assertIsNone(self.eng.curve_share("submissions", 30))
-        self.assertIsNone(self.eng.hires_by_day("submissions", 1000, 30))
-
 
 class TestGapPlan(unittest.TestCase):
     """כמה עוד צריך, אחרי שסופרים את מי שכבר בתהליך."""
@@ -726,12 +778,6 @@ class TestGapPlan(unittest.TestCase):
                 row["rate"] * self.eng.curve_share(row["key"], 90), places=9,
                 msg=row["key"])
 
-    def test_stage_without_data_never_gets_a_requirement(self):
-        row = next(r for r in self.eng.gap_plan(self.counts(), 400)["rows"]
-                   if r["key"] == "submissions")
-        self.assertFalse(row["has_data"])
-        self.assertIsNone(row["required"])
-
     def test_the_pipeline_is_the_forward_projection_of_the_requirement(self):
         counts = self.counts(yachbam=100)
         pipe = self.eng.gap_pipeline(counts, 400, "file_check")
@@ -773,14 +819,6 @@ class TestPlanning(unittest.TestCase):
             got = self.eng.project_cohort(row["key"], row["required"])["hires"]
             self.assertAlmostEqual(got, target, delta=1, msg=row["key"])
 
-    def test_required_plan_invents_nothing_for_a_stage_without_data(self):
-        row = next(r for r in self.eng.required_plan(500)["rows"]
-                   if r["key"] == "submissions")
-        self.assertFalse(row["has_data"])
-        self.assertIsNone(row["required"])
-        self.assertIsNone(row["lead_days_median"])
-        self.assertTrue(row["note"])
-
     def test_required_plan_carries_the_lead_time(self):
         for row in self.eng.required_plan(500)["rows"]:
             if not row["has_data"]:
@@ -813,9 +851,6 @@ class TestPlanning(unittest.TestCase):
         a = self.eng.plan_from_target("file_check", 100)["required"]
         b = self.eng.plan_from_target("file_check", 1000)["required"]
         self.assertAlmostEqual(b / a, 10, delta=0.05)
-
-    def test_plan_refuses_a_stage_without_data(self):
-        self.assertIsNone(self.eng.plan_from_target("submissions", 500))
 
     def test_planning_returns_single_numbers_not_ranges(self):
         """אין להחזיר טווח משום פונקציה במנוע - בקשה מפורשת של המשתמש."""
@@ -898,7 +933,6 @@ class TestPlanning(unittest.TestCase):
         """אמת המידה שמאפשרת לומר שדרישה אינה מעשית."""
         for key in self.eng.stage_keys(with_data_only=True):
             self.assertGreater(self.eng.observed_candidates(key), 0, key)
-        self.assertIsNone(self.eng.observed_candidates("submissions"))
 
     def test_the_pipeline_hire_row_answers_the_target_not_the_total(self):
         """התקלה השנייה שדווחה: המשפך הראה 11,716 גיוסים ליעד של 400."""
@@ -941,6 +975,225 @@ class TestPlanning(unittest.TestCase):
     def test_effective_rate_is_the_rate_when_time_is_open(self):
         for key in self.eng.stage_keys(with_data_only=True):
             self.assertEqual(self.eng.effective_rate(key), self.eng.rate(key), key)
+
+
+class TestFunnelData(unittest.TestCase):
+    """משפך המיון המלא ופילוח הערוצים - נתונים קבועים מהקבצים."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.eng = load_engine()
+        cls.data = cls.eng.data
+
+    def test_funnel_covers_every_stage_and_ends_in_hire(self):
+        f = self.data["funnel"]
+        keys = [r["key"] for r in f["rows"]]
+        self.assertEqual(keys[:-1], self.eng.stage_keys(with_data_only=True))
+        self.assertEqual(keys[-1], self.eng.hire_key)
+        self.assertTrue(f["rows"][-1]["is_hire"])
+        self.assertEqual(f["first_key"], keys[0])
+
+    def test_first_row_has_nothing_before_it(self):
+        first = self.data["funnel"]["rows"][0]
+        self.assertIsNone(first["from_prev"])
+        self.assertIsNone(first["from_first"])
+
+    def test_every_later_row_is_measured_from_both_directions(self):
+        for r in self.data["funnel"]["rows"][1:]:
+            self.assertIsNotNone(r["from_prev"], r["key"])
+            self.assertIsNotNone(r["from_first"], r["key"])
+            for m in (r["from_prev"], r["from_first"]):
+                self.assertGreater(m["reach"]["mid"], 0, r["key"])
+                self.assertGreaterEqual(m["days"]["median"], 0, r["key"])
+
+    def test_from_first_is_not_a_product_of_the_step_rates(self):
+        """המשפך אינו סדרתי, ולכן שרשור אחוזים היה מייצר מספר שאינו בנתונים."""
+        rows = self.data["funnel"]["rows"]
+        chained = 1.0
+        for r in rows[1:]:
+            chained *= r["from_prev"]["reach"]["mid"]
+        measured = rows[-1]["from_first"]["reach"]["mid"]
+        self.assertNotAlmostEqual(chained, measured, places=4)
+
+    def test_each_stage_matches_the_engine_it_feeds(self):
+        """שיעור המעבר במשפך זהה לזה שהמנוע משתמש בו - מקור אחד לשניהם."""
+        rows = {r["key"]: r for r in self.data["funnel"]["rows"]}
+        first = self.data["funnel"]["first_key"]
+        for f in self.eng.forward(first):
+            self.assertEqual(rows[f["key"]]["from_first"]["reach"],
+                             f["reach"], f["key"])
+
+    def test_segments_do_not_overlap_and_fit_inside_the_whole(self):
+        segs = {g["key"]: g for g in self.data["segments"]}
+        whole = segs["all"]["funnel"]["rows"]
+        parts = [g for k, g in segs.items() if k != "all" and g["funnel"]]
+        self.assertTrue(parts)
+        for i, row in enumerate(whole):
+            total = sum(g["funnel"]["rows"][i]["candidates"] for g in parts)
+            self.assertLessEqual(total, row["candidates"], row["key"])
+
+    def test_every_segment_measures_submission_to_hire_directly(self):
+        for g in self.data["segments"]:
+            if not g["funnel"]:
+                continue
+            hire = g["funnel"]["rows"][-1]
+            self.assertTrue(hire["is_hire"], g["key"])
+            self.assertIsNotNone(hire["from_first"], g["key"])
+            self.assertGreater(hire["from_first"]["days"]["n"], 0, g["key"])
+
+
+class TestCombinedMatrix(unittest.TestCase):
+    """טבלה אחת: כמה בכל שלב ומתי."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.eng = load_engine()
+
+    def counts(self, **kw):
+        c = {k: None for k in self.eng.stage_keys()}
+        c.update(kw)
+        return c
+
+    def test_the_windows_always_add_up_to_the_row_total(self):
+        """טבלה שלא מסתכמת נראית כמו טעות, ולכן העיגול על הסכום הרץ."""
+        for counts in (self.counts(file_check=5000),
+                       self.counts(submissions=12345, yachbam=77),
+                       self.counts(online_day=1), self.counts(screening_day=3)):
+            m = self.eng.combined_matrix(counts)
+            for r in m["rows"]:
+                self.assertEqual(sum(c["count"] for c in r["cells"]),
+                                 r["count"], r["key"])
+
+    def test_the_row_total_matches_the_forward_projection(self):
+        m = self.eng.combined_matrix(self.counts(file_check=5000))
+        proj = {s["key"]: s["count"]
+                for s in self.eng.project_cohort("file_check", 5000)["steps"]}
+        for r in m["rows"]:
+            self.assertEqual(r["count"], proj[r["key"]], r["key"])
+
+    def test_the_entered_stage_gets_no_row_of_its_own(self):
+        """מי שכבר שם אינו «מגיע» לשם ואין לו זמן הגעה."""
+        m = self.eng.combined_matrix(self.counts(screening_day=800))
+        self.assertNotIn("screening_day", [r["key"] for r in m["rows"]])
+
+    def test_every_row_says_where_it_came_from(self):
+        m = self.eng.combined_matrix(self.counts(file_check=900, yachbam=40))
+        for r in m["rows"]:
+            self.assertTrue(r["sources"], r["key"])
+            for src in r["sources"]:
+                self.assertIn("from_label", src)
+                self.assertIn("from_count", src)
+
+    def test_the_matrix_and_the_single_row_graph_agree(self):
+        """אותה טבלה בשתי צורות תצוגה - אסור שיציגו מספרים שונים."""
+        counts = self.counts(file_check=5000, yachbam=200)
+        by_key = {r["key"]: r for r in self.eng.combined_when(counts)}
+        for r in self.eng.combined_matrix(counts)["rows"]:
+            self.assertEqual(r["count"], by_key[r["key"]]["count"], r["key"])
+            self.assertEqual(r["days_median"], by_key[r["key"]]["days_median"],
+                             r["key"])
+
+    def test_spread_never_loses_or_invents_a_candidate(self):
+        st = self.eng.stage("file_check")
+        for total in (0, 1, 2, 3, 17, 999, 10000):
+            for buckets in [st["buckets"]] + [f["buckets"] for f in st["forward"]]:
+                cells = self.eng.spread(total, buckets)
+                self.assertEqual(sum(c["count"] for c in cells), total)
+                self.assertTrue(all(c["count"] >= 0 for c in cells))
+
+
+class TestManagerPlan(unittest.TestCase):
+    """הלוח של מנהלת הגיוס: כמה בכל שלב, ועד מתי."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.eng = load_engine()
+
+    def counts(self, **kw):
+        c = {k: None for k in self.eng.stage_keys()}
+        c.update(kw)
+        return c
+
+    def test_without_a_deadline_both_quantities_are_the_same(self):
+        plan = self.eng.manager_plan({}, 400)
+        for r in plan["rows"]:
+            if not r["has_data"]:
+                continue
+            self.assertEqual(r["required_by"], r["required_now"], r["key"])
+            self.assertIsNone(r["deadline_days"], r["key"])
+            self.assertFalse(r["late"], r["key"])
+
+    def test_a_deadline_never_makes_the_standing_quantity_larger(self):
+        """«כמה צריך שיעמדו שם» אינו תלוי בזמן - התאריך הוא המחיר."""
+        open_ended = self.eng.manager_plan({}, 400)
+        timed = self.eng.manager_plan({}, 400, 60)
+        for a, b in zip(open_ended["rows"], timed["rows"]):
+            if not a["has_data"]:
+                continue
+            self.assertEqual(a["required_by"], b["required_by"], a["key"])
+            self.assertGreaterEqual(b["required_now"] or 0,
+                                    a["required_now"], a["key"])
+
+    def test_the_standing_quantity_actually_produces_the_target(self):
+        for r in self.eng.manager_plan({}, 400, 200)["rows"]:
+            if not r["has_data"] or not r["required_by"]:
+                continue
+            got = self.eng.project_cohort(r["key"], r["required_by"])["hires"]
+            self.assertAlmostEqual(got, 400, delta=1, msg=r["key"])
+
+    def test_the_deadline_is_the_target_minus_the_lead_time(self):
+        for r in self.eng.manager_plan({}, 400, 90)["rows"]:
+            if not r["has_data"]:
+                continue
+            self.assertAlmostEqual(r["deadline_days"],
+                                   90 - r["lead_days_median"], places=6,
+                                   msg=r["key"])
+            self.assertEqual(r["late"], r["deadline_days"] < 0, r["key"])
+
+    def test_a_stage_whose_window_has_closed_is_marked_late(self):
+        plan = self.eng.manager_plan({}, 400, 5)
+        late = [r for r in plan["rows"] if r["has_data"] and r["late"]]
+        self.assertTrue(late, "בחמישה ימים אף שלב לא נסגר - בדיקה חסרת ערך")
+
+    def test_existing_candidates_are_deducted(self):
+        """יעד יחד עם מלאי קיים = כמה *עוד* צריך."""
+        alone = self.eng.manager_plan({}, 400)
+        with_stock = self.eng.manager_plan(self.counts(yachbam=300), 400)
+        self.assertGreater(with_stock["have"], 0)
+        self.assertEqual(with_stock["gap"], 400 - with_stock["have"])
+        for a, b in zip(alone["rows"], with_stock["rows"]):
+            if not a["has_data"]:
+                continue
+            self.assertLess(b["required_by"], a["required_by"], a["key"])
+
+    def test_a_target_already_met_asks_for_nothing(self):
+        plan = self.eng.manager_plan(self.counts(yachbam=5000), 10)
+        self.assertLessEqual(plan["gap"], 0)
+        for r in plan["rows"]:
+            if not r["has_data"]:
+                continue
+            self.assertEqual(r["required_by"], 0, r["key"])
+            self.assertEqual(r["required_now"], 0, r["key"])
+
+    def test_an_impossible_quantity_is_flagged_and_not_dressed_as_an_answer(self):
+        """מספר שגדול מכל קוהורט שנמדד אי פעם אינו תשובה."""
+        plan = self.eng.manager_plan({}, 100000)
+        blocked = [r for r in plan["rows"]
+                   if r["has_data"] and not r["required_by_feasible"]]
+        self.assertTrue(blocked)
+        for r in blocked:
+            self.assertGreater(r["required_by"], r["observed"], r["key"])
+
+    def test_it_agrees_with_the_gap_plan_it_is_built_on(self):
+        """אין חישוב דרישה משוכפל - מקור אמת אחד."""
+        counts = self.counts(file_check=2000)
+        for days in (None, 30, 122):
+            gap = self.eng.gap_plan(counts, 400, days)
+            mgr = self.eng.manager_plan(counts, 400, days)
+            self.assertEqual(mgr["gap"], gap["gap"])
+            for a, b in zip(gap["rows"], mgr["rows"]):
+                self.assertEqual(a["required"], b["required_now"], a["key"])
+
 
 
 if __name__ == "__main__":

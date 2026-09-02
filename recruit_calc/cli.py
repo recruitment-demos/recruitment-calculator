@@ -8,6 +8,9 @@
     python3 -m recruit_calc.cli --target 400
     python3 -m recruit_calc.cli --target 400 --by 2027-01-15
     python3 -m recruit_calc.cli --target 400 --entry file_check
+    python3 -m recruit_calc.cli --target 400 --by 2027-01-15 --manager
+    python3 -m recruit_calc.cli --funnel
+    python3 -m recruit_calc.cli --segments
 """
 
 import argparse
@@ -58,9 +61,92 @@ def print_basis(eng):
                   f"חציון {f['days']['median']:>5.0f} ימים   (n={f['days']['n']:,})")
 
 
+def print_funnel(eng):
+    """משפך המיון המלא, כפי שנמדד בקבצים."""
+    f = eng.data.get("funnel")
+    if not f:
+        raise SystemExit("אין נתוני משפך במאגר. יש להריץ make.")
+    first = f["rows"][0]["label"]
+    print("משפך המיון המלא")
+    print(f"  «מהקודם» ו«מ{first}» הן שתי מדידות ישירות ונפרדות. "
+          f"השנייה אינה מכפלה של הראשונות.\n")
+    print(f"  {'שלב':<20}{'מועמדים':>10}{'מהקודם':>10}{'ימים':>7}"
+          f"{'מ' + first:>12}{'ימים':>7}")
+    for row in f["rows"]:
+        prev, ff = row["from_prev"], row["from_first"]
+        print(f"  {row['label']:<20}{row['candidates']:>10,}"
+              f"{(pct(prev['reach']['mid']) if prev else '—'):>10}"
+              f"{(f"{prev['days']['median']:.0f}" if prev else '—'):>7}"
+              f"{(pct(ff['reach']['mid']) if ff else '—'):>12}"
+              f"{(f"{ff['days']['median']:.0f}" if ff else '—'):>7}")
+
+
+def print_segments(eng):
+    """הפער בין ערוצי הגיוס."""
+    segs = [g for g in (eng.data.get("segments") or []) if g["funnel"]]
+    if not segs:
+        raise SystemExit("אין פילוח ערוצים במאגר. יש להריץ make.")
+    base = next((g for g in segs if g["key"] == "all"), None)
+    base_rate = base and base["funnel"]["rows"][-1]["from_first"]["reach"]["mid"]
+    print("הפער בין ערוצי הגיוס")
+    print("  כל מועמד משויך לערוץ אחד לפי «דרישה» שברשומת ההגשה שלו.\n")
+    print(f"  {'ערוץ':<38}{'מגישים':>9}{'מגויסים':>9}"
+          f"{'מהגשה לגיוס':>13}{'ימים':>7}{'פי':>6}")
+    for g in segs:
+        rows = g["funnel"]["rows"]
+        ff = rows[-1]["from_first"]
+        ratio = "" if not (ff and base_rate) else f"{ff['reach']['mid']/base_rate:.2f}"
+        print(f"  {g['label']:<38}{rows[0]['candidates']:>9,}"
+              f"{rows[-1]['candidates']:>9,}"
+              f"{(pct(ff['reach']['mid']) if ff else '—'):>13}"
+              f"{(f"{ff['days']['median']:.0f}" if ff else '—'):>7}{ratio:>6}")
+
+
+def print_manager(eng, target, by, days, counts=None):
+    """הלוח של מנהלת הגיוס: כמה צריך בכל שלב, ועד מתי."""
+    plan = eng.manager_plan(counts or {}, target, days)
+    today = datetime.date.today()
+
+    print(f"\nהלוח של מנהלת הגיוס: כמה צריך בכל שלב כדי לגייס {target:,}" +
+          (f" עד {fmt_day(by)} (בעוד {days:,} ימים)" if days is not None else ""))
+    if plan["have"]:
+        print(f"  מי שכבר בתהליך מנוכה: {plan['have']:,} מהיעד מכוסים, "
+              f"והפער הוא {plan['gap']:,}.")
+    print("  «צריך שיעמדו שם» היא הכמות בלי לחץ זמן, והמחיר שלה הוא התאריך.")
+    print("  «אם הם שם היום» היא הכמות ממי שכבר עומד בשלב עכשיו.\n")
+    print(f"  {'שלב':<20}{'צריך שיעמדו שם':>16}{'עד מתי':>16}{'אם הם שם היום':>16}")
+
+    for row in plan["rows"]:
+        if not row["has_data"]:
+            print(f"  {row['label']:<20}{'—':>16}{'—':>16}{'—':>16}   {row['note']}")
+            continue
+        by_txt = ("לא בר-השגה" if not row["required_by_feasible"]
+                  else f"{row['required_by']:,}")
+        if days is None:
+            when = f"בעוד {row['lead_days_median']:.0f} ימים"
+        elif row["late"]:
+            when = "החלון נסגר"
+        else:
+            when = fmt_day(today + datetime.timedelta(
+                days=round(row["deadline_days"])))
+        now_txt = ("—" if row["required_now"] is None
+                   else "לא בר-השגה" if not row["feasible"]
+                   else f"{row['required_now']:,}")
+        print(f"  {row['label']:<20}{by_txt:>16}{when:>16}{now_txt:>16}")
+
+    print("\n  התאריכים אינם בסדר השלבים: הזמן עד הגיוס נמדד בכל שלב על "
+          "קבוצה אחרת,\n  רק על מי שהתגייס בפועל.")
+
+
 def main():
     p = argparse.ArgumentParser(description="מחשבון גיוס")
     p.add_argument("--basis", action="store_true", help="הצגת בסיס הנתונים")
+    p.add_argument("--funnel", action="store_true",
+                   help="משפך המיון המלא, כפי שנמדד בקבצים")
+    p.add_argument("--segments", action="store_true",
+                   help="הפער בין ערוצי הגיוס")
+    p.add_argument("--manager", action="store_true",
+                   help="הלוח של מנהלת הגיוס: כמה צריך בכל שלב, ועד מתי")
     p.add_argument("--from", dest="cohorts", nargs=2, action="append",
                    metavar=("STAGE", "COUNT"),
                    help="קבוצת מועמדים בשלב. אפשר לחזור על הדגל כמה פעמים.")
@@ -75,7 +161,20 @@ def main():
 
     eng = load_engine()
 
-    if args.basis or not (args.cohorts or args.target):
+    if args.funnel:
+        print_funnel(eng)
+        if not (args.cohorts or args.target or args.segments):
+            return
+        print()
+
+    if args.segments:
+        print_segments(eng)
+        if not (args.cohorts or args.target):
+            return
+        print()
+
+    if args.basis or not (args.cohorts or args.target or args.funnel
+                          or args.segments):
         print_basis(eng)
         if not (args.cohorts or args.target):
             return
@@ -142,6 +241,12 @@ def main():
                        "target_ok": "היעד מושג"}[v["kind"]]
             print(f"\n  יעד {v['target']:,} | צפוי {v['projected']:,} | {verdict}")
 
+            if args.manager:
+                left = None if by is None else (by - datetime.date.today()).days
+                print_manager(eng, args.target, by,
+                              left if left is not None and left >= 0 else None,
+                              counts)
+
     elif args.target is not None:
         days = None
         if by is not None:
@@ -149,6 +254,10 @@ def main():
             if left < 0:
                 raise SystemExit(f"התאריך {fmt_day(by)} כבר עבר.")
             days = left
+
+        if args.manager:
+            print_manager(eng, args.target, by, days)
+            return
 
         plan = eng.required_plan(args.target, days)
 

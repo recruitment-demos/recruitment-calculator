@@ -58,6 +58,12 @@ for (const sc of scenarios) {
     results.push(Engine.feasibleStages(sc.target, sc.days));
   } else if (sc.op === "gap_plan") {
     results.push(Engine.gapPlan(sc.counts, sc.target, sc.days));
+  } else if (sc.op === "combined_matrix") {
+    results.push(Engine.combinedMatrix(sc.counts));
+  } else if (sc.op === "spread") {
+    results.push(Engine.spread(sc.total, sc.buckets));
+  } else if (sc.op === "manager_plan") {
+    results.push(Engine.managerPlan(sc.counts, sc.target, sc.days));
   } else if (sc.op === "gap_pipeline") {
     results.push(Engine.gapPipeline(sc.counts, sc.target, sc.stage, sc.days));
   } else if (sc.op === "required_plan") {

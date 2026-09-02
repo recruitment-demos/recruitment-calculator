@@ -340,6 +340,97 @@ class Engine:
             r["share"] = round_to(r["hires"] / total, 6) if total else 0.0
         return {"rows": rows, "total": total, "buckets": len(rows)}
 
+    def spread(self, total, buckets):
+        """פיזור כמות אחת על חלונות הזמן, בלי שהעיגול יאבד או ימציא אנשים.
+
+        עיגול של כל חלון בנפרד גורם לסכום השורה לא להסתדר עם הסך הכול,
+        וטבלה שלא מסתכמת נראית כמו טעות. לכן העיגול נעשה על הסכום הרץ:
+        כל חלון מקבל את ההפרש בין הסכום המעוגל עד אליו לבין מה שכבר
+        חולק. הסכום תמיד מדויק, והשיטה זהה בפייתון וב-JS.
+        """
+        out = []
+        acc = 0.0
+        done = 0
+        for b in buckets or []:
+            share = b.get("share")
+            acc += 0.0 if share is None else total * share
+            v = round_half_up(acc) - done
+            done += v
+            out.append({"key": b["key"], "label": b["label"],
+                        "share": share, "count": v})
+        return out
+
+    def combined_matrix(self, counts):
+        """טבלה אחת: כמה יגיעו לכל שלב, ומתי, על אותה רשת חלונות זמן.
+
+        המשתמש ביקש טבלה אחת ולא טבלה לכל שלב. כל שורה היא שלב, כל
+        עמודה היא חלון זמן, והתא הוא כמה מועמדים יגיעו לשלב ההוא בתוך
+        החלון ההוא - מסכום כל הקבוצות שהוזנו.
+
+        השלב שהוזן ידנית אינו מקבל שורה משל עצמו: מי שכבר שם אינו
+        "מגיע" לשם ואין לו זמן הגעה. הוא נספר רק בשלבים שאחריו.
+
+        הזמן בעמודת «חציון» הוא ממוצע משוקלל של חציוני הימים לפי מספר
+        המועמדים שכל קבוצה תורמת, בדיוק כמו ב-combined_when.
+        """
+        result = self.combine(counts)
+        rows = {}
+        order = []
+        for c in result["cohorts"]:
+            for f in self.forward(c["stage"]):
+                key = f["key"]
+                if key not in rows:
+                    rows[key] = {
+                        "key": key, "label": f["label"], "total": 0,
+                        "weighted": 0.0, "cells": None, "sources": [],
+                        "is_hire": key == self.hire_key,
+                        "order": len(order),
+                    }
+                    order.append(key)
+                r = rows[key]
+                arrivals = round_half_up(c["count"] * f["reach"]["mid"])
+                r["total"] += arrivals
+                r["weighted"] += arrivals * f["days"]["median"]
+                cells = self.spread(arrivals, f.get("buckets"))
+                if r["cells"] is None:
+                    r["cells"] = [{"key": x["key"], "label": x["label"],
+                                   "count": 0} for x in cells]
+                for i, x in enumerate(cells):
+                    r["cells"][i]["count"] += x["count"]
+                r["sources"].append({
+                    "from": c["stage"], "from_label": c["label"],
+                    "from_count": c["count"], "count": arrivals,
+                    "reach": f["reach"]["mid"],
+                    "days_median": f["days"]["median"],
+                    "cells": cells,
+                })
+
+        out = []
+        for key in order:
+            r = rows[key]
+            n = len(r["sources"])
+            if r["total"]:
+                days = round_to(r["weighted"] / r["total"], 1)
+            else:
+                days = round_to(sum(x["days_median"] for x in r["sources"]) / n, 1)
+            out.append({
+                "key": r["key"], "label": r["label"], "count": r["total"],
+                "days_median": days, "weighted": n > 1,
+                "is_hire": r["is_hire"], "cells": r["cells"],
+                "sources": r["sources"], "order": r["order"],
+            })
+
+        out.sort(key=lambda r: (r["days_median"], r["order"]))
+        for r in out:
+            del r["order"]
+        return {
+            "buckets": [{"key": b["key"], "label": b["label"],
+                         "min_days": b["min_days"], "max_days": b["max_days"]}
+                        for b in self.buckets],
+            "rows": out,
+            "overlap_warning": result["overlap_warning"],
+        }
+
     def cross_check(self, counts):
         """מה קבוצה מוקדמת חוזה לשלב שבו הוזנה קבוצה מאוחרת.
 
@@ -620,6 +711,67 @@ class Engine:
             "days": days,
             "sources": sources,
             "rows": rows,
+        }
+
+    def manager_plan(self, counts, target_hires, days=None):
+        """הלוח של מנהלת הגיוס: כמה צריך בכל שלב, ועד מתי.
+
+        לשאלה "כמה צריך בשלב X" יש שתי תשובות שונות, ושתיהן נכונות.
+        הצגת אחת מהן בלבד היא מה שהטעה עד היום:
+
+          required_now - כמה צריך *היום* בשלב הזה. מוגבל בזמן שנותר,
+              ולכן שלב מוקדם דורש כמות עצומה: מי שנמצא היום בהגשות
+              פשוט לא יספיק להתגייס עד התאריך. זו התשובה על "יש לי
+              רק את מה שיש לי עכשיו".
+
+          required_by - כמה צריך שיעמדו בשלב הזה כשיגיע תורו, בלי לחץ
+              זמן. הכמות קטנה בהרבה, והמחיר שלה הוא תאריך: הם חייבים
+              להיות שם עד deadline_days. זו התשובה על "מתי אני צריכה
+              להתחיל" - וזו התשובה שמנהלת גיוס יכולה לעבוד לפיה.
+
+        deadline_days הוא מספר הימים מהיום שבו הכמות צריכה לעמוד בשלב:
+        הזמן עד היעד פחות חציון הימים מהשלב הזה עד הגיוס. מספר שלילי
+        פירושו שהחלון של השלב הזה כבר נסגר עבור התאריך הזה.
+
+        היעד מנוכה במי שכבר בתהליך, בדיוק כמו gap_plan - אותו עוזר
+        _requirement_rows משמש את שניהם.
+        """
+        plan = self.gap_plan(counts or {}, target_hires, days)
+        if plan is None:
+            return None
+        needed = plan["gap"]
+
+        rows = []
+        for r in plan["rows"]:
+            row = dict(r)
+            row["required_now"] = r["required"]
+            if not r["has_data"]:
+                row.update({"required_by": None, "required_by_feasible": False,
+                            "deadline_days": None, "late": False})
+                rows.append(row)
+                continue
+
+            if needed <= 0:
+                required_by = 0
+            elif r["rate"]:
+                required_by = round_half_up(needed / r["rate"])
+            else:
+                required_by = None
+
+            observed = r["observed"]
+            row["required_by"] = required_by
+            row["required_by_feasible"] = (
+                required_by is not None
+                and (required_by == 0 or required_by <= observed))
+            row["deadline_days"] = (None if days is None else
+                                    round_to(days - r["lead_days_median"], 1))
+            row["late"] = (row["deadline_days"] is not None
+                           and row["deadline_days"] < 0)
+            rows.append(row)
+
+        return {
+            "target": plan["target"], "have": plan["have"], "gap": plan["gap"],
+            "days": days, "sources": plan["sources"], "rows": rows,
         }
 
     def gap_pipeline(self, counts, target_hires, key, days=None):

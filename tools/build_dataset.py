@@ -45,6 +45,14 @@ HIRE_KEY = "hire"
 HIRE_LABEL = "גיוס"
 
 
+def activity_types(stage):
+    """סוגי הפעילות של שלב. שלב יכול להיות ממופה לכמה סוגים."""
+    at = stage.get("activity_type")
+    if at is None:
+        return []
+    return at if isinstance(at, list) else [at]
+
+
 def load_config():
     with CONFIG_PATH.open(encoding="utf-8") as fh:
         return json.load(fh)
@@ -54,20 +62,42 @@ def load_sources(cfg):
     src = cfg["sources"]
 
     a_cfg = src["activities"]
-    a_path = ROOT / a_cfg["file"]
-    if not a_path.exists():
-        sys.exit(f"קובץ הפעילויות חסר: {a_path}")
-    act = pd.read_excel(a_path, sheet_name=a_cfg["sheet"])
     ac = a_cfg["columns"]
-    act = act.rename(columns={
-        ac["candidate"]: "candidate",
-        ac["activity_type"]: "activity",
-        ac["date"]: "date",
-        ac["result"]: "result",
-        ac["district"]: "district",
-        ac["requisition"]: "requisition",
-    })
+    files = a_cfg.get("files") or [{"file": a_cfg["file"],
+                                    "sheet": a_cfg.get("sheet", "Data")}]
+
+    # שלושת הקבצים הם אותה טבלה בשלושה חתכים חופפים. הם מאוחדים לטבלה
+    # אחת, ושורה כפולה - אותו מועמד, אותה פעילות, אותו תאריך - נספרת
+    # פעם אחת. בלי האיחוד היו נמדדות תקופות שונות בשלבים שונים.
+    frames = []
+    for spec in files:
+        path = ROOT / spec["file"]
+        if not path.exists():
+            sys.exit(f"קובץ הפעילויות חסר: {path}")
+        df = pd.read_excel(path, sheet_name=spec.get("sheet", "Data"))
+        keep = {}
+        for name, target in (("candidate", "candidate"),
+                             ("activity_type", "activity"),
+                             ("date", "date"),
+                             ("result", "result"),
+                             ("district", "district"),
+                             ("requisition", "requisition")):
+            col = ac.get(name)
+            # עמודה שאינה קיימת בקובץ הזה נשארת ריקה בשורותיו במקום להפיל
+            # את הבנייה. «כלל פעולות» למשל אינו כולל את «תוצאה».
+            keep[target] = df[col] if col in df.columns else pd.NA
+        one = pd.DataFrame(keep)
+        one["source_file"] = spec["file"]
+        frames.append(one)
+
+    act = pd.concat(frames, ignore_index=True)
+    act["candidate"] = act["candidate"].astype(str).str.strip()
     act["date"] = pd.to_datetime(act["date"])
+    before = len(act)
+    act = act.sort_values("source_file").drop_duplicates(
+        subset=["candidate", "activity", "date"], keep="first")
+    act = act.reset_index(drop=True)
+    duplicates_dropped = before - len(act)
 
     h_cfg = src["hires"]
     h_path = ROOT / h_cfg["file"]
@@ -83,8 +113,9 @@ def load_sources(cfg):
         hc["unit"]: "unit",
     })
     rec["date"] = pd.to_datetime(rec["date"], dayfirst=h_cfg.get("date_dayfirst", True))
+    rec["candidate"] = rec["candidate"].astype(str).str.strip()
 
-    return act, rec
+    return act, rec, duplicates_dropped
 
 
 def days_between(cohort, event_dates, window=None):
@@ -298,7 +329,7 @@ def reached_ids_after(cohort, event_dates, window=None):
 
 
 def measure(source_dates, event_dates, horizon, conservative_date, cfg,
-            want_buckets=False, pair=None):
+            want_buckets=False, want_curve=False, pair=None):
     """מדידת שיעור הגעה וזמן הגעה משלב מקור לשלב יעד, בשני בסיסים."""
     cut, p90 = mature_cutoff(
         source_dates, event_dates, horizon,
@@ -351,13 +382,157 @@ def measure(source_dates, event_dates, horizon, conservative_date, cfg,
     }
     if want_buckets:
         out["buckets"] = bucket_shares(days, cfg["time_buckets"])
+    if want_curve:
         out["curve"] = hire_curve(days)
+    return out
+
+
+def build_funnel(cfg, first, hire_date, data_keys, last_activity,
+                 conservative_date, last_hire):
+    """המשפך המלא: כמה מועמדים ייחודיים נמדדו בכל שלב, ומה עובר הלאה.
+
+    שתי מדידות נפרדות לכל שלב, ושתיהן ישירות:
+      from_prev  - המעבר מהשלב שלפניו, נמדד בין שני השלבים האלה בלבד.
+      from_first - המעבר מהשלב הראשון, נמדד בין השלב הראשון לשלב הזה.
+
+    from_first אינו מכפלה של אחוזי from_prev. המשפך אינו סדרתי - יש
+    מועמדים שמדלגים על שלב ויש שנכנסים באמצע - ולכן שרשור אחוזים היה
+    מייצר מספרים שאינם בנתונים.
+
+    candidates הוא ספירה גולמית: כמה מועמדים ייחודיים הופיעו אי פעם
+    בשלב הזה בקבצים. זה לא קוהורט מדוד אלא היקף התנועה בפועל.
+    """
+    first_key = data_keys[0]
+    rows = []
+    prev = None
+    for key in data_keys:
+        st = next(x for x in cfg["stages"] if x["key"] == key)
+        src = first[key]
+        row = {
+            "key": key,
+            "label": st["label"],
+            "candidates": int(len(src)),
+            "first_date": src.min().date().isoformat() if len(src) else None,
+            "last_date": src.max().date().isoformat() if len(src) else None,
+            "from_prev": None,
+            "from_first": None,
+            "is_hire": False,
+        }
+        if prev is not None:
+            m = measure(first[prev], src, last_activity, conservative_date, cfg,
+                        pair=f"{prev}->{key}")
+            if m is not None:
+                row["from_prev"] = {
+                    "key": prev,
+                    "label": next(x["label"] for x in cfg["stages"]
+                                  if x["key"] == prev),
+                    "reach": m["reach"], "days": m["days"], "basis": m["basis"],
+                }
+        if key != first_key:
+            m = measure(first[first_key], src, last_activity, conservative_date,
+                        cfg, pair=f"{first_key}->{key}")
+            if m is not None:
+                row["from_first"] = {
+                    "key": first_key,
+                    "label": next(x["label"] for x in cfg["stages"]
+                                  if x["key"] == first_key),
+                    "reach": m["reach"], "days": m["days"], "basis": m["basis"],
+                }
+        rows.append(row)
+        prev = key
+
+    hired = hire_date
+    row = {
+        "key": HIRE_KEY, "label": HIRE_LABEL,
+        "candidates": int(len(hired)),
+        "first_date": hired.min().date().isoformat() if len(hired) else None,
+        "last_date": hired.max().date().isoformat() if len(hired) else None,
+        "from_prev": None, "from_first": None, "is_hire": True,
+    }
+    m = measure(first[prev], hired, last_hire, conservative_date, cfg,
+                pair=f"{prev}->hire")
+    if m is not None:
+        row["from_prev"] = {
+            "key": prev,
+            "label": next(x["label"] for x in cfg["stages"] if x["key"] == prev),
+            "reach": m["reach"], "days": m["days"], "basis": m["basis"],
+        }
+    m = measure(first[first_key], hired, last_hire, conservative_date, cfg,
+                pair=f"{first_key}->hire")
+    if m is not None:
+        row["from_first"] = {
+            "key": first_key,
+            "label": next(x["label"] for x in cfg["stages"]
+                          if x["key"] == first_key),
+            "reach": m["reach"], "days": m["days"], "basis": m["basis"],
+        }
+    rows.append(row)
+    return {"first_key": first_key, "rows": rows}
+
+
+def assign_segments(act, cfg, first):
+    """שיוך כל מועמד לפלח אחד לפי עמודת «דרישה».
+
+    הדרישה נלקחת מרשומת ההגשה של המועמד. למי שאין לו רשומת הגשה
+    בקבצים, נלקחת הדרישה מהפעילות המוקדמת ביותר שלו. מועמד מקבל
+    שיוך אחד בלבד, כדי שסכום הפלחים לא יעלה על המספר האמיתי.
+    """
+    seg_cfg = cfg.get("segments")
+    if not seg_cfg:
+        return None, None
+
+    sub_types = activity_types(
+        next(s for s in cfg["stages"] if s["key"] == "submissions"))
+    rows = act.dropna(subset=["requisition"]).copy()
+    rows["requisition"] = rows["requisition"].astype(str).str.strip()
+
+    subs = rows[rows["activity"].isin(sub_types)].sort_values("date")
+    req = subs.groupby("candidate")["requisition"].first()
+
+    rest = rows[~rows["candidate"].isin(req.index)].sort_values("date")
+    req = pd.concat([req, rest.groupby("candidate")["requisition"].first()])
+
+    groups = []
+    for g in seg_cfg["groups"]:
+        if g["match"] is None:
+            members = None          # None = כל המועמדים, בלי סינון
+        else:
+            wanted = {m.strip() for m in g["match"]}
+            members = set(req.index[req.isin(wanted)])
+        groups.append({"key": g["key"], "label": g["label"],
+                       "match": g["match"], "members": members})
+    return groups, req
+
+
+def segment_funnel(groups, first, hire_date, data_keys, cfg,
+                   last_activity, conservative_date, last_hire):
+    """אותו משפך, בנפרד לכל פלח. זה מה שמראה את הפער בין הערוצים."""
+    out = []
+    for g in groups:
+        sub_first = {}
+        for k in data_keys:
+            src = first[k]
+            sub_first[k] = src if g["members"] is None else src[
+                src.index.isin(g["members"])]
+        sub_hire = hire_date if g["members"] is None else hire_date[
+            hire_date.index.isin(g["members"])]
+        if any(len(v) == 0 for v in sub_first.values()) or len(sub_hire) == 0:
+            out.append({"key": g["key"], "label": g["label"],
+                        "match": g["match"], "funnel": None,
+                        "note": "אין מספיק נתונים בפלח הזה"})
+            continue
+        out.append({
+            "key": g["key"], "label": g["label"], "match": g["match"],
+            "funnel": build_funnel(cfg, sub_first, sub_hire, data_keys,
+                                   last_activity, conservative_date, last_hire),
+            "note": "",
+        })
     return out
 
 
 def main():
     cfg = load_config()
-    act, rec = load_sources(cfg)
+    act, rec, duplicates_dropped = load_sources(cfg)
 
     hire_date = rec.groupby("candidate")["date"].min()
     hired_ids = set(hire_date.index)
@@ -365,14 +540,17 @@ def main():
     last_activity = act["date"].max()
     conservative_date = pd.Timestamp(cfg["cutoff"]["conservative_date"])
 
-    # מועד הפעילות הראשונה של כל מועמד בכל שלב
+    # מועד הפעילות הראשונה של כל מועמד בכל שלב.
+    # שלב יכול להיות ממופה לכמה סוגי פעילות - «הגשות» למשל מורכב
+    # משלוש צורות של הקמת מועמדות, והמוקדמת שבהן היא ההגשה.
     first = {}
     for s in cfg["stages"]:
         if s["activity_type"] is None:
             continue
-        rows = act[act["activity"] == s["activity_type"]]
+        types = activity_types(s)
+        rows = act[act["activity"].isin(types)]
         if rows.empty:
-            sys.exit(f"סוג הפעילות '{s['activity_type']}' לא נמצא בקובץ הפעילויות.")
+            sys.exit(f"סוגי הפעילות {types} לא נמצאו בקובצי הפעילויות.")
         first[s["key"]] = rows.groupby("candidate")["date"].min()
 
     data_keys = [s["key"] for s in cfg["stages"] if s["activity_type"] is not None]
@@ -398,18 +576,20 @@ def main():
         later = data_keys[data_keys.index(s["key"]) + 1:]
         for other in later:
             m = measure(src, first[other], last_activity, conservative_date, cfg,
-                        pair=f"{s['key']}->{other}")
+                        want_buckets=True, pair=f"{s['key']}->{other}")
             if m is None or m["days"]["n"] < cfg["min_transition_n"]:
                 continue
             forward.append({
                 "key": other,
                 "label": next(x["label"] for x in cfg["stages"] if x["key"] == other),
                 "reach": m["reach"], "days": m["days"],
+                "buckets": m["buckets"],
                 "window": m["window"], "basis": m["basis"],
             })
 
         hire_m = measure(src, hire_date, last_hire, conservative_date, cfg,
-                         want_buckets=True, pair=f"{s['key']}->hire")
+                         want_buckets=True, want_curve=True,
+                         pair=f"{s['key']}->hire")
         if hire_m is None:
             sys.exit(f"אין נתוני גיוס לשלב {s['label']}")
 
@@ -418,6 +598,7 @@ def main():
         forward.append({
             "key": HIRE_KEY, "label": HIRE_LABEL,
             "reach": hire_m["reach"], "days": hire_m["days"],
+            "buckets": hire_m["buckets"],
             "window": hire_m["window"], "basis": hire_m["basis"],
         })
 
@@ -434,17 +615,28 @@ def main():
             "forward": forward,
         })
 
-    known_types = {s["activity_type"] for s in cfg["stages"] if s["activity_type"]}
+    known_types = {t for s in cfg["stages"] for t in activity_types(s)}
     unmapped = sorted(set(act["activity"].dropna().unique()) - known_types)
     hires_without_activity = int(len(hired_ids - set(act["candidate"])))
 
+    funnel = build_funnel(cfg, first, hire_date, data_keys, last_activity,
+                          conservative_date, last_hire)
+    groups, req = assign_segments(act, cfg, first)
+    segments = (None if groups is None else
+                segment_funnel(groups, first, hire_date, data_keys, cfg,
+                               last_activity, conservative_date, last_hire))
+
     dataset = {
         "gap_tolerance": cfg["gap_tolerance"],
+        "funnel": funnel,
+        "segments": segments,
         "hire_key": HIRE_KEY,
         "hire_label": HIRE_LABEL,
         "meta": {
             "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "activities_file": cfg["sources"]["activities"]["file"],
+            "activities_files": [f["file"] for f in
+                                 cfg["sources"]["activities"]["files"]],
+            "activity_duplicate_rows_dropped": duplicates_dropped,
             "hires_file": cfg["sources"]["hires"]["file"],
             "activity_rows": int(len(act)),
             "activity_candidates": int(act["candidate"].nunique()),

@@ -4,23 +4,2140 @@
     "pct": 0.02,
     "min_candidates": 1
   },
+  "funnel": {
+    "first_key": "submissions",
+    "rows": [
+      {
+        "key": "submissions",
+        "label": "הגשות",
+        "candidates": 35711,
+        "first_date": "2026-01-01",
+        "last_date": "2026-08-17",
+        "from_prev": null,
+        "from_first": null,
+        "is_hire": false
+      },
+      {
+        "key": "file_check",
+        "label": "בדיקת קבצים",
+        "candidates": 24277,
+        "first_date": "2026-01-01",
+        "last_date": "2026-08-17",
+        "from_prev": {
+          "key": "submissions",
+          "label": "הגשות",
+          "reach": {
+            "low": 0.606736,
+            "high": 0.61738,
+            "mid": 0.612058
+          },
+          "days": {
+            "n": 20231,
+            "mean": 8.8,
+            "median": 2.0,
+            "p25": 0.0,
+            "p75": 6.0,
+            "p90": 21.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 23786,
+              "reached": 14685,
+              "rate": 0.61738
+            },
+            "mature": {
+              "cutoff": "2026-07-27",
+              "followup_days_p90": 21.0,
+              "candidates": 33344,
+              "reached": 20231,
+              "rate": 0.606736
+            }
+          }
+        },
+        "from_first": {
+          "key": "submissions",
+          "label": "הגשות",
+          "reach": {
+            "low": 0.606736,
+            "high": 0.61738,
+            "mid": 0.612058
+          },
+          "days": {
+            "n": 20231,
+            "mean": 8.8,
+            "median": 2.0,
+            "p25": 0.0,
+            "p75": 6.0,
+            "p90": 21.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 23786,
+              "reached": 14685,
+              "rate": 0.61738
+            },
+            "mature": {
+              "cutoff": "2026-07-27",
+              "followup_days_p90": 21.0,
+              "candidates": 33344,
+              "reached": 20231,
+              "rate": 0.606736
+            }
+          }
+        },
+        "is_hire": false
+      },
+      {
+        "key": "online_invite",
+        "label": "זימון למבחן מקוון",
+        "candidates": 6877,
+        "first_date": "2026-01-01",
+        "last_date": "2026-08-17",
+        "from_prev": {
+          "key": "file_check",
+          "label": "בדיקת קבצים",
+          "reach": {
+            "low": 0.25261,
+            "high": 0.264253,
+            "mid": 0.258431
+          },
+          "days": {
+            "n": 5251,
+            "mean": 17.9,
+            "median": 6.0,
+            "p25": 1.0,
+            "p75": 20.0,
+            "p90": 47.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 16102,
+              "reached": 4255,
+              "rate": 0.264253
+            },
+            "mature": {
+              "cutoff": "2026-07-01",
+              "followup_days_p90": 47.0,
+              "candidates": 20787,
+              "reached": 5251,
+              "rate": 0.25261
+            }
+          }
+        },
+        "from_first": {
+          "key": "submissions",
+          "label": "הגשות",
+          "reach": {
+            "low": 0.167956,
+            "high": 0.167968,
+            "mid": 0.167962
+          },
+          "days": {
+            "n": 4002,
+            "mean": 29.7,
+            "median": 14.0,
+            "p25": 5.0,
+            "p75": 36.0,
+            "p90": 86.9
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 23786,
+              "reached": 3995,
+              "rate": 0.167956
+            },
+            "mature": {
+              "cutoff": "2026-05-22",
+              "followup_days_p90": 86.9,
+              "candidates": 23826,
+              "reached": 4002,
+              "rate": 0.167968
+            }
+          }
+        },
+        "is_hire": false
+      },
+      {
+        "key": "online_day",
+        "label": "יום מיון מקוון",
+        "candidates": 7819,
+        "first_date": "2026-01-01",
+        "last_date": "2026-08-17",
+        "from_prev": {
+          "key": "online_invite",
+          "label": "זימון למבחן מקוון",
+          "reach": {
+            "low": 0.622976,
+            "high": 0.629822,
+            "mid": 0.626399
+          },
+          "days": {
+            "n": 3617,
+            "mean": 20.2,
+            "median": 14.0,
+            "p25": 8.0,
+            "p75": 24.0,
+            "p90": 39.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 4433,
+              "reached": 2792,
+              "rate": 0.629822
+            },
+            "mature": {
+              "cutoff": "2026-07-09",
+              "followup_days_p90": 39.0,
+              "candidates": 5806,
+              "reached": 3617,
+              "rate": 0.622976
+            }
+          }
+        },
+        "from_first": {
+          "key": "submissions",
+          "label": "הגשות",
+          "reach": {
+            "low": 0.119398,
+            "high": 0.131597,
+            "mid": 0.125498
+          },
+          "days": {
+            "n": 2072,
+            "mean": 56.0,
+            "median": 38.0,
+            "p25": 22.0,
+            "p75": 77.0,
+            "p90": 133.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 23786,
+              "reached": 2840,
+              "rate": 0.119398
+            },
+            "mature": {
+              "cutoff": "2026-04-06",
+              "followup_days_p90": 133.0,
+              "candidates": 15745,
+              "reached": 2072,
+              "rate": 0.131597
+            }
+          }
+        },
+        "is_hire": false
+      },
+      {
+        "key": "screening_day",
+        "label": "יום מיון",
+        "candidates": 4272,
+        "first_date": "2026-01-01",
+        "last_date": "2026-08-17",
+        "from_prev": {
+          "key": "online_day",
+          "label": "יום מיון מקוון",
+          "reach": {
+            "low": 0.355744,
+            "high": 0.539888,
+            "mid": 0.447816
+          },
+          "days": {
+            "n": 2471,
+            "mean": 21.0,
+            "median": 14.0,
+            "p25": 7.0,
+            "p75": 24.0,
+            "p90": 43.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 3560,
+              "reached": 1922,
+              "rate": 0.539888
+            },
+            "mature": {
+              "cutoff": "2026-07-05",
+              "followup_days_p90": 43.0,
+              "candidates": 6946,
+              "reached": 2471,
+              "rate": 0.355744
+            }
+          }
+        },
+        "from_first": {
+          "key": "submissions",
+          "label": "הגשות",
+          "reach": {
+            "low": 0.090095,
+            "high": 0.102466,
+            "mid": 0.096281
+          },
+          "days": {
+            "n": 1533,
+            "mean": 68.9,
+            "median": 56.0,
+            "p25": 33.0,
+            "p75": 99.0,
+            "p90": 138.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 23786,
+              "reached": 2143,
+              "rate": 0.090095
+            },
+            "mature": {
+              "cutoff": "2026-04-01",
+              "followup_days_p90": 138.0,
+              "candidates": 14961,
+              "reached": 1533,
+              "rate": 0.102466
+            }
+          }
+        },
+        "is_hire": false
+      },
+      {
+        "key": "assessment",
+        "label": "מרכז הערכה",
+        "candidates": 1437,
+        "first_date": "2026-01-01",
+        "last_date": "2026-08-17",
+        "from_prev": {
+          "key": "screening_day",
+          "label": "יום מיון",
+          "reach": {
+            "low": 0.35497,
+            "high": 0.363747,
+            "mid": 0.359359
+          },
+          "days": {
+            "n": 1050,
+            "mean": 36.0,
+            "median": 30.0,
+            "p25": 21.0,
+            "p75": 43.8,
+            "p90": 63.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 2455,
+              "reached": 893,
+              "rate": 0.363747
+            },
+            "mature": {
+              "cutoff": "2026-06-15",
+              "followup_days_p90": 63.0,
+              "candidates": 2958,
+              "reached": 1050,
+              "rate": 0.35497
+            }
+          }
+        },
+        "from_first": {
+          "key": "submissions",
+          "label": "הגשות",
+          "reach": {
+            "low": 0.029765,
+            "high": 0.035469,
+            "mid": 0.032617
+          },
+          "days": {
+            "n": 424,
+            "mean": 93.1,
+            "median": 81.0,
+            "p25": 58.8,
+            "p75": 121.8,
+            "p90": 164.7
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 23786,
+              "reached": 708,
+              "rate": 0.029765
+            },
+            "mature": {
+              "cutoff": "2026-03-05",
+              "followup_days_p90": 164.7,
+              "candidates": 11954,
+              "reached": 424,
+              "rate": 0.035469
+            }
+          }
+        },
+        "is_hire": false
+      },
+      {
+        "key": "yachbam",
+        "label": "יחב\"מ",
+        "candidates": 2762,
+        "first_date": "2026-01-01",
+        "last_date": "2026-08-17",
+        "from_prev": {
+          "key": "assessment",
+          "label": "מרכז הערכה",
+          "reach": {
+            "low": 0.541206,
+            "high": 0.567181,
+            "mid": 0.554194
+          },
+          "days": {
+            "n": 637,
+            "mean": 18.1,
+            "median": 12.0,
+            "p25": 7.0,
+            "p75": 19.0,
+            "p90": 37.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 908,
+              "reached": 515,
+              "rate": 0.567181
+            },
+            "mature": {
+              "cutoff": "2026-07-11",
+              "followup_days_p90": 37.0,
+              "candidates": 1177,
+              "reached": 637,
+              "rate": 0.541206
+            }
+          }
+        },
+        "from_first": {
+          "key": "submissions",
+          "label": "הגשות",
+          "reach": {
+            "low": 0.041579,
+            "high": 0.050703,
+            "mid": 0.046141
+          },
+          "days": {
+            "n": 624,
+            "mean": 95.9,
+            "median": 89.0,
+            "p25": 62.0,
+            "p75": 126.0,
+            "p90": 161.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 23786,
+              "reached": 989,
+              "rate": 0.041579
+            },
+            "mature": {
+              "cutoff": "2026-03-09",
+              "followup_days_p90": 161.0,
+              "candidates": 12307,
+              "reached": 624,
+              "rate": 0.050703
+            }
+          }
+        },
+        "is_hire": false
+      },
+      {
+        "key": "hire",
+        "label": "גיוס",
+        "candidates": 2328,
+        "first_date": "2026-01-01",
+        "last_date": "2026-08-19",
+        "from_prev": {
+          "key": "yachbam",
+          "label": "יחב\"מ",
+          "reach": {
+            "low": 0.77284,
+            "high": 0.777711,
+            "mid": 0.775275
+          },
+          "days": {
+            "n": 1565,
+            "mean": 25.3,
+            "median": 17.0,
+            "p25": 8.0,
+            "p75": 36.0,
+            "p90": 57.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 1660,
+              "reached": 1291,
+              "rate": 0.777711
+            },
+            "mature": {
+              "cutoff": "2026-06-23",
+              "followup_days_p90": 57.0,
+              "candidates": 2025,
+              "reached": 1565,
+              "rate": 0.77284
+            }
+          }
+        },
+        "from_first": {
+          "key": "submissions",
+          "label": "הגשות",
+          "reach": {
+            "low": 0.028588,
+            "high": 0.035526,
+            "mid": 0.032057
+          },
+          "days": {
+            "n": 391,
+            "mean": 112.9,
+            "median": 108.0,
+            "p25": 77.0,
+            "p75": 143.0,
+            "p90": 177.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 23786,
+              "reached": 680,
+              "rate": 0.028588
+            },
+            "mature": {
+              "cutoff": "2026-02-23",
+              "followup_days_p90": 177.0,
+              "candidates": 11006,
+              "reached": 391,
+              "rate": 0.035526
+            }
+          }
+        },
+        "is_hire": true
+      }
+    ]
+  },
+  "segments": [
+    {
+      "key": "all",
+      "label": "כלל המועמדים",
+      "match": null,
+      "funnel": {
+        "first_key": "submissions",
+        "rows": [
+          {
+            "key": "submissions",
+            "label": "הגשות",
+            "candidates": 35711,
+            "first_date": "2026-01-01",
+            "last_date": "2026-08-17",
+            "from_prev": null,
+            "from_first": null,
+            "is_hire": false
+          },
+          {
+            "key": "file_check",
+            "label": "בדיקת קבצים",
+            "candidates": 24277,
+            "first_date": "2026-01-01",
+            "last_date": "2026-08-17",
+            "from_prev": {
+              "key": "submissions",
+              "label": "הגשות",
+              "reach": {
+                "low": 0.606736,
+                "high": 0.61738,
+                "mid": 0.612058
+              },
+              "days": {
+                "n": 20231,
+                "mean": 8.8,
+                "median": 2.0,
+                "p25": 0.0,
+                "p75": 6.0,
+                "p90": 21.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 23786,
+                  "reached": 14685,
+                  "rate": 0.61738
+                },
+                "mature": {
+                  "cutoff": "2026-07-27",
+                  "followup_days_p90": 21.0,
+                  "candidates": 33344,
+                  "reached": 20231,
+                  "rate": 0.606736
+                }
+              }
+            },
+            "from_first": {
+              "key": "submissions",
+              "label": "הגשות",
+              "reach": {
+                "low": 0.606736,
+                "high": 0.61738,
+                "mid": 0.612058
+              },
+              "days": {
+                "n": 20231,
+                "mean": 8.8,
+                "median": 2.0,
+                "p25": 0.0,
+                "p75": 6.0,
+                "p90": 21.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 23786,
+                  "reached": 14685,
+                  "rate": 0.61738
+                },
+                "mature": {
+                  "cutoff": "2026-07-27",
+                  "followup_days_p90": 21.0,
+                  "candidates": 33344,
+                  "reached": 20231,
+                  "rate": 0.606736
+                }
+              }
+            },
+            "is_hire": false
+          },
+          {
+            "key": "online_invite",
+            "label": "זימון למבחן מקוון",
+            "candidates": 6877,
+            "first_date": "2026-01-01",
+            "last_date": "2026-08-17",
+            "from_prev": {
+              "key": "file_check",
+              "label": "בדיקת קבצים",
+              "reach": {
+                "low": 0.25261,
+                "high": 0.264253,
+                "mid": 0.258431
+              },
+              "days": {
+                "n": 5251,
+                "mean": 17.9,
+                "median": 6.0,
+                "p25": 1.0,
+                "p75": 20.0,
+                "p90": 47.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 16102,
+                  "reached": 4255,
+                  "rate": 0.264253
+                },
+                "mature": {
+                  "cutoff": "2026-07-01",
+                  "followup_days_p90": 47.0,
+                  "candidates": 20787,
+                  "reached": 5251,
+                  "rate": 0.25261
+                }
+              }
+            },
+            "from_first": {
+              "key": "submissions",
+              "label": "הגשות",
+              "reach": {
+                "low": 0.167956,
+                "high": 0.167968,
+                "mid": 0.167962
+              },
+              "days": {
+                "n": 4002,
+                "mean": 29.7,
+                "median": 14.0,
+                "p25": 5.0,
+                "p75": 36.0,
+                "p90": 86.9
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 23786,
+                  "reached": 3995,
+                  "rate": 0.167956
+                },
+                "mature": {
+                  "cutoff": "2026-05-22",
+                  "followup_days_p90": 86.9,
+                  "candidates": 23826,
+                  "reached": 4002,
+                  "rate": 0.167968
+                }
+              }
+            },
+            "is_hire": false
+          },
+          {
+            "key": "online_day",
+            "label": "יום מיון מקוון",
+            "candidates": 7819,
+            "first_date": "2026-01-01",
+            "last_date": "2026-08-17",
+            "from_prev": {
+              "key": "online_invite",
+              "label": "זימון למבחן מקוון",
+              "reach": {
+                "low": 0.622976,
+                "high": 0.629822,
+                "mid": 0.626399
+              },
+              "days": {
+                "n": 3617,
+                "mean": 20.2,
+                "median": 14.0,
+                "p25": 8.0,
+                "p75": 24.0,
+                "p90": 39.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 4433,
+                  "reached": 2792,
+                  "rate": 0.629822
+                },
+                "mature": {
+                  "cutoff": "2026-07-09",
+                  "followup_days_p90": 39.0,
+                  "candidates": 5806,
+                  "reached": 3617,
+                  "rate": 0.622976
+                }
+              }
+            },
+            "from_first": {
+              "key": "submissions",
+              "label": "הגשות",
+              "reach": {
+                "low": 0.119398,
+                "high": 0.131597,
+                "mid": 0.125498
+              },
+              "days": {
+                "n": 2072,
+                "mean": 56.0,
+                "median": 38.0,
+                "p25": 22.0,
+                "p75": 77.0,
+                "p90": 133.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 23786,
+                  "reached": 2840,
+                  "rate": 0.119398
+                },
+                "mature": {
+                  "cutoff": "2026-04-06",
+                  "followup_days_p90": 133.0,
+                  "candidates": 15745,
+                  "reached": 2072,
+                  "rate": 0.131597
+                }
+              }
+            },
+            "is_hire": false
+          },
+          {
+            "key": "screening_day",
+            "label": "יום מיון",
+            "candidates": 4272,
+            "first_date": "2026-01-01",
+            "last_date": "2026-08-17",
+            "from_prev": {
+              "key": "online_day",
+              "label": "יום מיון מקוון",
+              "reach": {
+                "low": 0.355744,
+                "high": 0.539888,
+                "mid": 0.447816
+              },
+              "days": {
+                "n": 2471,
+                "mean": 21.0,
+                "median": 14.0,
+                "p25": 7.0,
+                "p75": 24.0,
+                "p90": 43.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 3560,
+                  "reached": 1922,
+                  "rate": 0.539888
+                },
+                "mature": {
+                  "cutoff": "2026-07-05",
+                  "followup_days_p90": 43.0,
+                  "candidates": 6946,
+                  "reached": 2471,
+                  "rate": 0.355744
+                }
+              }
+            },
+            "from_first": {
+              "key": "submissions",
+              "label": "הגשות",
+              "reach": {
+                "low": 0.090095,
+                "high": 0.102466,
+                "mid": 0.096281
+              },
+              "days": {
+                "n": 1533,
+                "mean": 68.9,
+                "median": 56.0,
+                "p25": 33.0,
+                "p75": 99.0,
+                "p90": 138.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 23786,
+                  "reached": 2143,
+                  "rate": 0.090095
+                },
+                "mature": {
+                  "cutoff": "2026-04-01",
+                  "followup_days_p90": 138.0,
+                  "candidates": 14961,
+                  "reached": 1533,
+                  "rate": 0.102466
+                }
+              }
+            },
+            "is_hire": false
+          },
+          {
+            "key": "assessment",
+            "label": "מרכז הערכה",
+            "candidates": 1437,
+            "first_date": "2026-01-01",
+            "last_date": "2026-08-17",
+            "from_prev": {
+              "key": "screening_day",
+              "label": "יום מיון",
+              "reach": {
+                "low": 0.35497,
+                "high": 0.363747,
+                "mid": 0.359359
+              },
+              "days": {
+                "n": 1050,
+                "mean": 36.0,
+                "median": 30.0,
+                "p25": 21.0,
+                "p75": 43.8,
+                "p90": 63.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 2455,
+                  "reached": 893,
+                  "rate": 0.363747
+                },
+                "mature": {
+                  "cutoff": "2026-06-15",
+                  "followup_days_p90": 63.0,
+                  "candidates": 2958,
+                  "reached": 1050,
+                  "rate": 0.35497
+                }
+              }
+            },
+            "from_first": {
+              "key": "submissions",
+              "label": "הגשות",
+              "reach": {
+                "low": 0.029765,
+                "high": 0.035469,
+                "mid": 0.032617
+              },
+              "days": {
+                "n": 424,
+                "mean": 93.1,
+                "median": 81.0,
+                "p25": 58.8,
+                "p75": 121.8,
+                "p90": 164.7
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 23786,
+                  "reached": 708,
+                  "rate": 0.029765
+                },
+                "mature": {
+                  "cutoff": "2026-03-05",
+                  "followup_days_p90": 164.7,
+                  "candidates": 11954,
+                  "reached": 424,
+                  "rate": 0.035469
+                }
+              }
+            },
+            "is_hire": false
+          },
+          {
+            "key": "yachbam",
+            "label": "יחב\"מ",
+            "candidates": 2762,
+            "first_date": "2026-01-01",
+            "last_date": "2026-08-17",
+            "from_prev": {
+              "key": "assessment",
+              "label": "מרכז הערכה",
+              "reach": {
+                "low": 0.541206,
+                "high": 0.567181,
+                "mid": 0.554194
+              },
+              "days": {
+                "n": 637,
+                "mean": 18.1,
+                "median": 12.0,
+                "p25": 7.0,
+                "p75": 19.0,
+                "p90": 37.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 908,
+                  "reached": 515,
+                  "rate": 0.567181
+                },
+                "mature": {
+                  "cutoff": "2026-07-11",
+                  "followup_days_p90": 37.0,
+                  "candidates": 1177,
+                  "reached": 637,
+                  "rate": 0.541206
+                }
+              }
+            },
+            "from_first": {
+              "key": "submissions",
+              "label": "הגשות",
+              "reach": {
+                "low": 0.041579,
+                "high": 0.050703,
+                "mid": 0.046141
+              },
+              "days": {
+                "n": 624,
+                "mean": 95.9,
+                "median": 89.0,
+                "p25": 62.0,
+                "p75": 126.0,
+                "p90": 161.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 23786,
+                  "reached": 989,
+                  "rate": 0.041579
+                },
+                "mature": {
+                  "cutoff": "2026-03-09",
+                  "followup_days_p90": 161.0,
+                  "candidates": 12307,
+                  "reached": 624,
+                  "rate": 0.050703
+                }
+              }
+            },
+            "is_hire": false
+          },
+          {
+            "key": "hire",
+            "label": "גיוס",
+            "candidates": 2328,
+            "first_date": "2026-01-01",
+            "last_date": "2026-08-19",
+            "from_prev": {
+              "key": "yachbam",
+              "label": "יחב\"מ",
+              "reach": {
+                "low": 0.77284,
+                "high": 0.777711,
+                "mid": 0.775275
+              },
+              "days": {
+                "n": 1565,
+                "mean": 25.3,
+                "median": 17.0,
+                "p25": 8.0,
+                "p75": 36.0,
+                "p90": 57.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 1660,
+                  "reached": 1291,
+                  "rate": 0.777711
+                },
+                "mature": {
+                  "cutoff": "2026-06-23",
+                  "followup_days_p90": 57.0,
+                  "candidates": 2025,
+                  "reached": 1565,
+                  "rate": 0.77284
+                }
+              }
+            },
+            "from_first": {
+              "key": "submissions",
+              "label": "הגשות",
+              "reach": {
+                "low": 0.028588,
+                "high": 0.035526,
+                "mid": 0.032057
+              },
+              "days": {
+                "n": 391,
+                "mean": 112.9,
+                "median": 108.0,
+                "p25": 77.0,
+                "p75": 143.0,
+                "p90": 177.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 23786,
+                  "reached": 680,
+                  "rate": 0.028588
+                },
+                "mature": {
+                  "cutoff": "2026-02-23",
+                  "followup_days_p90": 177.0,
+                  "candidates": 11006,
+                  "reached": 391,
+                  "rate": 0.035526
+                }
+              }
+            },
+            "is_hire": true
+          }
+        ]
+      },
+      "note": ""
+    },
+    {
+      "key": "campaign",
+      "label": "לידים / קמפיין ארצי + קמפיין תנועה",
+      "match": [
+        "לידים / קמפיין ארצי",
+        "לידים/קמפיין ארצי",
+        "לידים / קמפיין תנועה",
+        "לידים/קמפיין תנועה"
+      ],
+      "funnel": {
+        "first_key": "submissions",
+        "rows": [
+          {
+            "key": "submissions",
+            "label": "הגשות",
+            "candidates": 14313,
+            "first_date": "2026-01-01",
+            "last_date": "2026-08-17",
+            "from_prev": null,
+            "from_first": null,
+            "is_hire": false
+          },
+          {
+            "key": "file_check",
+            "label": "בדיקת קבצים",
+            "candidates": 10533,
+            "first_date": "2026-01-01",
+            "last_date": "2026-08-17",
+            "from_prev": {
+              "key": "submissions",
+              "label": "הגשות",
+              "reach": {
+                "low": 0.731844,
+                "high": 0.736367,
+                "mid": 0.734106
+              },
+              "days": {
+                "n": 10289,
+                "mean": 6.1,
+                "median": 2.0,
+                "p25": 1.0,
+                "p75": 5.0,
+                "p90": 14.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 10636,
+                  "reached": 7832,
+                  "rate": 0.736367
+                },
+                "mature": {
+                  "cutoff": "2026-08-03",
+                  "followup_days_p90": 14.0,
+                  "candidates": 14059,
+                  "reached": 10289,
+                  "rate": 0.731844
+                }
+              }
+            },
+            "from_first": {
+              "key": "submissions",
+              "label": "הגשות",
+              "reach": {
+                "low": 0.731844,
+                "high": 0.736367,
+                "mid": 0.734106
+              },
+              "days": {
+                "n": 10289,
+                "mean": 6.1,
+                "median": 2.0,
+                "p25": 1.0,
+                "p75": 5.0,
+                "p90": 14.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 10636,
+                  "reached": 7832,
+                  "rate": 0.736367
+                },
+                "mature": {
+                  "cutoff": "2026-08-03",
+                  "followup_days_p90": 14.0,
+                  "candidates": 14059,
+                  "reached": 10289,
+                  "rate": 0.731844
+                }
+              }
+            },
+            "is_hire": false
+          },
+          {
+            "key": "online_invite",
+            "label": "זימון למבחן מקוון",
+            "candidates": 1425,
+            "first_date": "2026-01-01",
+            "last_date": "2026-08-17",
+            "from_prev": {
+              "key": "file_check",
+              "label": "בדיקת קבצים",
+              "reach": {
+                "low": 0.143374,
+                "high": 0.143412,
+                "mid": 0.143393
+              },
+              "days": {
+                "n": 1108,
+                "mean": 28.2,
+                "median": 13.0,
+                "p25": 2.0,
+                "p75": 32.0,
+                "p90": 91.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 7742,
+                  "reached": 1110,
+                  "rate": 0.143374
+                },
+                "mature": {
+                  "cutoff": "2026-05-18",
+                  "followup_days_p90": 91.0,
+                  "candidates": 7726,
+                  "reached": 1108,
+                  "rate": 0.143412
+                }
+              }
+            },
+            "from_first": {
+              "key": "submissions",
+              "label": "הגשות",
+              "reach": {
+                "low": 0.10671,
+                "high": 0.107183,
+                "mid": 0.106946
+              },
+              "days": {
+                "n": 1126,
+                "mean": 34.6,
+                "median": 19.0,
+                "p25": 6.0,
+                "p75": 42.0,
+                "p90": 100.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 10636,
+                  "reached": 1140,
+                  "rate": 0.107183
+                },
+                "mature": {
+                  "cutoff": "2026-05-09",
+                  "followup_days_p90": 100.0,
+                  "candidates": 10552,
+                  "reached": 1126,
+                  "rate": 0.10671
+                }
+              }
+            },
+            "is_hire": false
+          },
+          {
+            "key": "online_day",
+            "label": "יום מיון מקוון",
+            "candidates": 848,
+            "first_date": "2026-01-01",
+            "last_date": "2026-08-17",
+            "from_prev": {
+              "key": "online_invite",
+              "label": "זימון למבחן מקוון",
+              "reach": {
+                "low": 0.470408,
+                "high": 0.478697,
+                "mid": 0.474552
+              },
+              "days": {
+                "n": 573,
+                "mean": 22.0,
+                "median": 15.0,
+                "p25": 10.0,
+                "p75": 26.0,
+                "p90": 45.8
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 980,
+                  "reached": 461,
+                  "rate": 0.470408
+                },
+                "mature": {
+                  "cutoff": "2026-07-02",
+                  "followup_days_p90": 45.8,
+                  "candidates": 1197,
+                  "reached": 573,
+                  "rate": 0.478697
+                }
+              }
+            },
+            "from_first": {
+              "key": "submissions",
+              "label": "הגשות",
+              "reach": {
+                "low": 0.057446,
+                "high": 0.060475,
+                "mid": 0.058961
+              },
+              "days": {
+                "n": 364,
+                "mean": 70.7,
+                "median": 49.0,
+                "p25": 28.0,
+                "p75": 108.8,
+                "p90": 163.4
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 10636,
+                  "reached": 611,
+                  "rate": 0.057446
+                },
+                "mature": {
+                  "cutoff": "2026-03-06",
+                  "followup_days_p90": 163.4,
+                  "candidates": 6019,
+                  "reached": 364,
+                  "rate": 0.060475
+                }
+              }
+            },
+            "is_hire": false
+          },
+          {
+            "key": "screening_day",
+            "label": "יום מיון",
+            "candidates": 466,
+            "first_date": "2026-01-14",
+            "last_date": "2026-08-17",
+            "from_prev": {
+              "key": "online_day",
+              "label": "יום מיון מקוון",
+              "reach": {
+                "low": 0.452282,
+                "high": 0.549425,
+                "mid": 0.500854
+              },
+              "days": {
+                "n": 327,
+                "mean": 20.6,
+                "median": 15.0,
+                "p25": 8.0,
+                "p75": 24.0,
+                "p90": 36.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 435,
+                  "reached": 239,
+                  "rate": 0.549425
+                },
+                "mature": {
+                  "cutoff": "2026-07-12",
+                  "followup_days_p90": 36.0,
+                  "candidates": 723,
+                  "reached": 327,
+                  "rate": 0.452282
+                }
+              }
+            },
+            "from_first": {
+              "key": "submissions",
+              "label": "הגשות",
+              "reach": {
+                "low": 0.03695,
+                "high": 0.041439,
+                "mid": 0.039194
+              },
+              "days": {
+                "n": 250,
+                "mean": 82.0,
+                "median": 63.0,
+                "p25": 40.2,
+                "p75": 124.8,
+                "p90": 159.6
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 10636,
+                  "reached": 393,
+                  "rate": 0.03695
+                },
+                "mature": {
+                  "cutoff": "2026-03-10",
+                  "followup_days_p90": 159.6,
+                  "candidates": 6033,
+                  "reached": 250,
+                  "rate": 0.041439
+                }
+              }
+            },
+            "is_hire": false
+          },
+          {
+            "key": "assessment",
+            "label": "מרכז הערכה",
+            "candidates": 147,
+            "first_date": "2026-03-02",
+            "last_date": "2026-08-17",
+            "from_prev": {
+              "key": "screening_day",
+              "label": "יום מיון",
+              "reach": {
+                "low": 0.395425,
+                "high": 0.402913,
+                "mid": 0.399169
+              },
+              "days": {
+                "n": 121,
+                "mean": 31.8,
+                "median": 28.0,
+                "p25": 18.0,
+                "p75": 40.0,
+                "p90": 58.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 206,
+                  "reached": 83,
+                  "rate": 0.402913
+                },
+                "mature": {
+                  "cutoff": "2026-06-20",
+                  "followup_days_p90": 58.0,
+                  "candidates": 306,
+                  "reached": 121,
+                  "rate": 0.395425
+                }
+              }
+            },
+            "from_first": {
+              "key": "submissions",
+              "label": "הגשות",
+              "reach": {
+                "low": 0.012693,
+                "high": 0.01578,
+                "mid": 0.014236
+              },
+              "days": {
+                "n": 94,
+                "mean": 100.8,
+                "median": 87.5,
+                "p25": 63.0,
+                "p75": 144.2,
+                "p90": 175.4
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 10636,
+                  "reached": 135,
+                  "rate": 0.012693
+                },
+                "mature": {
+                  "cutoff": "2026-02-22",
+                  "followup_days_p90": 175.4,
+                  "candidates": 5957,
+                  "reached": 94,
+                  "rate": 0.01578
+                }
+              }
+            },
+            "is_hire": false
+          },
+          {
+            "key": "yachbam",
+            "label": "יחב\"מ",
+            "candidates": 130,
+            "first_date": "2026-02-22",
+            "last_date": "2026-08-16",
+            "from_prev": {
+              "key": "assessment",
+              "label": "מרכז הערכה",
+              "reach": {
+                "low": 0.455357,
+                "high": 0.483333,
+                "mid": 0.469345
+              },
+              "days": {
+                "n": 51,
+                "mean": 15.6,
+                "median": 13.0,
+                "p25": 7.5,
+                "p75": 20.0,
+                "p90": 28.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 60,
+                  "reached": 29,
+                  "rate": 0.483333
+                },
+                "mature": {
+                  "cutoff": "2026-07-20",
+                  "followup_days_p90": 28.0,
+                  "candidates": 112,
+                  "reached": 51,
+                  "rate": 0.455357
+                }
+              }
+            },
+            "from_first": {
+              "key": "submissions",
+              "label": "הגשות",
+              "reach": {
+                "low": 0.011376,
+                "high": 0.015033,
+                "mid": 0.013205
+              },
+              "days": {
+                "n": 90,
+                "mean": 108.0,
+                "median": 95.5,
+                "p25": 69.2,
+                "p75": 147.8,
+                "p90": 172.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 10636,
+                  "reached": 121,
+                  "rate": 0.011376
+                },
+                "mature": {
+                  "cutoff": "2026-02-25",
+                  "followup_days_p90": 172.0,
+                  "candidates": 5987,
+                  "reached": 90,
+                  "rate": 0.015033
+                }
+              }
+            },
+            "is_hire": false
+          },
+          {
+            "key": "hire",
+            "label": "גיוס",
+            "candidates": 102,
+            "first_date": "2026-01-29",
+            "last_date": "2026-08-19",
+            "from_prev": {
+              "key": "yachbam",
+              "label": "יחב\"מ",
+              "reach": {
+                "low": 0.87,
+                "high": 0.872727,
+                "mid": 0.871364
+              },
+              "days": {
+                "n": 87,
+                "mean": 19.1,
+                "median": 15.0,
+                "p25": 7.0,
+                "p75": 24.0,
+                "p90": 35.2
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 55,
+                  "reached": 48,
+                  "rate": 0.872727
+                },
+                "mature": {
+                  "cutoff": "2026-07-14",
+                  "followup_days_p90": 35.2,
+                  "candidates": 100,
+                  "reached": 87,
+                  "rate": 0.87
+                }
+              }
+            },
+            "from_first": {
+              "key": "submissions",
+              "label": "הגשות",
+              "reach": {
+                "low": 0.00912,
+                "high": 0.012391,
+                "mid": 0.010756
+              },
+              "days": {
+                "n": 74,
+                "mean": 119.2,
+                "median": 114.5,
+                "p25": 90.2,
+                "p75": 153.5,
+                "p90": 176.7
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 10636,
+                  "reached": 97,
+                  "rate": 0.00912
+                },
+                "mature": {
+                  "cutoff": "2026-02-23",
+                  "followup_days_p90": 176.7,
+                  "candidates": 5972,
+                  "reached": 74,
+                  "rate": 0.012391
+                }
+              }
+            },
+            "is_hire": true
+          }
+        ]
+      },
+      "note": ""
+    },
+    {
+      "key": "friend",
+      "label": "לידים / שוטר מגייס חבר",
+      "match": [
+        "לידים/שוטר מגייס חבר",
+        "לידים / שוטר מגייס חבר"
+      ],
+      "funnel": {
+        "first_key": "submissions",
+        "rows": [
+          {
+            "key": "submissions",
+            "label": "הגשות",
+            "candidates": 3581,
+            "first_date": "2026-01-01",
+            "last_date": "2026-08-17",
+            "from_prev": null,
+            "from_first": null,
+            "is_hire": false
+          },
+          {
+            "key": "file_check",
+            "label": "בדיקת קבצים",
+            "candidates": 3077,
+            "first_date": "2026-01-01",
+            "last_date": "2026-08-17",
+            "from_prev": {
+              "key": "submissions",
+              "label": "הגשות",
+              "reach": {
+                "low": 0.832817,
+                "high": 0.832883,
+                "mid": 0.83285
+              },
+              "days": {
+                "n": 2959,
+                "mean": 2.2,
+                "median": 0.0,
+                "p25": 0.0,
+                "p75": 1.0,
+                "p90": 3.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 2220,
+                  "reached": 1849,
+                  "rate": 0.832883
+                },
+                "mature": {
+                  "cutoff": "2026-08-14",
+                  "followup_days_p90": 3.0,
+                  "candidates": 3553,
+                  "reached": 2959,
+                  "rate": 0.832817
+                }
+              }
+            },
+            "from_first": {
+              "key": "submissions",
+              "label": "הגשות",
+              "reach": {
+                "low": 0.832817,
+                "high": 0.832883,
+                "mid": 0.83285
+              },
+              "days": {
+                "n": 2959,
+                "mean": 2.2,
+                "median": 0.0,
+                "p25": 0.0,
+                "p75": 1.0,
+                "p90": 3.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 2220,
+                  "reached": 1849,
+                  "rate": 0.832883
+                },
+                "mature": {
+                  "cutoff": "2026-08-14",
+                  "followup_days_p90": 3.0,
+                  "candidates": 3553,
+                  "reached": 2959,
+                  "rate": 0.832817
+                }
+              }
+            },
+            "is_hire": false
+          },
+          {
+            "key": "online_invite",
+            "label": "זימון למבחן מקוון",
+            "candidates": 1018,
+            "first_date": "2026-01-01",
+            "last_date": "2026-08-17",
+            "from_prev": {
+              "key": "file_check",
+              "label": "בדיקת קבצים",
+              "reach": {
+                "low": 0.341523,
+                "high": 0.348326,
+                "mid": 0.344925
+              },
+              "days": {
+                "n": 834,
+                "mean": 18.4,
+                "median": 7.0,
+                "p25": 2.0,
+                "p75": 20.0,
+                "p90": 45.7
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 1912,
+                  "reached": 666,
+                  "rate": 0.348326
+                },
+                "mature": {
+                  "cutoff": "2026-07-02",
+                  "followup_days_p90": 45.7,
+                  "candidates": 2442,
+                  "reached": 834,
+                  "rate": 0.341523
+                }
+              }
+            },
+            "from_first": {
+              "key": "submissions",
+              "label": "הגשות",
+              "reach": {
+                "low": 0.296554,
+                "high": 0.299099,
+                "mid": 0.297827
+              },
+              "days": {
+                "n": 809,
+                "mean": 21.0,
+                "median": 9.0,
+                "p25": 3.0,
+                "p75": 22.0,
+                "p90": 54.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 2220,
+                  "reached": 664,
+                  "rate": 0.299099
+                },
+                "mature": {
+                  "cutoff": "2026-06-24",
+                  "followup_days_p90": 54.0,
+                  "candidates": 2728,
+                  "reached": 809,
+                  "rate": 0.296554
+                }
+              }
+            },
+            "is_hire": false
+          },
+          {
+            "key": "online_day",
+            "label": "יום מיון מקוון",
+            "candidates": 911,
+            "first_date": "2026-01-04",
+            "last_date": "2026-08-17",
+            "from_prev": {
+              "key": "online_invite",
+              "label": "זימון למבחן מקוון",
+              "reach": {
+                "low": 0.66709,
+                "high": 0.669967,
+                "mid": 0.668529
+              },
+              "days": {
+                "n": 525,
+                "mean": 24.9,
+                "median": 19.0,
+                "p25": 11.0,
+                "p75": 31.0,
+                "p90": 49.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 606,
+                  "reached": 406,
+                  "rate": 0.669967
+                },
+                "mature": {
+                  "cutoff": "2026-06-29",
+                  "followup_days_p90": 49.0,
+                  "candidates": 787,
+                  "reached": 525,
+                  "rate": 0.66709
+                }
+              }
+            },
+            "from_first": {
+              "key": "submissions",
+              "label": "הגשות",
+              "reach": {
+                "low": 0.227928,
+                "high": 0.230238,
+                "mid": 0.229083
+              },
+              "days": {
+                "n": 367,
+                "mean": 56.1,
+                "median": 40.0,
+                "p25": 22.0,
+                "p75": 78.0,
+                "p90": 129.4
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 2220,
+                  "reached": 506,
+                  "rate": 0.227928
+                },
+                "mature": {
+                  "cutoff": "2026-04-09",
+                  "followup_days_p90": 129.4,
+                  "candidates": 1594,
+                  "reached": 367,
+                  "rate": 0.230238
+                }
+              }
+            },
+            "is_hire": false
+          },
+          {
+            "key": "screening_day",
+            "label": "יום מיון",
+            "candidates": 507,
+            "first_date": "2026-01-11",
+            "last_date": "2026-08-17",
+            "from_prev": {
+              "key": "online_day",
+              "label": "יום מיון מקוון",
+              "reach": {
+                "low": 0.450521,
+                "high": 0.5975,
+                "mid": 0.52401
+              },
+              "days": {
+                "n": 346,
+                "mean": 20.8,
+                "median": 14.0,
+                "p25": 7.0,
+                "p75": 25.0,
+                "p90": 41.5
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 400,
+                  "reached": 239,
+                  "rate": 0.5975
+                },
+                "mature": {
+                  "cutoff": "2026-07-06",
+                  "followup_days_p90": 41.5,
+                  "candidates": 768,
+                  "reached": 346,
+                  "rate": 0.450521
+                }
+              }
+            },
+            "from_first": {
+              "key": "submissions",
+              "label": "הגשות",
+              "reach": {
+                "low": 0.164865,
+                "high": 0.168454,
+                "mid": 0.16666
+              },
+              "days": {
+                "n": 267,
+                "mean": 64.9,
+                "median": 55.0,
+                "p25": 31.5,
+                "p75": 91.5,
+                "p90": 130.4
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 2220,
+                  "reached": 366,
+                  "rate": 0.164865
+                },
+                "mature": {
+                  "cutoff": "2026-04-08",
+                  "followup_days_p90": 130.4,
+                  "candidates": 1585,
+                  "reached": 267,
+                  "rate": 0.168454
+                }
+              }
+            },
+            "is_hire": false
+          },
+          {
+            "key": "assessment",
+            "label": "מרכז הערכה",
+            "candidates": 174,
+            "first_date": "2026-01-06",
+            "last_date": "2026-08-17",
+            "from_prev": {
+              "key": "screening_day",
+              "label": "יום מיון",
+              "reach": {
+                "low": 0.45625,
+                "high": 0.502165,
+                "mid": 0.479207
+              },
+              "days": {
+                "n": 146,
+                "mean": 33.4,
+                "median": 28.0,
+                "p25": 20.0,
+                "p75": 42.0,
+                "p90": 59.5
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 231,
+                  "reached": 116,
+                  "rate": 0.502165
+                },
+                "mature": {
+                  "cutoff": "2026-06-18",
+                  "followup_days_p90": 59.5,
+                  "candidates": 320,
+                  "reached": 146,
+                  "rate": 0.45625
+                }
+              }
+            },
+            "from_first": {
+              "key": "submissions",
+              "label": "הגשות",
+              "reach": {
+                "low": 0.067117,
+                "high": 0.074274,
+                "mid": 0.070696
+              },
+              "days": {
+                "n": 110,
+                "mean": 85.2,
+                "median": 77.0,
+                "p25": 56.2,
+                "p75": 108.2,
+                "p90": 143.4
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 2220,
+                  "reached": 149,
+                  "rate": 0.067117
+                },
+                "mature": {
+                  "cutoff": "2026-03-26",
+                  "followup_days_p90": 143.4,
+                  "candidates": 1481,
+                  "reached": 110,
+                  "rate": 0.074274
+                }
+              }
+            },
+            "is_hire": false
+          },
+          {
+            "key": "yachbam",
+            "label": "יחב\"מ",
+            "candidates": 215,
+            "first_date": "2026-01-07",
+            "last_date": "2026-08-17",
+            "from_prev": {
+              "key": "assessment",
+              "label": "מרכז הערכה",
+              "reach": {
+                "low": 0.595588,
+                "high": 0.60241,
+                "mid": 0.598999
+              },
+              "days": {
+                "n": 81,
+                "mean": 16.2,
+                "median": 11.0,
+                "p25": 6.0,
+                "p75": 16.0,
+                "p90": 33.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 83,
+                  "reached": 50,
+                  "rate": 0.60241
+                },
+                "mature": {
+                  "cutoff": "2026-07-15",
+                  "followup_days_p90": 33.0,
+                  "candidates": 136,
+                  "reached": 81,
+                  "rate": 0.595588
+                }
+              }
+            },
+            "from_first": {
+              "key": "submissions",
+              "label": "הגשות",
+              "reach": {
+                "low": 0.072973,
+                "high": 0.08132,
+                "mid": 0.077147
+              },
+              "days": {
+                "n": 101,
+                "mean": 96.0,
+                "median": 89.0,
+                "p25": 59.0,
+                "p75": 125.0,
+                "p90": 157.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 2220,
+                  "reached": 162,
+                  "rate": 0.072973
+                },
+                "mature": {
+                  "cutoff": "2026-03-13",
+                  "followup_days_p90": 157.0,
+                  "candidates": 1242,
+                  "reached": 101,
+                  "rate": 0.08132
+                }
+              }
+            },
+            "is_hire": false
+          },
+          {
+            "key": "hire",
+            "label": "גיוס",
+            "candidates": 176,
+            "first_date": "2026-01-07",
+            "last_date": "2026-08-19",
+            "from_prev": {
+              "key": "yachbam",
+              "label": "יחב\"מ",
+              "reach": {
+                "low": 0.707692,
+                "high": 0.709677,
+                "mid": 0.708685
+              },
+              "days": {
+                "n": 92,
+                "mean": 30.1,
+                "median": 22.5,
+                "p25": 14.0,
+                "p75": 38.0,
+                "p90": 63.0
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 93,
+                  "reached": 66,
+                  "rate": 0.709677
+                },
+                "mature": {
+                  "cutoff": "2026-06-18",
+                  "followup_days_p90": 62.0,
+                  "candidates": 130,
+                  "reached": 92,
+                  "rate": 0.707692
+                }
+              }
+            },
+            "from_first": {
+              "key": "submissions",
+              "label": "הגשות",
+              "reach": {
+                "low": 0.059459,
+                "high": 0.079877,
+                "mid": 0.069668
+              },
+              "days": {
+                "n": 52,
+                "mean": 117.3,
+                "median": 108.0,
+                "p25": 82.8,
+                "p75": 147.0,
+                "p90": 185.8
+              },
+              "basis": {
+                "conservative": {
+                  "cutoff": "2026-05-20",
+                  "candidates": 2220,
+                  "reached": 132,
+                  "rate": 0.059459
+                },
+                "mature": {
+                  "cutoff": "2026-02-14",
+                  "followup_days_p90": 185.6,
+                  "candidates": 651,
+                  "reached": 52,
+                  "rate": 0.079877
+                }
+              }
+            },
+            "is_hire": true
+          }
+        ]
+      },
+      "note": ""
+    }
+  ],
   "hire_key": "hire",
   "hire_label": "גיוס",
   "meta": {
-    "generated_at": "2026-08-31 12:38",
-    "activities_file": "נתונים למערכת/פעילויות למחשבון.xlsx",
+    "generated_at": "2026-09-02 13:17",
+    "activities_files": [
+      "נתונים למערכת/פעילויות למחשבון.xlsx",
+      "נתונים למערכת/כלל פעולות למערכת.xlsx",
+      "נתונים למערכת/הגשות חציון א 2026.xlsx"
+    ],
+    "activity_duplicate_rows_dropped": 8790,
     "hires_file": "נתונים למערכת/גיוסים 20.8.xlsx",
-    "activity_rows": 64038,
-    "activity_candidates": 25811,
+    "activity_rows": 137296,
+    "activity_candidates": 42293,
     "activity_first": "2026-01-01",
-    "activity_last": "2026-07-14",
+    "activity_last": "2026-08-17",
     "hire_rows": 2331,
     "hire_candidates": 2328,
     "hire_first": "2026-01-01",
     "hire_last": "2026-08-19",
     "conservative_cutoff": "2026-05-20",
-    "unmapped_activity_types": [],
-    "hires_without_activity": 226
+    "unmapped_activity_types": [
+      "הועסק",
+      "הפניה לזימון לקב\"ט",
+      "הפסקת הליך",
+      "הפסקת הליך ע\"י רפרנט",
+      "זימון לגיוס",
+      "תוצאות בדיקת רופא",
+      "תוצאות מבחני אישיות"
+    ],
+    "hires_without_activity": 195
   },
   "duration_filter": {
     "_comment": "פסילת תצפיות שאינן התקדמות אמיתית במשפך. גיוס יום-יומיים אחרי בדיקת קבצים אינו מועמד שעבר את התהליך במהירות אלא בדיקה שנרשמה בדיעבד על מי שכבר היה בסופו. תצפית שנפסלת אינה נספרת לא בזמנים ולא בשיעור ההגעה.",
@@ -82,16 +2199,1257 @@
     {
       "key": "submissions",
       "label": "הגשות",
-      "activity_type": null,
-      "has_data": false,
-      "note": "אין מקור נתונים לשלב זה בקבצים שהתקבלו. המחשבון לא מציג עבורו יחס המרה.",
-      "hire_rate": null,
-      "days_to_hire": null,
-      "buckets": null,
-      "hire_curve": null,
-      "hire_window": null,
-      "basis": null,
-      "forward": null
+      "activity_type": [
+        "עדכון מועמד בדבר הקמת מועמדות",
+        "עדכון מועמד על הקמת מועמדות מתעדוף",
+        "עדכון מועמד על הקמת מועמדות ידנית"
+      ],
+      "has_data": true,
+      "note": "הקמת מועמדות היא אירוע ההגשה. שלושת הסוגים - רגיל, מתעדוף וידני - הם אותו שלב, ומועמד נספר לפי המוקדם שבהם.",
+      "hire_rate": {
+        "low": 0.028588,
+        "high": 0.035526,
+        "mid": 0.032057
+      },
+      "days_to_hire": {
+        "n": 391,
+        "mean": 112.9,
+        "median": 108.0,
+        "p25": 77.0,
+        "p75": 143.0,
+        "p90": 177.0
+      },
+      "hire_window": {
+        "from_days": null,
+        "to_days": null,
+        "reason": "אין בליטה בהתחלה: 1 מול שקע 0, פחות מפי 2.0",
+        "observations_before": 391,
+        "observations_after": 391,
+        "dropped_fast": 0,
+        "dropped_slow": 0,
+        "sigma_floor_days": 52.8
+      },
+      "buckets": [
+        {
+          "key": "w1",
+          "label": "עד שבוע",
+          "min_days": 0,
+          "max_days": 7,
+          "share": 0.002558
+        },
+        {
+          "key": "w2",
+          "label": "שבוע עד שבועיים",
+          "min_days": 8,
+          "max_days": 14,
+          "share": 0.0
+        },
+        {
+          "key": "m1",
+          "label": "שבועיים עד חודש",
+          "min_days": 15,
+          "max_days": 30,
+          "share": 0.0
+        },
+        {
+          "key": "m2",
+          "label": "חודש עד חודשיים",
+          "min_days": 31,
+          "max_days": 60,
+          "share": 0.102302
+        },
+        {
+          "key": "m3",
+          "label": "חודשיים עד 3 חודשים",
+          "min_days": 61,
+          "max_days": 90,
+          "share": 0.242967
+        },
+        {
+          "key": "m3p",
+          "label": "מעל 3 חודשים",
+          "min_days": 91,
+          "max_days": null,
+          "share": 0.652174
+        }
+      ],
+      "hire_curve": [
+        [
+          3,
+          0.002558
+        ],
+        [
+          31,
+          0.005115
+        ],
+        [
+          36,
+          0.01023
+        ],
+        [
+          39,
+          0.02046
+        ],
+        [
+          41,
+          0.023018
+        ],
+        [
+          42,
+          0.028133
+        ],
+        [
+          43,
+          0.035806
+        ],
+        [
+          44,
+          0.040921
+        ],
+        [
+          45,
+          0.043478
+        ],
+        [
+          46,
+          0.048593
+        ],
+        [
+          47,
+          0.053708
+        ],
+        [
+          48,
+          0.058824
+        ],
+        [
+          50,
+          0.063939
+        ],
+        [
+          53,
+          0.066496
+        ],
+        [
+          54,
+          0.069054
+        ],
+        [
+          55,
+          0.076726
+        ],
+        [
+          56,
+          0.084399
+        ],
+        [
+          58,
+          0.092072
+        ],
+        [
+          59,
+          0.102302
+        ],
+        [
+          60,
+          0.104859
+        ],
+        [
+          61,
+          0.109974
+        ],
+        [
+          62,
+          0.112532
+        ],
+        [
+          63,
+          0.120205
+        ],
+        [
+          64,
+          0.127877
+        ],
+        [
+          65,
+          0.132992
+        ],
+        [
+          66,
+          0.150895
+        ],
+        [
+          67,
+          0.158568
+        ],
+        [
+          68,
+          0.16624
+        ],
+        [
+          69,
+          0.184143
+        ],
+        [
+          70,
+          0.191816
+        ],
+        [
+          71,
+          0.207161
+        ],
+        [
+          72,
+          0.217391
+        ],
+        [
+          73,
+          0.227621
+        ],
+        [
+          74,
+          0.230179
+        ],
+        [
+          75,
+          0.237852
+        ],
+        [
+          76,
+          0.242967
+        ],
+        [
+          77,
+          0.26087
+        ],
+        [
+          78,
+          0.276215
+        ],
+        [
+          79,
+          0.289003
+        ],
+        [
+          82,
+          0.29156
+        ],
+        [
+          83,
+          0.304348
+        ],
+        [
+          84,
+          0.309463
+        ],
+        [
+          85,
+          0.314578
+        ],
+        [
+          86,
+          0.324808
+        ],
+        [
+          87,
+          0.337596
+        ],
+        [
+          88,
+          0.340153
+        ],
+        [
+          89,
+          0.342711
+        ],
+        [
+          90,
+          0.347826
+        ],
+        [
+          91,
+          0.358056
+        ],
+        [
+          92,
+          0.365729
+        ],
+        [
+          93,
+          0.375959
+        ],
+        [
+          94,
+          0.388747
+        ],
+        [
+          95,
+          0.393862
+        ],
+        [
+          97,
+          0.40665
+        ],
+        [
+          98,
+          0.414322
+        ],
+        [
+          99,
+          0.419437
+        ],
+        [
+          100,
+          0.432225
+        ],
+        [
+          101,
+          0.43734
+        ],
+        [
+          102,
+          0.442455
+        ],
+        [
+          103,
+          0.44757
+        ],
+        [
+          104,
+          0.452685
+        ],
+        [
+          105,
+          0.465473
+        ],
+        [
+          106,
+          0.475703
+        ],
+        [
+          107,
+          0.485934
+        ],
+        [
+          108,
+          0.514066
+        ],
+        [
+          109,
+          0.516624
+        ],
+        [
+          110,
+          0.519182
+        ],
+        [
+          111,
+          0.524297
+        ],
+        [
+          112,
+          0.537084
+        ],
+        [
+          114,
+          0.544757
+        ],
+        [
+          115,
+          0.560102
+        ],
+        [
+          117,
+          0.565217
+        ],
+        [
+          118,
+          0.58312
+        ],
+        [
+          119,
+          0.588235
+        ],
+        [
+          120,
+          0.598465
+        ],
+        [
+          121,
+          0.606138
+        ],
+        [
+          122,
+          0.611253
+        ],
+        [
+          124,
+          0.613811
+        ],
+        [
+          125,
+          0.626598
+        ],
+        [
+          126,
+          0.636829
+        ],
+        [
+          127,
+          0.644501
+        ],
+        [
+          128,
+          0.647059
+        ],
+        [
+          129,
+          0.664962
+        ],
+        [
+          131,
+          0.670077
+        ],
+        [
+          132,
+          0.685422
+        ],
+        [
+          133,
+          0.690537
+        ],
+        [
+          134,
+          0.700767
+        ],
+        [
+          136,
+          0.705882
+        ],
+        [
+          139,
+          0.710997
+        ],
+        [
+          140,
+          0.723785
+        ],
+        [
+          141,
+          0.731458
+        ],
+        [
+          142,
+          0.741688
+        ],
+        [
+          143,
+          0.754476
+        ],
+        [
+          144,
+          0.762148
+        ],
+        [
+          146,
+          0.772379
+        ],
+        [
+          147,
+          0.774936
+        ],
+        [
+          148,
+          0.777494
+        ],
+        [
+          149,
+          0.782609
+        ],
+        [
+          150,
+          0.792839
+        ],
+        [
+          153,
+          0.797954
+        ],
+        [
+          154,
+          0.800512
+        ],
+        [
+          155,
+          0.810742
+        ],
+        [
+          157,
+          0.815857
+        ],
+        [
+          160,
+          0.818414
+        ],
+        [
+          161,
+          0.823529
+        ],
+        [
+          162,
+          0.828645
+        ],
+        [
+          163,
+          0.836317
+        ],
+        [
+          164,
+          0.841432
+        ],
+        [
+          167,
+          0.84399
+        ],
+        [
+          168,
+          0.85422
+        ],
+        [
+          169,
+          0.861893
+        ],
+        [
+          170,
+          0.86445
+        ],
+        [
+          171,
+          0.867008
+        ],
+        [
+          174,
+          0.879795
+        ],
+        [
+          175,
+          0.887468
+        ],
+        [
+          176,
+          0.897698
+        ],
+        [
+          177,
+          0.907928
+        ],
+        [
+          178,
+          0.913043
+        ],
+        [
+          180,
+          0.915601
+        ],
+        [
+          182,
+          0.920716
+        ],
+        [
+          184,
+          0.925831
+        ],
+        [
+          185,
+          0.938619
+        ],
+        [
+          186,
+          0.941176
+        ],
+        [
+          188,
+          0.946292
+        ],
+        [
+          189,
+          0.953964
+        ],
+        [
+          190,
+          0.956522
+        ],
+        [
+          191,
+          0.959079
+        ],
+        [
+          194,
+          0.961637
+        ],
+        [
+          195,
+          0.964194
+        ],
+        [
+          197,
+          0.969309
+        ],
+        [
+          198,
+          0.974425
+        ],
+        [
+          199,
+          0.97954
+        ],
+        [
+          202,
+          0.984655
+        ],
+        [
+          203,
+          0.987212
+        ],
+        [
+          205,
+          0.98977
+        ],
+        [
+          211,
+          0.992327
+        ],
+        [
+          212,
+          0.994885
+        ],
+        [
+          220,
+          0.997442
+        ],
+        [
+          224,
+          1.0
+        ]
+      ],
+      "basis": {
+        "conservative": {
+          "cutoff": "2026-05-20",
+          "candidates": 23786,
+          "reached": 680,
+          "rate": 0.028588
+        },
+        "mature": {
+          "cutoff": "2026-02-23",
+          "followup_days_p90": 177.0,
+          "candidates": 11006,
+          "reached": 391,
+          "rate": 0.035526
+        }
+      },
+      "forward": [
+        {
+          "key": "file_check",
+          "label": "בדיקת קבצים",
+          "reach": {
+            "low": 0.606736,
+            "high": 0.61738,
+            "mid": 0.612058
+          },
+          "days": {
+            "n": 20231,
+            "mean": 8.8,
+            "median": 2.0,
+            "p25": 0.0,
+            "p75": 6.0,
+            "p90": 21.0
+          },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.796253
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.066037
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.071326
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.029163
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.017251
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.019969
+            }
+          ],
+          "window": {
+            "from_days": null,
+            "to_days": null,
+            "reason": "טווח קצר מדי לזיהוי שקע",
+            "observations_before": 20231,
+            "observations_after": 20231,
+            "dropped_fast": 0,
+            "dropped_slow": 0,
+            "sigma_floor_days": -0.4
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 23786,
+              "reached": 14685,
+              "rate": 0.61738
+            },
+            "mature": {
+              "cutoff": "2026-07-27",
+              "followup_days_p90": 21.0,
+              "candidates": 33344,
+              "reached": 20231,
+              "rate": 0.606736
+            }
+          }
+        },
+        {
+          "key": "online_invite",
+          "label": "זימון למבחן מקוון",
+          "reach": {
+            "low": 0.167956,
+            "high": 0.167968,
+            "mid": 0.167962
+          },
+          "days": {
+            "n": 4002,
+            "mean": 29.7,
+            "median": 14.0,
+            "p25": 5.0,
+            "p75": 36.0,
+            "p90": 86.9
+          },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.348576
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.153423
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.210895
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.137181
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.056472
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.093453
+            }
+          ],
+          "window": {
+            "from_days": null,
+            "to_days": null,
+            "reason": "אין עלייה אחרי השקע: 264 מול 242, פחות מפי 2.0",
+            "observations_before": 4002,
+            "observations_after": 4002,
+            "dropped_fast": 0,
+            "dropped_slow": 0,
+            "sigma_floor_days": 1.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 23786,
+              "reached": 3995,
+              "rate": 0.167956
+            },
+            "mature": {
+              "cutoff": "2026-05-22",
+              "followup_days_p90": 86.9,
+              "candidates": 23826,
+              "reached": 4002,
+              "rate": 0.167968
+            }
+          }
+        },
+        {
+          "key": "online_day",
+          "label": "יום מיון מקוון",
+          "reach": {
+            "low": 0.119398,
+            "high": 0.131597,
+            "mid": 0.125498
+          },
+          "days": {
+            "n": 2072,
+            "mean": 56.0,
+            "median": 38.0,
+            "p25": 22.0,
+            "p75": 77.0,
+            "p90": 133.0
+          },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.027027
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.083977
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.291506
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.27751
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.115347
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.204633
+            }
+          ],
+          "window": {
+            "from_days": null,
+            "to_days": null,
+            "reason": "אין בליטה בהתחלה: 3 מול שקע 15, פחות מפי 2.0",
+            "observations_before": 2072,
+            "observations_after": 2072,
+            "dropped_fast": 0,
+            "dropped_slow": 0,
+            "sigma_floor_days": 11.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 23786,
+              "reached": 2840,
+              "rate": 0.119398
+            },
+            "mature": {
+              "cutoff": "2026-04-06",
+              "followup_days_p90": 133.0,
+              "candidates": 15745,
+              "reached": 2072,
+              "rate": 0.131597
+            }
+          }
+        },
+        {
+          "key": "screening_day",
+          "label": "יום מיון",
+          "reach": {
+            "low": 0.090095,
+            "high": 0.102466,
+            "mid": 0.096281
+          },
+          "days": {
+            "n": 1533,
+            "mean": 68.9,
+            "median": 56.0,
+            "p25": 33.0,
+            "p75": 99.0,
+            "p90": 138.0
+          },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.006523
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.030007
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.178735
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.324201
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.174821
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.285714
+            }
+          ],
+          "window": {
+            "from_days": null,
+            "to_days": null,
+            "reason": "אין בליטה בהתחלה: 0 מול שקע 4, פחות מפי 2.0",
+            "observations_before": 1533,
+            "observations_after": 1533,
+            "dropped_fast": 0,
+            "dropped_slow": 0,
+            "sigma_floor_days": 18.7
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 23786,
+              "reached": 2143,
+              "rate": 0.090095
+            },
+            "mature": {
+              "cutoff": "2026-04-01",
+              "followup_days_p90": 138.0,
+              "candidates": 14961,
+              "reached": 1533,
+              "rate": 0.102466
+            }
+          }
+        },
+        {
+          "key": "assessment",
+          "label": "מרכז הערכה",
+          "reach": {
+            "low": 0.029765,
+            "high": 0.035469,
+            "mid": 0.032617
+          },
+          "days": {
+            "n": 424,
+            "mean": 93.1,
+            "median": 81.0,
+            "p25": 58.8,
+            "p75": 121.8,
+            "p90": 164.7
+          },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.0
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.0
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.018868
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.252358
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.313679
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.415094
+            }
+          ],
+          "window": {
+            "from_days": null,
+            "to_days": null,
+            "reason": "אין בליטה בהתחלה: 0 מול שקע 0, פחות מפי 2.0",
+            "observations_before": 424,
+            "observations_after": 424,
+            "dropped_fast": 0,
+            "dropped_slow": 0,
+            "sigma_floor_days": 40.3
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 23786,
+              "reached": 708,
+              "rate": 0.029765
+            },
+            "mature": {
+              "cutoff": "2026-03-05",
+              "followup_days_p90": 164.7,
+              "candidates": 11954,
+              "reached": 424,
+              "rate": 0.035469
+            }
+          }
+        },
+        {
+          "key": "yachbam",
+          "label": "יחב\"מ",
+          "reach": {
+            "low": 0.041579,
+            "high": 0.050703,
+            "mid": 0.046141
+          },
+          "days": {
+            "n": 624,
+            "mean": 95.9,
+            "median": 89.0,
+            "p25": 62.0,
+            "p75": 126.0,
+            "p90": 161.0
+          },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.003205
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.00641
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.027244
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.201923
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.270833
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.490385
+            }
+          ],
+          "window": {
+            "from_days": null,
+            "to_days": null,
+            "reason": "אין בליטה בהתחלה: 1 מול שקע 0, פחות מפי 2.0",
+            "observations_before": 624,
+            "observations_after": 624,
+            "dropped_fast": 0,
+            "dropped_slow": 0,
+            "sigma_floor_days": 37.0
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 23786,
+              "reached": 989,
+              "rate": 0.041579
+            },
+            "mature": {
+              "cutoff": "2026-03-09",
+              "followup_days_p90": 161.0,
+              "candidates": 12307,
+              "reached": 624,
+              "rate": 0.050703
+            }
+          }
+        },
+        {
+          "key": "hire",
+          "label": "גיוס",
+          "reach": {
+            "low": 0.028588,
+            "high": 0.035526,
+            "mid": 0.032057
+          },
+          "days": {
+            "n": 391,
+            "mean": 112.9,
+            "median": 108.0,
+            "p25": 77.0,
+            "p75": 143.0,
+            "p90": 177.0
+          },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.002558
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.0
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.0
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.102302
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.242967
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.652174
+            }
+          ],
+          "window": {
+            "from_days": null,
+            "to_days": null,
+            "reason": "אין בליטה בהתחלה: 1 מול שקע 0, פחות מפי 2.0",
+            "observations_before": 391,
+            "observations_after": 391,
+            "dropped_fast": 0,
+            "dropped_slow": 0,
+            "sigma_floor_days": 52.8
+          },
+          "basis": {
+            "conservative": {
+              "cutoff": "2026-05-20",
+              "candidates": 23786,
+              "reached": 680,
+              "rate": 0.028588
+            },
+            "mature": {
+              "cutoff": "2026-02-23",
+              "followup_days_p90": 177.0,
+              "candidates": 11006,
+              "reached": 391,
+              "rate": 0.035526
+            }
+          }
+        }
+      ]
     },
     {
       "key": "file_check",
@@ -836,24 +4194,68 @@
           "key": "online_invite",
           "label": "זימון למבחן מקוון",
           "reach": {
-            "low": 0.248344,
-            "high": 0.257049,
-            "mid": 0.252696
+            "low": 0.25261,
+            "high": 0.264253,
+            "mid": 0.258431
           },
           "days": {
-            "n": 4423,
-            "mean": 15.6,
+            "n": 5251,
+            "mean": 17.9,
             "median": 6.0,
             "p25": 1.0,
-            "p75": 18.0,
-            "p90": 41.0
+            "p75": 20.0,
+            "p90": 47.0
           },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.551324
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.126643
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.158827
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.085698
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.03047
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.047039
+            }
+          ],
           "window": {
             "from_days": null,
             "to_days": null,
             "reason": "טווח קצר מדי לזיהוי שקע",
-            "observations_before": 4423,
-            "observations_after": 4423,
+            "observations_before": 5251,
+            "observations_after": 5251,
             "dropped_fast": 0,
             "dropped_slow": 0,
             "sigma_floor_days": -0.2
@@ -862,15 +4264,15 @@
             "conservative": {
               "cutoff": "2026-05-20",
               "candidates": 16102,
-              "reached": 4139,
-              "rate": 0.257049
+              "reached": 4255,
+              "rate": 0.264253
             },
             "mature": {
-              "cutoff": "2026-06-03",
-              "followup_days_p90": 41.0,
-              "candidates": 17810,
-              "reached": 4423,
-              "rate": 0.248344
+              "cutoff": "2026-07-01",
+              "followup_days_p90": 47.0,
+              "candidates": 20787,
+              "reached": 5251,
+              "rate": 0.25261
             }
           }
         },
@@ -878,41 +4280,85 @@
           "key": "online_day",
           "label": "יום מיון מקוון",
           "reach": {
-            "low": 0.190722,
-            "high": 0.198934,
-            "mid": 0.194828
+            "low": 0.198671,
+            "high": 0.210315,
+            "mid": 0.204493
           },
           "days": {
-            "n": 1754,
+            "n": 2414,
             "mean": 46.2,
             "median": 27.0,
-            "p25": 14.0,
-            "p75": 60.0,
-            "p90": 128.0
+            "p25": 15.0,
+            "p75": 58.0,
+            "p90": 127.0
           },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.084507
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.163629
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.294532
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.21541
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.074151
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.167771
+            }
+          ],
           "window": {
             "from_days": null,
             "to_days": null,
-            "reason": "אין בליטה בהתחלה: 24 מול שקע 58, פחות מפי 2.0",
-            "observations_before": 1754,
-            "observations_after": 1754,
+            "reason": "אין בליטה בהתחלה: 32 מול שקע 71, פחות מפי 2.0",
+            "observations_before": 2414,
+            "observations_after": 2414,
             "dropped_fast": 0,
             "dropped_slow": 0,
-            "sigma_floor_days": 6.0
+            "sigma_floor_days": 6.3
           },
           "basis": {
             "conservative": {
               "cutoff": "2026-05-20",
               "candidates": 16102,
-              "reached": 3071,
-              "rate": 0.190722
+              "reached": 3199,
+              "rate": 0.198671
             },
             "mature": {
-              "cutoff": "2026-03-08",
-              "followup_days_p90": 128.0,
-              "candidates": 8817,
-              "reached": 1754,
-              "rate": 0.198934
+              "cutoff": "2026-04-12",
+              "followup_days_p90": 127.0,
+              "candidates": 11478,
+              "reached": 2414,
+              "rate": 0.210315
             }
           }
         },
@@ -920,41 +4366,85 @@
           "key": "screening_day",
           "label": "יום מיון",
           "reach": {
-            "low": 0.152341,
-            "high": 0.166432,
-            "mid": 0.159387
+            "low": 0.163458,
+            "high": 0.164872,
+            "mid": 0.164165
           },
           "days": {
-            "n": 1773,
-            "mean": 49.4,
+            "n": 2312,
+            "mean": 50.7,
             "median": 39.0,
             "p25": 23.0,
             "p75": 65.0,
-            "p90": 105.0
+            "p90": 108.9
           },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.031574
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.083045
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.261678
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.342561
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.128893
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.152249
+            }
+          ],
           "window": {
-            "from_days": 6.0,
+            "from_days": null,
             "to_days": null,
-            "reason": "בליטה 25 בהתחלה, שקע 10 סביב יום 3, ואחריו 115",
-            "observations_before": 1808,
-            "observations_after": 1773,
-            "dropped_fast": 35,
+            "reason": "אין בליטה בהתחלה: 25 מול שקע 14, פחות מפי 2.0",
+            "observations_before": 2312,
+            "observations_after": 2312,
+            "dropped_fast": 0,
             "dropped_slow": 0,
-            "sigma_floor_days": 9.6
+            "sigma_floor_days": 10.4
           },
           "basis": {
             "conservative": {
               "cutoff": "2026-05-20",
               "candidates": 16102,
-              "reached": 2453,
-              "rate": 0.152341
+              "reached": 2632,
+              "rate": 0.163458
             },
             "mature": {
-              "cutoff": "2026-03-31",
-              "followup_days_p90": 105.0,
-              "candidates": 10653,
-              "reached": 1773,
-              "rate": 0.166432
+              "cutoff": "2026-04-30",
+              "followup_days_p90": 108.9,
+              "candidates": 14023,
+              "reached": 2312,
+              "rate": 0.164872
             }
           }
         },
@@ -962,41 +4452,85 @@
           "key": "yachbam",
           "label": "יחב\"מ",
           "reach": {
-            "low": 0.077009,
-            "high": 0.094022,
-            "mid": 0.085515
+            "low": 0.085642,
+            "high": 0.098942,
+            "mid": 0.092292
           },
           "days": {
-            "n": 865,
-            "mean": 69.9,
-            "median": 65.0,
-            "p25": 42.0,
-            "p75": 94.0,
-            "p90": 123.0
+            "n": 1094,
+            "mean": 78.3,
+            "median": 70.0,
+            "p25": 48.0,
+            "p75": 103.0,
+            "p90": 137.7
           },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.0
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.0
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.082267
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.310786
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.28245
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.324497
+            }
+          ],
           "window": {
-            "from_days": 6.0,
+            "from_days": 18.0,
             "to_days": null,
-            "reason": "בליטה 28 בהתחלה, שקע 9 סביב יום 3, ואחריו 38",
-            "observations_before": 902,
-            "observations_after": 865,
-            "dropped_fast": 37,
+            "reason": "בליטה 32 בהתחלה, שקע 10 סביב יום 15, ואחריו 47",
+            "observations_before": 1189,
+            "observations_after": 1094,
+            "dropped_fast": 95,
             "dropped_slow": 0,
-            "sigma_floor_days": 11.6
+            "sigma_floor_days": 12.8
           },
           "basis": {
             "conservative": {
               "cutoff": "2026-05-20",
               "candidates": 16102,
-              "reached": 1240,
-              "rate": 0.077009
+              "reached": 1379,
+              "rate": 0.085642
             },
             "mature": {
-              "cutoff": "2026-03-14",
-              "followup_days_p90": 122.0,
-              "candidates": 9200,
-              "reached": 865,
-              "rate": 0.094022
+              "cutoff": "2026-04-06",
+              "followup_days_p90": 133.0,
+              "candidates": 11057,
+              "reached": 1094,
+              "rate": 0.098942
             }
           }
         },
@@ -1004,41 +4538,85 @@
           "key": "assessment",
           "label": "מרכז הערכה",
           "reach": {
-            "low": 0.045274,
-            "high": 0.057397,
-            "mid": 0.051336
+            "low": 0.054652,
+            "high": 0.062395,
+            "mid": 0.058523
           },
           "days": {
-            "n": 561,
-            "mean": 71.4,
-            "median": 66.0,
-            "p25": 48.0,
-            "p75": 89.0,
-            "p90": 116.0
+            "n": 669,
+            "mean": 79.2,
+            "median": 71.0,
+            "p25": 50.0,
+            "p75": 98.0,
+            "p90": 138.0
           },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.005979
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.007474
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.037369
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.318386
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.328849
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.301943
+            }
+          ],
           "window": {
             "from_days": null,
             "to_days": null,
             "reason": "אין בליטה בהתחלה: 1 מול שקע 1, פחות מפי 2.0",
-            "observations_before": 561,
-            "observations_after": 561,
+            "observations_before": 669,
+            "observations_after": 669,
             "dropped_fast": 0,
             "dropped_slow": 0,
-            "sigma_floor_days": 28.9
+            "sigma_floor_days": 30.0
           },
           "basis": {
             "conservative": {
               "cutoff": "2026-05-20",
               "candidates": 16102,
-              "reached": 729,
-              "rate": 0.045274
+              "reached": 880,
+              "rate": 0.054652
             },
             "mature": {
-              "cutoff": "2026-03-20",
-              "followup_days_p90": 116.0,
-              "candidates": 9774,
-              "reached": 561,
-              "rate": 0.057397
+              "cutoff": "2026-04-01",
+              "followup_days_p90": 138.0,
+              "candidates": 10722,
+              "reached": 669,
+              "rate": 0.062395
             }
           }
         },
@@ -1058,6 +4636,50 @@
             "p75": 115.0,
             "p90": 148.3
           },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.0
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.0
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.034141
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.211454
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.298458
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.455947
+            }
+          ],
           "window": {
             "from_days": 21.0,
             "to_days": null,
@@ -1777,24 +5399,68 @@
           "key": "online_day",
           "label": "יום מיון מקוון",
           "reach": {
-            "low": 0.620311,
-            "high": 0.624408,
-            "mid": 0.622359
+            "low": 0.622976,
+            "high": 0.629822,
+            "mid": 0.626399
           },
           "days": {
-            "n": 2993,
-            "mean": 19.9,
+            "n": 3617,
+            "mean": 20.2,
             "median": 14.0,
             "p25": 8.0,
-            "p75": 23.0,
+            "p75": 24.0,
             "p90": 39.0
           },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.220625
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.285596
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.32679
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.125242
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.025435
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.016312
+            }
+          ],
           "window": {
             "from_days": null,
             "to_days": null,
-            "reason": "אין בליטה בהתחלה: 386 מול שקע 278, פחות מפי 2.0",
-            "observations_before": 2993,
-            "observations_after": 2993,
+            "reason": "אין בליטה בהתחלה: 485 מול שקע 343, פחות מפי 2.0",
+            "observations_before": 3617,
+            "observations_after": 3617,
             "dropped_fast": 0,
             "dropped_slow": 0,
             "sigma_floor_days": 4.0
@@ -1803,15 +5469,15 @@
             "conservative": {
               "cutoff": "2026-05-20",
               "candidates": 4433,
-              "reached": 2768,
-              "rate": 0.624408
+              "reached": 2792,
+              "rate": 0.629822
             },
             "mature": {
-              "cutoff": "2026-06-05",
+              "cutoff": "2026-07-09",
               "followup_days_p90": 39.0,
-              "candidates": 4825,
-              "reached": 2993,
-              "rate": 0.620311
+              "candidates": 5806,
+              "reached": 3617,
+              "rate": 0.622976
             }
           }
         },
@@ -1819,41 +5485,85 @@
           "key": "screening_day",
           "label": "יום מיון",
           "reach": {
-            "low": 0.470562,
-            "high": 0.477432,
-            "mid": 0.473997
+            "low": 0.479134,
+            "high": 0.481737,
+            "mid": 0.480435
           },
           "days": {
-            "n": 1703,
-            "mean": 38.5,
-            "median": 28.0,
-            "p25": 19.0,
-            "p75": 49.0,
-            "p90": 81.8
+            "n": 2308,
+            "mean": 38.0,
+            "median": 29.0,
+            "p25": 20.0,
+            "p75": 46.0,
+            "p90": 75.0
           },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.037695
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.095321
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.392114
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.32539
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.079289
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.070191
+            }
+          ],
           "window": {
             "from_days": null,
             "to_days": null,
-            "reason": "אין בליטה בהתחלה: 11 מול שקע 28, פחות מפי 2.0",
-            "observations_before": 1703,
-            "observations_after": 1703,
+            "reason": "אין בליטה בהתחלה: 12 מול שקע 32, פחות מפי 2.0",
+            "observations_before": 2308,
+            "observations_after": 2308,
             "dropped_fast": 0,
             "dropped_slow": 0,
-            "sigma_floor_days": 9.1
+            "sigma_floor_days": 9.8
           },
           "basis": {
             "conservative": {
               "cutoff": "2026-05-20",
               "candidates": 4433,
-              "reached": 2086,
-              "rate": 0.470562
+              "reached": 2124,
+              "rate": 0.479134
             },
             "mature": {
-              "cutoff": "2026-04-23",
-              "followup_days_p90": 81.8,
-              "candidates": 3567,
-              "reached": 1703,
-              "rate": 0.477432
+              "cutoff": "2026-06-03",
+              "followup_days_p90": 75.0,
+              "candidates": 4791,
+              "reached": 2308,
+              "rate": 0.481737
             }
           }
         },
@@ -1861,41 +5571,85 @@
           "key": "assessment",
           "label": "מרכז הערכה",
           "reach": {
-            "low": 0.142567,
-            "high": 0.169685,
-            "mid": 0.156126
+            "low": 0.168283,
+            "high": 0.178267,
+            "mid": 0.173275
           },
           "days": {
-            "n": 506,
-            "mean": 64.4,
-            "median": 60.0,
-            "p25": 46.0,
-            "p75": 77.0,
-            "p90": 101.5
+            "n": 648,
+            "mean": 70.0,
+            "median": 64.0,
+            "p25": 48.0,
+            "p75": 86.2,
+            "p90": 113.0
           },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.0
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.0
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.050926
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.407407
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.328704
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.212963
+            }
+          ],
           "window": {
             "from_days": 12.0,
             "to_days": null,
-            "reason": "בליטה 2 בהתחלה, שקע 0 סביב יום 9, ואחריו 41",
-            "observations_before": 510,
-            "observations_after": 506,
+            "reason": "בליטה 2 בהתחלה, שקע 0 סביב יום 9, ואחריו 42",
+            "observations_before": 652,
+            "observations_after": 648,
             "dropped_fast": 4,
             "dropped_slow": 0,
-            "sigma_floor_days": 28.6
+            "sigma_floor_days": 29.9
           },
           "basis": {
             "conservative": {
               "cutoff": "2026-05-20",
               "candidates": 4433,
-              "reached": 632,
-              "rate": 0.142567
+              "reached": 746,
+              "rate": 0.168283
             },
             "mature": {
-              "cutoff": "2026-04-03",
-              "followup_days_p90": 101.1,
-              "candidates": 2982,
-              "reached": 506,
-              "rate": 0.169685
+              "cutoff": "2026-04-26",
+              "followup_days_p90": 112.9,
+              "candidates": 3635,
+              "reached": 648,
+              "rate": 0.178267
             }
           }
         },
@@ -1903,41 +5657,85 @@
           "key": "yachbam",
           "label": "יחב\"מ",
           "reach": {
-            "low": 0.202346,
-            "high": 0.236862,
-            "mid": 0.219604
+            "low": 0.232574,
+            "high": 0.244311,
+            "mid": 0.238443
           },
           "days": {
-            "n": 622,
-            "mean": 69.5,
-            "median": 65.0,
-            "p25": 46.0,
-            "p75": 88.0,
-            "p90": 115.9
+            "n": 816,
+            "mean": 73.2,
+            "median": 67.0,
+            "p25": 48.0,
+            "p75": 94.0,
+            "p90": 124.0
           },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.009804
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.011029
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.053922
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.349265
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.305147
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.270833
+            }
+          ],
           "window": {
             "from_days": null,
             "to_days": null,
             "reason": "אין בליטה בהתחלה: 0 מול שקע 2, פחות מפי 2.0",
-            "observations_before": 622,
-            "observations_after": 622,
+            "observations_before": 816,
+            "observations_after": 816,
             "dropped_fast": 0,
             "dropped_slow": 0,
-            "sigma_floor_days": 26.2
+            "sigma_floor_days": 27.7
           },
           "basis": {
             "conservative": {
               "cutoff": "2026-05-20",
               "candidates": 4433,
-              "reached": 897,
-              "rate": 0.202346
+              "reached": 1031,
+              "rate": 0.232574
             },
             "mature": {
-              "cutoff": "2026-03-20",
-              "followup_days_p90": 115.9,
-              "candidates": 2626,
-              "reached": 622,
-              "rate": 0.236862
+              "cutoff": "2026-04-15",
+              "followup_days_p90": 124.0,
+              "candidates": 3340,
+              "reached": 816,
+              "rate": 0.244311
             }
           }
         },
@@ -1957,6 +5755,50 @@
             "p75": 114.5,
             "p90": 143.0
           },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.005445
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.00363
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.027223
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.174229
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.319419
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.470054
+            }
+          ],
           "window": {
             "from_days": null,
             "to_days": null,
@@ -2628,24 +6470,68 @@
           "key": "screening_day",
           "label": "יום מיון",
           "reach": {
-            "low": 0.534551,
-            "high": 0.536605,
-            "mid": 0.535578
+            "low": 0.355744,
+            "high": 0.539888,
+            "mid": 0.447816
           },
           "days": {
-            "n": 1957,
-            "mean": 21.8,
+            "n": 2471,
+            "mean": 21.0,
             "median": 14.0,
             "p25": 7.0,
-            "p75": 25.0,
-            "p90": 46.0
+            "p75": 24.0,
+            "p90": 43.0
           },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.284096
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.24484
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.307568
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.094699
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.029138
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.03966
+            }
+          ],
           "window": {
             "from_days": null,
             "to_days": null,
-            "reason": "אין עלייה אחרי השקע: 229 מול 117, פחות מפי 2.0",
-            "observations_before": 1957,
-            "observations_after": 1957,
+            "reason": "אין בליטה בהתחלה: 293 מול שקע 183, פחות מפי 2.0",
+            "observations_before": 2471,
+            "observations_after": 2471,
             "dropped_fast": 0,
             "dropped_slow": 0,
             "sigma_floor_days": 1.4
@@ -2654,15 +6540,15 @@
             "conservative": {
               "cutoff": "2026-05-20",
               "candidates": 3560,
-              "reached": 1903,
-              "rate": 0.534551
+              "reached": 1922,
+              "rate": 0.539888
             },
             "mature": {
-              "cutoff": "2026-05-29",
-              "followup_days_p90": 46.0,
-              "candidates": 3647,
-              "reached": 1957,
-              "rate": 0.536605
+              "cutoff": "2026-07-05",
+              "followup_days_p90": 43.0,
+              "candidates": 6946,
+              "reached": 2471,
+              "rate": 0.355744
             }
           }
         },
@@ -2670,41 +6556,85 @@
           "key": "assessment",
           "label": "מרכז הערכה",
           "reach": {
-            "low": 0.189607,
-            "high": 0.200342,
-            "mid": 0.194974
+            "low": 0.212079,
+            "high": 0.213181,
+            "mid": 0.21263
           },
           "days": {
-            "n": 586,
-            "mean": 49.4,
-            "median": 43.0,
+            "n": 744,
+            "mean": 52.4,
+            "median": 45.0,
             "p25": 31.0,
-            "p75": 60.8,
-            "p90": 81.0
+            "p75": 63.0,
+            "p90": 90.7
           },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.018817
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.022849
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.192204
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.477151
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.188172
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.100806
+            }
+          ],
           "window": {
-            "from_days": 9.0,
+            "from_days": null,
             "to_days": null,
-            "reason": "בליטה 7 בהתחלה, שקע 3 סביב יום 6, ואחריו 46",
-            "observations_before": 600,
-            "observations_after": 586,
-            "dropped_fast": 14,
+            "reason": "אין בליטה בהתחלה: 7 מול שקע 4, פחות מפי 2.0",
+            "observations_before": 744,
+            "observations_after": 744,
+            "dropped_fast": 0,
             "dropped_slow": 0,
-            "sigma_floor_days": 14.5
+            "sigma_floor_days": 15.5
           },
           "basis": {
             "conservative": {
               "cutoff": "2026-05-20",
               "candidates": 3560,
-              "reached": 675,
-              "rate": 0.189607
+              "reached": 755,
+              "rate": 0.212079
             },
             "mature": {
-              "cutoff": "2026-04-24",
-              "followup_days_p90": 80.1,
-              "candidates": 2925,
-              "reached": 586,
-              "rate": 0.200342
+              "cutoff": "2026-05-18",
+              "followup_days_p90": 90.7,
+              "candidates": 3490,
+              "reached": 744,
+              "rate": 0.213181
             }
           }
         },
@@ -2712,41 +6642,85 @@
           "key": "yachbam",
           "label": "יחב\"מ",
           "reach": {
-            "low": 0.252528,
-            "high": 0.271811,
-            "mid": 0.262169
+            "low": 0.276685,
+            "high": 0.281428,
+            "mid": 0.279057
           },
           "days": {
-            "n": 701,
-            "mean": 55.6,
-            "median": 49.0,
-            "p25": 34.0,
-            "p75": 70.0,
-            "p90": 98.0
+            "n": 891,
+            "mean": 58.8,
+            "median": 50.0,
+            "p25": 35.0,
+            "p75": 74.0,
+            "p90": 106.0
           },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.008979
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.020202
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.156004
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.452301
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.203143
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.159371
+            }
+          ],
           "window": {
             "from_days": 6.0,
             "to_days": null,
-            "reason": "בליטה 13 בהתחלה, שקע 2 סביב יום 3, ואחריו 43",
-            "observations_before": 716,
-            "observations_after": 701,
-            "dropped_fast": 15,
+            "reason": "בליטה 14 בהתחלה, שקע 2 סביב יום 3, ואחריו 54",
+            "observations_before": 907,
+            "observations_after": 891,
+            "dropped_fast": 16,
             "dropped_slow": 0,
-            "sigma_floor_days": 14.3
+            "sigma_floor_days": 15.6
           },
           "basis": {
             "conservative": {
               "cutoff": "2026-05-20",
               "candidates": 3560,
-              "reached": 899,
-              "rate": 0.252528
+              "reached": 985,
+              "rate": 0.276685
             },
             "mature": {
-              "cutoff": "2026-04-07",
-              "followup_days_p90": 98.0,
-              "candidates": 2579,
-              "reached": 701,
-              "rate": 0.271811
+              "cutoff": "2026-05-04",
+              "followup_days_p90": 105.0,
+              "candidates": 3166,
+              "reached": 891,
+              "rate": 0.281428
             }
           }
         },
@@ -2766,6 +6740,50 @@
             "p75": 93.0,
             "p90": 126.0
           },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.0
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.0
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.066667
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.347619
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.315873
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.269841
+            }
+          ],
           "window": {
             "from_days": 15.0,
             "to_days": null,
@@ -3465,41 +7483,85 @@
           "key": "assessment",
           "label": "מרכז הערכה",
           "reach": {
-            "low": 0.350713,
-            "high": 0.352841,
-            "mid": 0.351777
+            "low": 0.35497,
+            "high": 0.363747,
+            "mid": 0.359359
           },
           "days": {
-            "n": 832,
-            "mean": 34.2,
-            "median": 29.0,
+            "n": 1050,
+            "mean": 36.0,
+            "median": 30.0,
             "p25": 21.0,
-            "p75": 42.0,
-            "p90": 58.0
+            "p75": 43.8,
+            "p90": 63.0
           },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.013333
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.088571
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.402857
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.382857
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.073333
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.039048
+            }
+          ],
           "window": {
             "from_days": null,
             "to_days": null,
             "reason": "אין בליטה בהתחלה: 2 מול שקע 4, פחות מפי 2.0",
-            "observations_before": 832,
-            "observations_after": 832,
+            "observations_before": 1050,
+            "observations_after": 1050,
             "dropped_fast": 0,
             "dropped_slow": 0,
-            "sigma_floor_days": 11.9
+            "sigma_floor_days": 12.2
           },
           "basis": {
             "conservative": {
               "cutoff": "2026-05-20",
               "candidates": 2455,
-              "reached": 861,
-              "rate": 0.350713
+              "reached": 893,
+              "rate": 0.363747
             },
             "mature": {
-              "cutoff": "2026-05-17",
-              "followup_days_p90": 58.0,
-              "candidates": 2358,
-              "reached": 832,
-              "rate": 0.352841
+              "cutoff": "2026-06-15",
+              "followup_days_p90": 63.0,
+              "candidates": 2958,
+              "reached": 1050,
+              "rate": 0.35497
             }
           }
         },
@@ -3507,41 +7569,85 @@
           "key": "yachbam",
           "label": "יחב\"מ",
           "reach": {
-            "low": 0.481466,
-            "high": 0.493043,
-            "mid": 0.487255
+            "low": 0.500189,
+            "high": 0.507536,
+            "mid": 0.503862
           },
           "days": {
-            "n": 1063,
-            "mean": 39.2,
+            "n": 1325,
+            "mean": 41.4,
             "median": 34.0,
             "p25": 22.0,
-            "p75": 48.0,
-            "p90": 70.0
+            "p75": 50.0,
+            "p90": 77.0
           },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.04
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.072453
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.325283
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.38566
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.10566
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.070943
+            }
+          ],
           "window": {
             "from_days": null,
             "to_days": null,
-            "reason": "אין בליטה בהתחלה: 9 מול שקע 10, פחות מפי 2.0",
-            "observations_before": 1063,
-            "observations_after": 1063,
+            "reason": "אין בליטה בהתחלה: 9 מול שקע 17, פחות מפי 2.0",
+            "observations_before": 1325,
+            "observations_after": 1325,
             "dropped_fast": 0,
             "dropped_slow": 0,
-            "sigma_floor_days": 10.7
+            "sigma_floor_days": 10.6
           },
           "basis": {
             "conservative": {
               "cutoff": "2026-05-20",
               "candidates": 2455,
-              "reached": 1182,
-              "rate": 0.481466
+              "reached": 1246,
+              "rate": 0.507536
             },
             "mature": {
-              "cutoff": "2026-05-05",
-              "followup_days_p90": 70.0,
-              "candidates": 2156,
-              "reached": 1063,
-              "rate": 0.493043
+              "cutoff": "2026-06-01",
+              "followup_days_p90": 77.0,
+              "candidates": 2649,
+              "reached": 1325,
+              "rate": 0.500189
             }
           }
         },
@@ -3561,6 +7667,50 @@
             "p75": 80.0,
             "p90": 111.0
           },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.003398
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.019253
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.121178
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.411099
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.244621
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.200453
+            }
+          ],
           "window": {
             "from_days": 6.0,
             "to_days": null,
@@ -4104,24 +8254,68 @@
           "key": "yachbam",
           "label": "יחב\"מ",
           "reach": {
-            "low": 0.532755,
-            "high": 0.550661,
-            "mid": 0.541708
+            "low": 0.541206,
+            "high": 0.567181,
+            "mid": 0.554194
           },
           "days": {
-            "n": 553,
-            "mean": 15.4,
-            "median": 11.0,
+            "n": 637,
+            "mean": 18.1,
+            "median": 12.0,
             "p25": 7.0,
-            "p75": 18.0,
-            "p90": 30.0
+            "p75": 19.0,
+            "p90": 37.0
           },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.299843
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.3281
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.241758
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.080063
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.028257
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.021978
+            }
+          ],
           "window": {
             "from_days": null,
             "to_days": null,
             "reason": "טווח קצר מדי לזיהוי שקע",
-            "observations_before": 553,
-            "observations_after": 553,
+            "observations_before": 637,
+            "observations_after": 637,
             "dropped_fast": 0,
             "dropped_slow": 0,
             "sigma_floor_days": 2.6
@@ -4130,15 +8324,15 @@
             "conservative": {
               "cutoff": "2026-05-20",
               "candidates": 908,
-              "reached": 500,
-              "rate": 0.550661
+              "reached": 515,
+              "rate": 0.567181
             },
             "mature": {
-              "cutoff": "2026-06-14",
-              "followup_days_p90": 30.0,
-              "candidates": 1038,
-              "reached": 553,
-              "rate": 0.532755
+              "cutoff": "2026-07-11",
+              "followup_days_p90": 37.0,
+              "candidates": 1177,
+              "reached": 637,
+              "rate": 0.541206
             }
           }
         },
@@ -4158,6 +8352,50 @@
             "p75": 52.0,
             "p90": 80.0
           },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.045175
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.104723
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.336756
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.330595
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.110883
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.071869
+            }
+          ],
           "window": {
             "from_days": null,
             "to_days": null,
@@ -4737,6 +8975,50 @@
             "p75": 36.0,
             "p90": 57.0
           },
+          "buckets": [
+            {
+              "key": "w1",
+              "label": "עד שבוע",
+              "min_days": 0,
+              "max_days": 7,
+              "share": 0.244728
+            },
+            {
+              "key": "w2",
+              "label": "שבוע עד שבועיים",
+              "min_days": 8,
+              "max_days": 14,
+              "share": 0.182748
+            },
+            {
+              "key": "m1",
+              "label": "שבועיים עד חודש",
+              "min_days": 15,
+              "max_days": 30,
+              "share": 0.267093
+            },
+            {
+              "key": "m2",
+              "label": "חודש עד חודשיים",
+              "min_days": 31,
+              "max_days": 60,
+              "share": 0.226837
+            },
+            {
+              "key": "m3",
+              "label": "חודשיים עד 3 חודשים",
+              "min_days": 61,
+              "max_days": 90,
+              "share": 0.051118
+            },
+            {
+              "key": "m3p",
+              "label": "מעל 3 חודשים",
+              "min_days": 91,
+              "max_days": null,
+              "share": 0.027476
+            }
+          ],
           "window": {
             "from_days": null,
             "to_days": null,

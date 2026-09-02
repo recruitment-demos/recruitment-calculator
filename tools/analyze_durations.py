@@ -28,7 +28,8 @@ from openpyxl.utils import get_column_letter
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
-from build_dataset import days_between, load_config, load_sources  # noqa: E402
+from build_dataset import (activity_types, days_between, load_config,  # noqa: E402
+                           load_sources)
 
 OUT = ROOT / "קבצים" / "התקבל" / "זמנים בין שלבים.xlsx"
 SIGMAS = 1.5
@@ -69,14 +70,14 @@ def window_stats(days, sigmas=SIGMAS):
 
 def collect():
     cfg = load_config()
-    act, rec = load_sources(cfg)
+    act, rec, _ = load_sources(cfg)
     hire_date = rec.groupby("candidate")["date"].min()
 
     first = {}
     for s in cfg["stages"]:
         if s["activity_type"] is None:
             continue
-        rows = act[act["activity"] == s["activity_type"]]
+        rows = act[act["activity"].isin(activity_types(s))]
         first[s["key"]] = rows.groupby("candidate")["date"].min()
 
     keys = [s["key"] for s in cfg["stages"] if s["activity_type"] is not None]

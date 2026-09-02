@@ -78,7 +78,7 @@ function check(name, fn) {
     const problem = fn();
     if (problem) fails.push(name + ": " + problem);
   } catch (e) {
-    fails.push(name + ": " + (e && e.stack ? e.stack.split("\n")[0] : e));
+    fails.push(name + ": " + (e && e.stack ? e.stack.split("\n").slice(0,4).join(" | ") : e));
   }
 }
 
@@ -289,14 +289,21 @@ check("כל כמות בתכנון אומרת ממה היא נגזרה", () => {
     ? null : "המקור לא מסביר את שיעור הגיוס ואת הזמן";
 });
 
-check("שלב ללא נתונים אינו מקבל כמות נדרשת", () => {
+check("אין שורה בלי מספר ובלי הסבר", () => {
+  // מאז שהתקבל קובץ ההגשות יש לכל שלב מקור נתונים. הכלל שנשמר: שורה
+  // בלי מספר חייבת לומר במפורש «לא בר-השגה» או «לא יספיק», ולא להישאר
+  // ריקה - ושורה עם מספר חייבת להיות מספר, לא טקסט.
   clearAll();
   setVal("target", "400");
   sandbox.calculate();
-  const row = planRows()[0];
-  if (!row.classList.contains("nodata")) return "השורה הראשונה אינה «הגשות»";
-  const val = row.children.filter(c => c.classList.contains("fval"))[0];
-  return val.textContent === "—" ? null : "הומצאה כמות לשלב ללא נתונים";
+  const rows = planRows();
+  if (!rows.length) return "אין שורות במשפך הנדרש";
+  const bad = rows.filter(r => {
+    const val = r.children.filter(c => c.classList.contains("fval"))[0];
+    const t = val ? val.textContent : "";
+    return !t || (!/[0-9]/.test(t) && t.indexOf("לא ") !== 0);
+  });
+  return bad.length ? bad.length + " שורות בלי מספר ובלי הסבר" : null;
 });
 
 check("המשפך הרציף נגזר קדימה מהכמות הנדרשת", () => {
@@ -497,16 +504,92 @@ check("יעד מול תחזית", () => {
     ? null : "אין הודעת יעד";
 });
 
-check("שלב ללא נתונים מפיק אזהרה ולא תחזית", () => {
+check("שלב ההגשות נכנס לחישוב ככל שלב אחר", () => {
   clearAll();
   setVal("submissions", "9999");
   setVal("yachbam", "100");
   sandbox.calculate();
-  const warned = registry.gapBody.children.some(
-    c => c.classList.contains("warn") && c.textContent.includes("הגשות"));
   const cohorts = sandbox.Engine.combine({ submissions: 9999, yachbam: 100 }).cohorts;
-  if (cohorts.length !== 1) return "שלב ללא נתונים נכנס לחישוב";
-  return warned ? null : "לא הוצגה אזהרה";
+  if (cohorts.length !== 2) return "ההגשות לא נכנסו לחישוב";
+  const warned = registry.gapBody.children.some(
+    c => c.classList.contains("warn") && c.textContent.includes("קבוצות"));
+  if (!warned) return "לא הוצגה אזהרת חפיפה";
+  return allText(registry.funnelBody).includes("הגשות")
+    ? null : "ההגשות אינן מופיעות במשפך";
+});
+
+check("משפך המיון המלא מוצג", () => {
+  const rows = registry.fullFunnelBody.children;
+  // שתי שורות כותרת ועוד שורה לכל שלב, כולל הגיוס
+  if (rows.length !== 2 + D.funnel.rows.length) return "מספר שורות לא צפוי";
+  const txt = allText(registry.fullFunnelBody);
+  return D.funnel.rows.every(r => txt.includes(r.label))
+    ? null : "חסר שלב במשפך המלא";
+});
+
+check("הפער בין הערוצים מוצג ומוסבר", () => {
+  const txt = allText(registry.segmentsBody);
+  const named = D.segments.filter(g => g.funnel);
+  if (!named.every(g => txt.includes(g.label))) return "חסר ערוץ";
+  return txt.includes("פי ") ? null : "אין השוואה מספרית בין הערוצים";
+});
+
+check("הלוח של מנהלת הגיוס מציג כמות ותאריך לכל שלב", () => {
+  clearAll();
+  setVal("target", "400");
+  const soon = new Date();
+  soon.setDate(soon.getDate() + 150);
+  setVal("targetDate", soon.getFullYear() + "-" +
+    String(soon.getMonth() + 1).padStart(2, "0") + "-" +
+    String(soon.getDate()).padStart(2, "0"));
+  sandbox.calculate();
+  if (!shown("managerCard")) return "הכרטיס לא הוצג";
+  const rows = registry.managerBody.children;
+  // שורת כותרת, ואז זוג שורות לכל שלב: הנתונים וההסבר שמתחתיו
+  if (rows.length !== 1 + withData.length * 2) return "מספר שורות לא צפוי";
+  const why = rows.filter(r => r.classList.contains("why"));
+  if (why.some(r => allText(r).length < 30)) return "יש שורה בלי הסבר מקור";
+  const data = rows.filter((r, i) => i > 0 && !r.classList.contains("why"));
+  const bad = data.filter(r => {
+    const by = r.children[1], when = r.children[2];
+    const t = by.textContent;
+    if (!t || (!/[0-9]/.test(t) && t !== "לא בר-השגה" && t !== "—")) return true;
+    return !when.textContent;
+  });
+  return bad.length ? bad.length + " שורות בלי כמות או בלי תאריך" : null;
+});
+
+check("בלי תאריך יעד שתי הכמויות בלוח זהות", () => {
+  clearAll();
+  setVal("target", "400");
+  sandbox.calculate();
+  const plan = sandbox.Engine.managerPlan({}, 400, null);
+  const diff = plan.rows.filter(r => r.has_data &&
+                                r.required_by !== r.required_now);
+  if (diff.length) return "הכמויות נפרדו בלי תאריך יעד";
+  return plan.rows.every(r => r.deadline_days === null)
+    ? null : "נקבע תאריך יעד בלי שהוזן";
+});
+
+check("הטבלה האחת מסתכמת בדיוק", () => {
+  clearAll();
+  setVal("file_check", "5000");
+  setVal("yachbam", "200");
+  sandbox.calculate();
+  if (!shown("matrixCard")) return "הטבלה לא הוצגה";
+  const m = sandbox.Engine.combinedMatrix({ file_check: 5000, yachbam: 200 });
+  const off = m.rows.filter(r => {
+    let sum = 0;
+    r.cells.forEach(c => { sum += c.count; });
+    return sum !== r.count;
+  });
+  if (off.length) return off.length + " שורות שסכום החלונות בהן אינו הסך הכול";
+  const rows = registry.matrixBody.children;
+  // כותרת, זוג שורות לכל שלב, ושורת הסבר החלונות בסוף
+  if (rows.length !== 2 + m.rows.length * 2) return "מספר שורות לא צפוי";
+  const why = rows.filter(r => r.classList.contains("why"));
+  return why.every(r => allText(r).length > 20)
+    ? null : "יש שורה בלי מקור";
 });
 
 check("אין טווחים בתצוגה", () => {

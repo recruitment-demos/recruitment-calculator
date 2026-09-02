@@ -74,6 +74,11 @@ def build_scenarios(eng):
             scenarios.append({"op": "cross_check", "counts": dict(counts)})
             scenarios.append({"op": "combined_when", "counts": dict(counts)})
             scenarios.append({"op": "combined_timeline", "counts": dict(counts)})
+            scenarios.append({"op": "combined_matrix", "counts": dict(counts)})
+            for t in TARGETS:
+                for d in (None, 10, 30, 122, 400):
+                    scenarios.append({"op": "manager_plan", "counts": dict(counts),
+                                      "target": t, "days": d})
             for d in DAYS:
                 scenarios.append({"op": "combined_by_day",
                                   "counts": dict(counts), "days": d})
@@ -95,6 +100,9 @@ def build_scenarios(eng):
                 scenarios.append({"op": "cross_check", "counts": dict(counts)})
                 scenarios.append({"op": "combined_when", "counts": dict(counts)})
                 scenarios.append({"op": "combined_timeline", "counts": dict(counts)})
+                scenarios.append({"op": "combined_matrix", "counts": dict(counts)})
+                scenarios.append({"op": "manager_plan", "counts": dict(counts),
+                                  "target": 400, "days": 122})
                 for d in DAYS:
                     scenarios.append({"op": "combined_by_day",
                                       "counts": dict(counts), "days": d})
@@ -118,10 +126,23 @@ def build_scenarios(eng):
     scenarios.append({"op": "cross_check", "counts": dict(counts_all)})
     scenarios.append({"op": "combined_when", "counts": dict(counts_all)})
     scenarios.append({"op": "combined_timeline", "counts": dict(counts_all)})
+    scenarios.append({"op": "combined_matrix", "counts": dict(counts_all)})
+
+    # פיזור על חלונות הזמן: עיגול על הסכום הרץ חייב להיות זהה בשני המנועים
+    for k in with_data:
+        st = eng.stage(k)
+        for total in (0, 1, 3, 7, 99, 1000, 12345):
+            scenarios.append({"op": "spread", "total": total,
+                              "buckets": st["buckets"]})
+            for f in st["forward"]:
+                scenarios.append({"op": "spread", "total": total,
+                                  "buckets": f.get("buckets")})
     # יעד שכבר הושג, יעד שווה בדיוק, ויעד רחוק - שלושת המסלולים בפער
     for t in (1, 100, 5000):
         for d in (None, 10, 122):
             scenarios.append({"op": "gap_plan", "counts": dict(counts_all),
+                              "target": t, "days": d})
+            scenarios.append({"op": "manager_plan", "counts": dict(counts_all),
                               "target": t, "days": d})
             for k in with_data:
                 scenarios.append({"op": "gap_pipeline", "counts": dict(counts_all),
@@ -166,6 +187,12 @@ def python_result(eng, sc):
         return eng.combined_when(sc["counts"])
     if op == "combined_timeline":
         return eng.combined_timeline(sc["counts"])
+    if op == "combined_matrix":
+        return eng.combined_matrix(sc["counts"])
+    if op == "spread":
+        return eng.spread(sc["total"], sc["buckets"])
+    if op == "manager_plan":
+        return eng.manager_plan(sc["counts"], sc["target"], sc.get("days"))
     if op == "lead_time_anomalies":
         return eng.lead_time_anomalies()
     if op == "feasible_stages":

@@ -267,6 +267,19 @@
   tr.nodata td { color: var(--warn); background: var(--warn-soft); white-space: normal; }
   .scroller { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
+  /* ---------- טבלאות התוצאה ---------- */
+  .mtable td.big { font-size: 15px; font-weight: 700; }
+  .mtable td.hi { background: var(--brand-soft); }
+  .mtable tr.hire td { background: var(--good-soft); font-weight: 600; }
+  .mtable tr.late td { color: var(--bad); background: var(--bad-soft); }
+  .mtable td.blocked { color: var(--bad); font-weight: 600; }
+  .mtable td.why, .mtable tr.why td {
+    white-space: normal; font-size: 11.5px; color: var(--muted);
+    line-height: 1.5; padding-top: 2px; border-bottom: 0;
+  }
+  .mtable tr.why + tr td { border-top: 1px solid var(--line); }
+  .mtable td.stage { font-weight: 600; white-space: normal; }
+
   details { border: 1px solid var(--line); border-radius: 11px; padding: 11px 14px; background: #fafbfd; }
   details + details { margin-top: 10px; }
   summary { cursor: pointer; font-weight: 600; font-size: 13.5px; }
@@ -353,6 +366,13 @@
       <div class="from" id="heroFrom"></div>
     </div>
 
+    <div class="card reveal" id="managerCard">
+      <h2>הלוח של מנהלת הגיוס</h2>
+      <p class="cardsub" id="managerSub"></p>
+      <div class="scroller"><table class="mtable" id="managerBody"></table></div>
+      <p class="cardsub" id="managerFoot"></p>
+    </div>
+
     <div class="card reveal" id="gapCardPlan">
       <h2>כמה עוד צריך, מעבר למי שכבר בתהליך</h2>
       <p class="cardsub" id="gapPlanSub"></p>
@@ -386,6 +406,12 @@
       <div class="funnel" id="funnelBody"></div>
     </div>
 
+    <div class="card reveal" id="matrixCard">
+      <h2>הכול בטבלה אחת: כמה בכל שלב, ומתי</h2>
+      <p class="cardsub" id="matrixSub"></p>
+      <div class="scroller"><table class="mtable" id="matrixBody"></table></div>
+    </div>
+
     <div class="card reveal" id="whenCard">
       <h2>מתי הם צפויים להגיע לכל שלב</h2>
       <p class="cardsub" id="whenSub"></p>
@@ -402,6 +428,17 @@
       <h2>הערות ובדיקות</h2>
       <div id="gapBody"></div>
     </div>
+  </div>
+
+  <div class="card" id="fullFunnelCard">
+    <h2>משפך המיון המלא</h2>
+    <p class="cardsub" id="fullFunnelSub"></p>
+    <div class="scroller"><table class="mtable" id="fullFunnelBody"></table></div>
+    <details>
+      <summary>הפער בין ערוצי הגיוס</summary>
+      <p class="cardsub" id="segmentsSub"></p>
+      <div class="scroller"><table class="mtable" id="segmentsBody"></table></div>
+    </details>
   </div>
 
   <div class="card">
@@ -661,6 +698,83 @@ const Engine = (() => {
     return { rows: rows, total: total, buckets: rows.length };
   };
 
+  // פיזור כמות אחת על חלונות הזמן, בלי שהעיגול יאבד או ימציא אנשים.
+  // העיגול נעשה על הסכום הרץ, ולכן סכום התאים שווה בדיוק לסך הכול.
+  const spread = (total, buckets) => {
+    const out = [];
+    let acc = 0.0, done = 0;
+    (buckets || []).forEach(b => {
+      const share = b.share;
+      acc += (share === null || share === undefined) ? 0.0 : total * share;
+      const v = roundHalfUp(acc) - done;
+      done += v;
+      out.push({ key: b.key, label: b.label, share: share, count: v });
+    });
+    return out;
+  };
+
+  // טבלה אחת: כמה יגיעו לכל שלב, ומתי, על אותה רשת חלונות זמן.
+  const combinedMatrix = (counts) => {
+    const result = combine(counts);
+    const rows = {};
+    const order = [];
+    result.cohorts.forEach(c => {
+      forward(c.stage).forEach(f => {
+        const key = f.key;
+        if (!(key in rows)) {
+          rows[key] = {
+            key: key, label: f.label, total: 0, weighted: 0.0,
+            cells: null, sources: [], is_hire: key === HIRE,
+            order: order.length
+          };
+          order.push(key);
+        }
+        const r = rows[key];
+        const arrivals = roundHalfUp(c.count * f.reach.mid);
+        r.total += arrivals;
+        r.weighted += arrivals * f.days.median;
+        const cells = spread(arrivals, f.buckets);
+        if (r.cells === null) {
+          r.cells = cells.map(x => ({ key: x.key, label: x.label, count: 0 }));
+        }
+        cells.forEach((x, i) => { r.cells[i].count += x.count; });
+        r.sources.push({
+          from: c.stage, from_label: c.label, from_count: c.count,
+          count: arrivals, reach: f.reach.mid, days_median: f.days.median,
+          cells: cells
+        });
+      });
+    });
+
+    const out = order.map(key => {
+      const r = rows[key];
+      const n = r.sources.length;
+      let days;
+      if (r.total) {
+        days = roundTo(r.weighted / r.total, 1);
+      } else {
+        let sum = 0;
+        r.sources.forEach(x => { sum += x.days_median; });
+        days = roundTo(sum / n, 1);
+      }
+      return {
+        key: r.key, label: r.label, count: r.total, days_median: days,
+        weighted: n > 1, is_hire: r.is_hire, cells: r.cells,
+        sources: r.sources, order: r.order
+      };
+    });
+
+    out.sort((a, b) => (a.days_median - b.days_median) || (a.order - b.order));
+    out.forEach(r => { delete r.order; });
+    return {
+      buckets: DATA.time_buckets.map(b => ({
+        key: b.key, label: b.label, min_days: b.min_days, max_days: b.max_days
+      })),
+      rows: out,
+      overlap_warning: result.overlap_warning
+    };
+  };
+
   const crossCheck = (counts) => {
     const entered = stageKeys().filter(
       k => counts[k] !== undefined && counts[k] !== null && hasRate(k));
@@ -855,6 +969,45 @@ const Engine = (() => {
              sources: sources, rows: rows };
   };
 
+  // הלוח של מנהלת הגיוס: כמה צריך בכל שלב, ועד מתי.
+  // required_now - כמה צריך היום, מוגבל בזמן שנותר.
+  // required_by  - כמה צריך שיעמדו בשלב, ותאריך היעד שלהם.
+  const managerPlan = (counts, target, days) => {
+    const plan = gapPlan(counts || {}, target, days);
+    if (plan === null) return null;
+    const needed = plan.gap;
+    const dd = (days === null || days === undefined) ? null : days;
+
+    const rows = plan.rows.map(r => {
+      const row = Object.assign({}, r);
+      row.required_now = r.required;
+      if (!r.has_data) {
+        row.required_by = null;
+        row.required_by_feasible = false;
+        row.deadline_days = null;
+        row.late = false;
+        return row;
+      }
+      let requiredBy;
+      if (needed <= 0) requiredBy = 0;
+      else if (r.rate) requiredBy = roundHalfUp(needed / r.rate);
+      else requiredBy = null;
+
+      row.required_by = requiredBy;
+      row.required_by_feasible = requiredBy !== null &&
+        (requiredBy === 0 || requiredBy <= r.observed);
+      row.deadline_days = dd === null ? null :
+        roundTo(dd - r.lead_days_median, 1);
+      row.late = row.deadline_days !== null && row.deadline_days < 0;
+      return row;
+    });
+
+    return {
+      target: plan.target, have: plan.have, gap: plan.gap, days: dd,
+      sources: plan.sources, rows: rows
+    };
+  };
+
   const gapPipeline = (counts, target, k, days) => {
     const plan = gapPlan(counts, target, days);
     if (plan === null || !hasRate(k)) return null;
@@ -880,6 +1033,7 @@ const Engine = (() => {
 
   return { stage, hasRate, rate, label, stageKeys, forward, roundHalfUp, roundTo,
            projectCohort, timeline, combine, combinedWhen, combinedTimeline,
+           spread, combinedMatrix, managerPlan,
            curveShare, hiresByDay, combinedByDay,
            crossCheck, requiredForTarget, requiredFunnel, requiredPlan,
            effectiveRate, observedCandidates, feasibleStages,
@@ -1520,6 +1674,288 @@ function renderGapPipeline(plan, cutoffDays) {
   });
 }
 
+/* --- הלוח של מנהלת הגיוס --- *
+ * התשובה על "כמה אני צריכה בכל שלב, ומתי". לכל שלב שתי כמויות שונות,
+ * ושתיהן נכונות - הצגת אחת מהן בלבד היא מה שמטעה:
+ *   «צריך שיעמדו שם»  - הכמות בלי לחץ זמן, ולצידה התאריך שעד אליו היא
+ *                       חייבת לעמוד. זו הכמות שאפשר לעבוד לפיה.
+ *   «אם הם שם היום»   - הכמות הדרושה למי שנמצא שם עכשיו, כשנשאר רק
+ *                       הזמן שעד היעד. גדולה בהרבה, ולעיתים בלתי אפשרית.
+ * מספר שאינו בר-השגה אינו מוצג כמספר.                                  */
+function managerRowNote(r, target, targetDate, days) {
+  const timed = days !== null && days !== undefined;
+  if (!r.has_data) return r.note;
+
+  let t = "שיעור גיוס " + pct(r.rate) + " מ«" + r.label + "», נמדד על " +
+          nf(r.measured_on) + " מועמדים שהתגייסו בפועל. חציון " +
+          Math.round(r.lead_days_median) + " ימים מהשלב הזה ועד הגיוס";
+  if (timed && targetDate) {
+    t += ", ולכן הכמות צריכה לעמוד שם " + nf(Math.round(r.deadline_days)) +
+         " ימים מהיום - עד " +
+         fmtDay(shiftDays(todayDay(), r.deadline_days));
+  }
+  t += ".";
+  if (r.late) {
+    t = "הדרך מ«" + r.label + "» עד גיוס היא בחציון " +
+        Math.round(r.lead_days_median) + " ימים, ועד " + fmtDay(targetDate) +
+        " נשארו " + nf(days) + ". החלון של השלב הזה כבר נסגר עבור התאריך הזה.";
+  }
+  if (r.required_by !== null && !r.required_by_feasible) {
+    t += " " + nf(r.required_by) + " ב«" + r.label + "» הם יותר מהקבוצה " +
+         "הגדולה ביותר שנמדדה שם אי פעם (" + nf(r.observed) + "), ולכן " +
+         "המספר אינו מוצג ככמות שאפשר לעבוד לפיה.";
+  }
+  // ההסבר על הפער בין שתי הכמויות נאמר רק כשיש פער. כשכמעט כולם
+  // מספיקים בזמן, "רק 99.4%" נשמע כמו בעיה במקום כמו הערה.
+  if (timed && r.share_in_time < 0.95) {
+    t += " רק " + pct(r.share_in_time) + " ממי שמתגייס מ«" + r.label +
+         "» מספיק לעשות זאת תוך " + nf(days) + " ימים - לכן העמודה " +
+         "«אם הם שם היום» גדולה יותר.";
+  } else if (timed) {
+    t += " " + pct(r.share_in_time) + " ממי שמתגייס מ«" + r.label +
+         "» מספיק לעשות זאת תוך " + nf(days) + " ימים, ולכן שתי " +
+         "הכמויות כמעט זהות.";
+  }
+  return t;
+}
+
+function renderManager(counts, target, targetDate, days) {
+  const plan = Engine.managerPlan(counts, target, days);
+  const body = $("managerBody");
+  body.innerHTML = "";
+  if (!plan) return false;
+
+  const timed = days !== null && days !== undefined;
+  const start = todayDay();
+
+  $("managerSub").textContent =
+    "מה צריך לעמוד בכל שלב כדי לגייס " + nf(target) +
+    (timed ? " עד " + fmtDay(targetDate) : "") + ". " +
+    (plan.have > 0
+      ? "מי שכבר בתהליך נוכה: " + nf(plan.have) + " מהיעד כבר מכוסים, " +
+        "והשורות מראות את הפער - " + nf(plan.gap) + " גיוסים."
+      : "לא הוזן מלאי קיים, ולכן כל היעד מחושב מאפס.") +
+    " כל שורה עומדת לבדה: אלו תשובות חלופיות לאותה שאלה, לא משפך מצטבר.";
+
+  const head = el("tr");
+  ["שלב", "כמה צריך שיעמדו שם", timed ? "עד מתי" : "חציון ימים עד גיוס",
+   "אם הם שם היום"].forEach(t => head.append(el("th", null, t)));
+  body.append(head);
+
+  plan.rows.forEach(r => {
+    const tr = el("tr", r.late ? "late" : "");
+    tr.append(el("td", "stage", r.label));
+
+    const by = el("td", "num big");
+    if (!r.has_data || r.required_by === null) { by.textContent = "—"; }
+    else if (!r.required_by_feasible) {
+      by.textContent = "לא בר-השגה"; by.className = "num blocked";
+    } else { by.textContent = nf(r.required_by); by.classList.add("hi"); }
+    tr.append(by);
+
+    const when = el("td", "num");
+    if (!r.has_data) when.textContent = "—";
+    else if (!timed) when.textContent = Math.round(r.lead_days_median);
+    else if (r.late) when.textContent = "החלון נסגר";
+    else when.textContent = fmtDay(shiftDays(start, r.deadline_days));
+    tr.append(when);
+
+    const now = el("td", "num");
+    if (!r.has_data || r.required_now === null) now.textContent = "—";
+    else if (!r.feasible) { now.textContent = "לא בר-השגה"; now.className = "num blocked"; }
+    else now.textContent = nf(r.required_now);
+    tr.append(now);
+
+    body.append(tr);
+
+    const note = el("tr", "why");
+    const td = el("td", "why", managerRowNote(r, target, targetDate, days));
+    td.setAttribute("colspan", "4");
+    note.append(td);
+    body.append(note);
+  });
+
+  $("managerFoot").textContent =
+    "«כמה צריך שיעמדו שם» היא הכמות בלי לחץ זמן, והמחיר שלה הוא התאריך " +
+    "שבעמודה שלידה. «אם הם שם היום» היא הכמות הדרושה ממי שכבר עומד בשלב " +
+    "הזה עכשיו, כשנשאר רק הזמן שעד היעד" +
+    (timed ? "" : " - בלי תאריך יעד שתי העמודות זהות") + ". " +
+    "התאריכים אינם בסדר השלבים, כי הזמן עד הגיוס נמדד בכל שלב על קבוצה " +
+    "אחרת - רק על מי שהתגייס בפועל.";
+  return true;
+}
+
+/* --- הכול בטבלה אחת: כמה בכל שלב, ומתי --- *
+ * המשתמש ביקש טבלה אחת ולא טבלה לכל שלב. שורה לכל שלב, עמודה לכל חלון
+ * זמן, והתא הוא כמה מועמדים יגיעו לשלב ההוא בתוך החלון ההוא. סכום התאים
+ * שווה בדיוק לעמודת הסך הכול - הפיזור מעוגל על הסכום הרץ.               */
+function matrixSourceText(r) {
+  const parts = r.sources.map(x =>
+    nf(x.count) + " מתוך " + nf(x.from_count) + " ב«" + x.from_label +
+    "» (" + pct(x.reach) + "), חציון " + Math.round(x.days_median) + " ימים");
+  return parts.join("  +  ") + (r.weighted
+    ? "  ·  החציון המוצג הוא ממוצע משוקלל לפי מספר המועמדים שכל קבוצה תורמת"
+    : "");
+}
+
+function renderMatrix(counts, targetDate, cutoffDays) {
+  const m = Engine.combinedMatrix(counts);
+  const body = $("matrixBody");
+  body.innerHTML = "";
+  if (!m.rows.length) return false;
+
+  const start = todayDay();
+  const timed = cutoffDays !== null && cutoffDays !== undefined;
+
+  $("matrixSub").textContent =
+    "שורה לכל שלב, עמודה לכל חלון זמן. התא הוא כמה מועמדים יגיעו לשלב " +
+    "ההוא בתוך החלון ההוא, מסכום כל הקבוצות שהוזנו. השורה התחתונה היא " +
+    "הגיוס עצמו." +
+    (timed ? " החלונות שכולם אחרי " + fmtDay(targetDate) +
+             " מסומנים - הם לא נספרים ביעד." : "") +
+    " מתחת לכל שורה כתוב ממה היא נגזרה.";
+
+  const head = el("tr");
+  head.append(el("th", null, "שלב"));
+  m.buckets.forEach(b => {
+    const late = timed && b.min_days > cutoffDays;
+    head.append(el("th", null, b.label + (late ? " ⟵ מאוחר" : "")));
+  });
+  head.append(el("th", null, "סך הכול"), el("th", null, "חציון ימים"));
+  body.append(head);
+
+  m.rows.forEach(r => {
+    const tr = el("tr", r.is_hire ? "hire" : "");
+    tr.append(el("td", "stage", r.label));
+    r.cells.forEach((c, i) => {
+      const late = timed && m.buckets[i].min_days > cutoffDays;
+      const td = el("td", "num" + (late ? " late" : ""), nf(c.count));
+      tr.append(td);
+    });
+    tr.append(el("td", "num big hi", nf(r.count)));
+    tr.append(el("td", "num", Math.round(r.days_median)));
+    body.append(tr);
+
+    const note = el("tr", "why");
+    const td = el("td", "why", matrixSourceText(r));
+    td.setAttribute("colspan", String(m.buckets.length + 3));
+    note.append(td);
+    body.append(note);
+  });
+
+  const foot = el("tr", "why");
+  const ftd = el("td", "why",
+    "החלונות נמדדים מהיום שבו המועמדים נמצאים בשלב שהוזן: " +
+    m.buckets.map(b => b.label + " = " +
+      (b.max_days === null ? "אחרי " + fmtDay(shiftDays(start, b.min_days))
+                           : "עד " + fmtDay(shiftDays(start, b.max_days)))
+    ).join(" · ") + ".");
+  ftd.setAttribute("colspan", String(m.buckets.length + 3));
+  foot.append(ftd);
+  body.append(foot);
+  return true;
+}
+
+/* --- משפך המיון המלא --- *
+ * נתון קבוע מהקבצים, לא תלוי בקלט. לכל שלב: כמה מועמדים ייחודיים נמדדו
+ * בו, וכמה עוברים אליו - גם מהשלב שלפניו וגם מהשלב הראשון. שתי המדידות
+ * ישירות. from_first אינו מכפלה של אחוזי from_prev.                    */
+function funnelRowCells(tr, r, showCandidates) {
+  tr.append(el("td", "stage", r.label));
+  if (showCandidates) tr.append(el("td", "num", nf(r.candidates)));
+  [r.from_prev, r.from_first].forEach(x => {
+    tr.append(el("td", "num", x ? pct(x.reach.mid) : "—"));
+    tr.append(el("td", "num", x ? Math.round(x.days.median) : "—"));
+  });
+}
+
+function renderFullFunnel() {
+  const f = DATA.funnel;
+  const body = $("fullFunnelBody");
+  body.innerHTML = "";
+  if (!f) return;
+
+  const firstLabel = f.rows[0].label;
+  $("fullFunnelSub").textContent =
+    "כל שלב במשפך, כפי שנמדד בקבצים. «מועמדים» הוא כמה מועמדים ייחודיים " +
+    "הופיעו אי פעם בשלב הזה - היקף התנועה בפועל, לא קוהורט מדוד. שתי " +
+    "עמודות המעבר נמדדו ישירות: אחת מהשלב שלפניו, ואחת מ«" + firstLabel +
+    "». השנייה אינה מכפלה של הראשונות - המשפך אינו סדרתי, ויש מועמדים " +
+    "שנכנסים באמצע או מדלגים על שלב, ולכן מספר המועמדים בשלב אינו יורד " +
+    "בהכרח משלב לשלב.";
+
+  const h1 = el("tr");
+  [["שלב", 1, 2], ["מועמדים", 1, 2], ["מהשלב הקודם", 2, 1],
+   ["מ«" + firstLabel + "»", 2, 1]].forEach(([t, cs, rs]) => {
+    const th = el("th", null, t);
+    if (cs > 1) th.setAttribute("colspan", String(cs));
+    if (rs > 1) th.setAttribute("rowspan", String(rs));
+    h1.append(th);
+  });
+  const h2 = el("tr");
+  ["עוברים", "חציון ימים", "עוברים", "חציון ימים"].forEach(t =>
+    h2.append(el("th", null, t)));
+  body.append(h1, h2);
+
+  f.rows.forEach(r => {
+    const tr = el("tr", r.is_hire ? "hire" : "");
+    funnelRowCells(tr, r, true);
+    body.append(tr);
+  });
+}
+
+/* --- הפער בין ערוצי הגיוס --- */
+function renderSegments() {
+  const segs = DATA.segments;
+  const body = $("segmentsBody");
+  body.innerHTML = "";
+  if (!segs || !segs.length) return;
+
+  const withData = segs.filter(g => g.funnel);
+  if (!withData.length) return;
+
+  const base = withData[0].funnel;
+  const hireRow = g => g.funnel.rows[g.funnel.rows.length - 1];
+  $("segmentsSub").textContent =
+    "אותו משפך, בנפרד לכל ערוץ. כל מועמד משויך לערוץ אחד לפי עמודת " +
+    "«דרישה» שברשומת ההגשה שלו, ולכן הערוצים אינם חופפים. העמודה " +
+    "האחרונה היא מה שבאמת מבדיל ביניהם: איזה חלק מהמגישים בערוץ הזה " +
+    "התגייס בסופו של דבר.";
+
+  const head = el("tr");
+  ["ערוץ", "מגישים", "מגויסים", "מהגשה עד גיוס", "חציון ימים"]
+    .forEach(t => head.append(el("th", null, t)));
+  body.append(head);
+
+  withData.forEach(g => {
+    const hire = hireRow(g);
+    const ff = hire.from_first;
+    const tr = el("tr", g.key === "all" ? "hire" : "");
+    tr.append(el("td", "stage", g.label));
+    tr.append(el("td", "num", nf(g.funnel.rows[0].candidates)));
+    tr.append(el("td", "num", nf(hire.candidates)));
+    tr.append(el("td", "num big hi", ff ? pct(ff.reach.mid) : "—"));
+    tr.append(el("td", "num", ff ? Math.round(ff.days.median) : "—"));
+    body.append(tr);
+  });
+
+  const allHire = hireRow(withData[0]).from_first;
+  withData.slice(1).forEach(g => {
+    const ff = hireRow(g).from_first;
+    if (!ff || !allHire) return;
+    const note = el("tr", "why");
+    const td = el("td", "why",
+      "«" + g.label + "»: " + pct(ff.reach.mid) + " מהמגישים מתגייסים, " +
+      "לעומת " + pct(allHire.reach.mid) + " בכלל המועמדים - פי " +
+      (ff.reach.mid / allHire.reach.mid).toFixed(1) + ". " +
+      "המדידה ישירה מההגשה אל הגיוס, על " + nf(ff.days.n) +
+      " מועמדים שהתגייסו בפועל.");
+    td.setAttribute("colspan", "5");
+    note.append(td);
+    body.append(note);
+  });
+}
+
 /* --- הערות ובדיקות --- */
 function renderNotes(messages) {
   const body = $("gapBody");
@@ -1531,8 +1967,9 @@ function renderNotes(messages) {
 }
 
 /* --- חשיפת התוצאות --- */
-const ALL_CARDS = ["heroCard", "gapCardPlan", "pipelineCard", "planCard",
-                   "funnelCard", "whenCard", "timelineCard", "gapCard"];
+const ALL_CARDS = ["heroCard", "managerCard", "gapCardPlan", "pipelineCard",
+                   "planCard", "funnelCard", "matrixCard", "whenCard",
+                   "timelineCard", "gapCard"];
 
 function revealResults(cards) {
   $("results").classList.remove("hidden");
@@ -1611,6 +2048,7 @@ function calculate() {
         : "כל כמות נגזרת משיעור הגיוס הנמדד של אותו שלב. " +
           "מילוי «תאריך היעד» יוסיף גם עד מתי הם צריכים להיות שם.");
 
+    const hasManager = renderManager({}, target, targetDate, planDays);
     renderPipeline(target, targetDate, planDays);
     renderPlan(target, targetDate, planDays);
 
@@ -1634,7 +2072,10 @@ function calculate() {
       });
     }
     renderNotes(notes);
-    revealResults(["heroCard", "pipelineCard", "planCard", "gapCard"]);
+    const targetCards = ["heroCard"];
+    if (hasManager) targetCards.push("managerCard");
+    targetCards.push("pipelineCard", "planCard", "gapCard");
+    revealResults(targetCards);
     return;
   }
 
@@ -1687,6 +2128,7 @@ function calculate() {
     (byDate ? " החלונות שמאוחרים מ-" + fmtDay(targetDate) + " מסומנים " +
               "בהיר: הם אינם נספרים ב-" + nf(byDate.hires) + " שלמעלה." : "");
 
+  const hasMatrix = renderMatrix(counts, targetDate, cutoffDays);
   const hasWhen = renderWhen(counts);
   const hasTimeline = renderTimeline(counts, cutoffDays);
 
@@ -1729,10 +2171,13 @@ function calculate() {
   const against = byDate ? byDate.hires : result.hires;
   /* יעד יחד עם מלאי קיים: לחשב כמה עוד צריך, ולא כמה צריך מאפס */
   let hasGapPlan = false;
+  let hasManagerBoard = false;
   if (target !== null) {
     gapCounts = counts;
     gapTarget = target;
     gapDays = cutoffDays !== null && cutoffDays >= 0 ? cutoffDays : null;
+    hasManagerBoard = renderManager(counts, target,
+                                    gapDays === null ? null : targetDate, gapDays);
     hasGapPlan = renderGapPlan(counts, target, gapDays, gapDays === null ? null : targetDate);
   }
 
@@ -1749,8 +2194,10 @@ function calculate() {
   renderNotes(notes);
 
   const cards = ["heroCard"];
+  if (hasManagerBoard) cards.push("managerCard");
   if (hasGapPlan) cards.push("gapCardPlan");
   cards.push("funnelCard");
+  if (hasMatrix) cards.push("matrixCard");
   if (hasWhen) cards.push("whenCard");
   if (hasTimeline) cards.push("timelineCard");
   cards.push("gapCard");
@@ -1789,7 +2236,8 @@ function renderBasis() {
   const m = DATA.meta;
 
   $("stamp").textContent =
-    "מבוסס על " + nf(m.activity_rows) + " שורות פעילות (" + nf(m.activity_candidates) +
+    "מבוסס על " + nf(m.activity_rows) + " שורות פעילות מ-" +
+    m.activities_files.length + " קבצים (" + nf(m.activity_candidates) +
     " מועמדים ייחודיים, " + m.activity_first + " עד " + m.activity_last + ") ועל " +
     nf(m.hire_rows) + " שורות גיוס (" + nf(m.hire_candidates) + " מועמדים, " +
     m.hire_first + " עד " + m.hire_last + "). נבנה בתאריך " + m.generated_at + ".";
@@ -1823,7 +2271,11 @@ function renderBasis() {
   $("basisBody").innerHTML = html;
 
   const limits = [
-    "השלב «הגשות» אינו קיים בקבצי המקור. לא נגזר עבורו שיעור, והוא אינו משתתף בחישוב.",
+    "שלב «הגשות» נמדד מקובץ ההגשות: אירוע «הקמת מועמדות» על שלוש צורותיו - " +
+      "רגיל, מתעדוף וידני. מועמד נספר לפי המוקדם שבהם.",
+    "נתוני הפעילות מאוחדים משלושה קובצי מקור שמכסים תקופות חופפות. שורה " +
+      "כפולה - אותו מועמד, אותה פעילות, אותו תאריך - נספרת פעם אחת; כך " +
+      "נופו " + nf(m.activity_duplicate_rows_dropped) + " שורות.",
     "הגזירה היא קדימה בלבד. ממספר שהוזן בשלב מסוים אי אפשר לדעת כמה מועמדים היו בשלבים שלפניו, ולכן הם אינם מוצגים.",
     "המשפך אינו סדרתי: לא כל מועמד עובר דרך כל השלבים. כל מעבר נמדד ישירות בין שני השלבים, ולא כמכפלה של אחוזי מעבר. לכן שיעור ההגעה לגיוס יכול להיות גבוה משיעור ההגעה לשלב שלפניו.",
     "מרכז הערכה הוא שלב סלקטיבי שרק חלק מהמועמדים עוברים בו.",
@@ -1884,6 +2336,8 @@ function renderBasis() {
 buildInputs();
 buildPlanEntry();
 renderBasis();
+renderFullFunnel();
+renderSegments();
 watchHero();
 $("calcBtn").addEventListener("click", calculate);
 $("resetBtn").addEventListener("click", reset);
