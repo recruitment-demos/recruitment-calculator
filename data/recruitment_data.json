@@ -4,7 +4,15 @@
     "pct": 0.02,
     "min_candidates": 1
   },
+  "hire_observed": {
+    "candidates": 2328,
+    "first_date": "2026-01-01",
+    "last_date": "2026-08-19",
+    "days": 231,
+    "per_day": 10.077922
+  },
   "coverage_warning_below": 0.75,
+  "selective_below": 0.5,
   "funnel": {
     "first_key": "submissions",
     "rows": [
@@ -2396,7 +2404,7 @@
   "hire_key": "hire",
   "hire_label": "גיוס",
   "meta": {
-    "generated_at": "2026-09-02 15:30",
+    "generated_at": "2026-09-02 15:42",
     "activities_files": [
       "נתונים למערכת/פעילויות למחשבון.xlsx",
       "נתונים למערכת/כלל פעולות למערכת.xlsx",

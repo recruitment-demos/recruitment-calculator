@@ -66,6 +66,7 @@ class Engine:
         self.buckets = dataset["time_buckets"]
         self.tolerance = dataset["gap_tolerance"]
         self.coverage_floor = dataset.get("coverage_warning_below")
+        self.selective_floor = dataset.get("selective_below")
         self.hire_key = dataset["hire_key"]
         self.hire_label = dataset["hire_label"]
 
@@ -874,6 +875,79 @@ class Engine:
         return {
             "target": plan["target"], "have": plan["have"], "gap": plan["gap"],
             "days": days, "sources": plan["sources"], "rows": rows,
+        }
+
+    def throughput_plan(self, target_hires, days=None):
+        """כמה צריך שיעברו בכל שלב כדי לגייס X - לפי המשפך שנמדד בפועל.
+
+        זו התשובה שמנהלת גיוס צריכה, והיא שונה מ-required_plan.
+
+        required_plan עונה על "אם כל המועמדים שלי נמצאים בשלב אחד
+        בלבד, כמה צריכים להיות שם" - לפי שיעור הגיוס של אותו שלב.
+        השיעור הזה נמדד על קוהורט, והוא נמוך מהיחס האמיתי בין נפחי
+        המשפך: רק כמחצית מהמגויסים בכלל נרשמו כהגשה, ולכן 3.2%
+        מתארים חצי מהתמונה. לפי זה יצאו 124,778 הגשות ל-4,000
+        גיוסים - כמות שאינה עומדת מול מה שקרה בפועל.
+
+        כאן המדידה היא של הארגון כולו: ב-229 ימים עברו במשפך
+        35,711 הגשות, 2,762 יחב"מ וכן הלאה, והתגייסו 2,328.
+        כדי לגייס פי 1.72 צריך שכל השלבים ירוצו פי 1.72 - וזה
+        כולל גם את המסלולים שאינם עוברים דרך ההגשות. התוצאה
+        ל-4,000: 61,359 הגשות ו-4,746 יחב"מ.
+
+        הכמות אינה תלויה בחלון הזמן - היא פרופורציונלית ליעד בלבד.
+        מה שהזמן קובע הוא הקצב: pace הוא פי כמה מהקצב הנמדד צריך
+        השלב לרוץ כדי לספק את הכמות בזמן שנותר.
+        """
+        if target_hires is None:
+            return None
+        base = self.data.get("hire_observed")
+        if not base or not base["candidates"]:
+            return None
+
+        factor = target_hires / base["candidates"]
+        rows = []
+        for k in self.stage_keys():
+            st = self.stage(k)
+            if not self.has_rate(k) or not st.get("observed"):
+                rows.append({
+                    "key": k, "label": st["label"], "has_data": False,
+                    "observed": None, "required": None, "per_day": None,
+                    "observed_per_day": None, "pace": None,
+                    "coverage": None, "selective": False, "note": st["note"],
+                })
+                continue
+            o = st["observed"]
+            required = round_half_up(o["candidates"] * factor)
+            per_day = None if not days else round_to(required / days, 2)
+            pace = (None if per_day is None or not o["per_day"]
+                    else round_to(per_day / o["per_day"], 2))
+            share = self.covered_share(k)
+            rows.append({
+                "key": k, "label": st["label"], "has_data": True,
+                "observed": o["candidates"],
+                "observed_days": o["days"],
+                "observed_per_day": o["per_day"],
+                "required": required,
+                "per_day": per_day,
+                "pace": pace,
+                "coverage": share,
+                # שלב שרוב המגויסים אינם עוברים בו. מרכז הערכה הוא
+                # כזה, ואסור שייקרא כאילו כל המשפך חייב לעבור דרכו.
+                "selective": bool(share is not None and self.selective_floor
+                                  and share < self.selective_floor),
+                "note": "",
+            })
+
+        return {
+            "target": target_hires,
+            "days": days,
+            "factor": round_to(factor, 4),
+            "observed_hires": base["candidates"],
+            "observed_days": base["days"],
+            "observed_from": base["first_date"],
+            "observed_to": base["last_date"],
+            "rows": rows,
         }
 
     def gap_pipeline(self, counts, target_hires, key, days=None):

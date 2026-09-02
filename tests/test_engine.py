@@ -1336,5 +1336,91 @@ class TestCoverage(unittest.TestCase):
 
 
 
+
+class TestThroughputPlan(unittest.TestCase):
+    """כמה צריך שיעברו בכל שלב, לפי היחס בין נפחי המשפך שנמדדו.
+
+    התקלה שהוביל לזה: ל-4,000 גיוסים יצאו 124,778 הגשות, לפי שיעור
+    קוהורט של 3.2%. אבל בפועל 35,711 הגשות דרו בכפיפה אחת עם 2,328
+    גיוסים, כלומר פי 1.72 מזה הם כ-61 אלף - לא 124 אלף. השיעור
+    מכסה רק את מי שיש לו רשומת הגשה, וזה כמחצית מהגיוסים.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.eng = load_engine()
+
+    def test_the_measured_funnel_reproduces_itself(self):
+        """יעד השווה למה שנמדד חייב להחזיר בדיוק את הנפחים שנמדדו."""
+        base = self.eng.data["hire_observed"]["candidates"]
+        plan = self.eng.throughput_plan(base)
+        self.assertEqual(plan["factor"], 1.0)
+        for r in plan["rows"]:
+            if r["has_data"]:
+                self.assertEqual(r["required"], r["observed"], r["key"])
+
+    def test_it_scales_linearly_with_the_target(self):
+        a = self.eng.throughput_plan(2000)
+        b = self.eng.throughput_plan(4000)
+        for x, y in zip(a["rows"], b["rows"]):
+            if x["has_data"]:
+                self.assertAlmostEqual(y["required"] / x["required"], 2,
+                                       delta=0.01, msg=x["key"])
+
+    def test_it_stands_up_to_what_actually_happened(self):
+        """הבדיקה שתופסת את התקלה: הכמות חייבת לעמוד מול המציאות."""
+        plan = self.eng.throughput_plan(4000)
+        rows = {r["key"]: r for r in plan["rows"]}
+        # 35,711 הגשות הניבו 2,328 גיוסים, ולכן 4,000 דורשים כ-61 אלף
+        self.assertLess(rows["submissions"]["required"], 70000)
+        self.assertGreater(rows["submissions"]["required"], 55000)
+        # ולא ייתכן שיידרשו יותר מ-5,000 ביחב"מ כדי לגייס 4,000
+        self.assertLess(rows["yachbam"]["required"], 5000)
+        self.assertGreater(rows["yachbam"]["required"], 4000)
+
+    def test_the_quantity_does_not_depend_on_the_deadline(self):
+        """רק הקצב תלוי בזמן, לא הכמות."""
+        base = self.eng.throughput_plan(4000)
+        for days in (30, 122, 365, 900):
+            timed = self.eng.throughput_plan(4000, days)
+            for a, b in zip(base["rows"], timed["rows"]):
+                self.assertEqual(a["required"], b["required"], a["key"])
+
+    def test_the_pace_is_the_same_multiple_for_every_stage(self):
+        """כל המשפך צריך לרוץ באותו כפל - זו המשמעות של «פי 1.72»."""
+        plan = self.eng.throughput_plan(4000, 365)
+        paces = {r["pace"] for r in plan["rows"] if r["has_data"]}
+        self.assertEqual(len(paces), 1, paces)
+
+    def test_a_longer_window_needs_a_slower_pace(self):
+        fast = self.eng.throughput_plan(4000, 180)
+        slow = self.eng.throughput_plan(4000, 720)
+        for a, b in zip(fast["rows"], slow["rows"]):
+            if a["has_data"]:
+                self.assertGreater(a["pace"], b["pace"], a["key"])
+
+    def test_the_assessment_centre_is_marked_selective(self):
+        """מרכז הערכה - לא כולם עוברים בו, ואסור לקרוא אותו כתחנת חובה."""
+        rows = {r["key"]: r for r in self.eng.throughput_plan(4000)["rows"]}
+        self.assertTrue(rows["assessment"]["selective"])
+        self.assertLess(rows["assessment"]["coverage"], 0.5)
+        # ושלב שרוב המגויסים כן עוברים בו אינו מסומן
+        self.assertFalse(rows["yachbam"]["selective"])
+        self.assertFalse(rows["file_check"]["selective"])
+
+    def test_a_selective_stage_carries_fewer_than_the_stage_before_it(self):
+        rows = {r["key"]: r for r in self.eng.throughput_plan(4000)["rows"]}
+        self.assertLess(rows["assessment"]["required"],
+                        rows["screening_day"]["required"])
+
+    def test_it_disagrees_with_the_cohort_rate_and_that_is_the_point(self):
+        """שתי השאלות שונות, ואסור ששתי התשובות יתלכדו בשקט."""
+        volume = {r["key"]: r for r in self.eng.throughput_plan(4000)["rows"]}
+        cohort = {r["key"]: r for r in self.eng.required_plan(4000)["rows"]}
+        self.assertLess(volume["submissions"]["required"],
+                        cohort["submissions"]["required"] / 1.5)
+
+
+
 if __name__ == "__main__":
     unittest.main()

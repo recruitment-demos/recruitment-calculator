@@ -371,6 +371,14 @@
       <div class="from" id="heroFrom"></div>
     </div>
 
+    <div class="card reveal" id="volumeCard">
+      <h2>כמה צריך שיעברו בכל שלב</h2>
+      <p class="hist" style="background:var(--good-soft);color:var(--good)"
+         id="volumeBanner"></p>
+      <div class="scroller"><table class="mtable" id="volumeBody"></table></div>
+      <p class="cardsub" id="volumeFoot"></p>
+    </div>
+
     <div class="card reveal" id="managerCard">
       <h2>הלוח של מנהלת הגיוס</h2>
       <p class="cardsub" id="managerSub"></p>
@@ -511,6 +519,7 @@ const Engine = (() => {
   DATA.stages.forEach(s => { byKey[s.key] = s; });
   const TOL = DATA.gap_tolerance;
   const COVERAGE_FLOOR = DATA.coverage_warning_below;
+  const SELECTIVE_FLOOR = DATA.selective_below;
   const HIRE = DATA.hire_key;
 
   // עיגול שמתנהג זהה בפייתון וב-JS. כל הערכים אינם שליליים.
@@ -1087,6 +1096,49 @@ const Engine = (() => {
     };
   };
 
+  /* כמה צריך שיעברו בכל שלב כדי לגייס X - לפי המשפך שנמדד בפועל.
+     שונה מ-requiredPlan: שם השיעור נמדד על קוהורט ומכסה רק כמחצית
+     מהגיוסים, וכאן המדידה היא של הארגון כולו. הכמות פרופורציונלית
+     ליעד בלבד; הזמן קובע רק את הקצב הנדרש.                          */
+  const throughputPlan = (target, days) => {
+    if (target === null || target === undefined) return null;
+    if (days === undefined) days = null;
+    const base = DATA.hire_observed;
+    if (!base || !base.candidates) return null;
+
+    const factor = target / base.candidates;
+    const rows = stageKeys().map(k => {
+      const st = stage(k);
+      if (!hasRate(k) || !st.observed) {
+        return { key: k, label: st.label, has_data: false, observed: null,
+                 required: null, per_day: null, observed_per_day: null,
+                 pace: null, coverage: null, selective: false, note: st.note };
+      }
+      const o = st.observed;
+      const required = roundHalfUp(o.candidates * factor);
+      const perDay = !days ? null : roundTo(required / days, 2);
+      const pace = (perDay === null || !o.per_day) ? null
+                 : roundTo(perDay / o.per_day, 2);
+      const share = coveredShare(k);
+      return {
+        key: k, label: st.label, has_data: true,
+        observed: o.candidates, observed_days: o.days,
+        observed_per_day: o.per_day, required: required,
+        per_day: perDay, pace: pace, coverage: share,
+        selective: !!(share !== null && SELECTIVE_FLOOR &&
+                      share < SELECTIVE_FLOOR),
+        note: ""
+      };
+    });
+
+    return {
+      target: target, days: days, factor: roundTo(factor, 4),
+      observed_hires: base.candidates, observed_days: base.days,
+      observed_from: base.first_date, observed_to: base.last_date,
+      rows: rows
+    };
+  };
+
   const gapPipeline = (counts, target, k, days) => {
     const plan = gapPlan(counts, target, days);
     if (plan === null || !hasRate(k)) return null;
@@ -1113,7 +1165,7 @@ const Engine = (() => {
   return { stage, hasRate, rate, label, stageKeys, forward, roundHalfUp, roundTo,
            coverage, coveredShare, lowCoverage,
            projectCohort, timeline, combine, combinedWhen, combinedTimeline,
-           spread, combinedMatrix, managerPlan,
+           spread, combinedMatrix, managerPlan, throughputPlan,
            curveShare, hiresByDay, combinedByDay,
            crossCheck, requiredForTarget, requiredFunnel, requiredPlan,
            effectiveRate, observedCandidates, observedPerDay, capacity,
@@ -1781,6 +1833,83 @@ function renderGapPipeline(plan, cutoffDays) {
   });
 }
 
+/* --- כמה צריך שיעברו בכל שלב, לפי המשפך שנמדד --- *
+ * זו התשובה הראשית לשאלה "כמה צריך כדי לגייס X", והיא נגזרת מהיחס
+ * בין נפחי המשפך שנמדדו בפועל - לא משיעור הגיוס של קוהורט.
+ *
+ * למה: שיעור הקוהורט מכסה רק את מי שיש לו רשומת הגשה, כלומר כמחצית
+ * מהגיוסים. לפיו יצאו 124,778 הגשות ל-4,000 גיוסים, בעוד שבפועל
+ * 35,711 הגשות דרו בכפיפה אחת עם 2,328 גיוסים. כאן היחס הוא של
+ * הארגון כולו, ולכן הוא עומד מול מה שקרה.                          */
+function renderVolume(target, targetDate, days) {
+  const plan = Engine.throughputPlan(target, days);
+  const body = $("volumeBody");
+  body.innerHTML = "";
+  if (!plan) return false;
+
+  $("volumeBanner").textContent =
+    "בפועל: " + nf(plan.observed_hires) + " גיוסים ב-" + nf(plan.observed_days) +
+    " ימים. כדי לגייס " + nf(plan.target) + " צריך שכל המשפך ירוץ פי " +
+    plan.factor.toFixed(2) + ".";
+
+  $("volumeFoot").textContent =
+    "הכמויות פרופורציוניות ליעד ואינן תלויות בתאריך - מה שהתאריך קובע " +
+    "הוא הקצב. הן נגזרות מהיחס בין נפחי המשפך שנמדדו בפועל בין " +
+    plan.observed_from + " ל-" + plan.observed_to + ", ולכן הן כוללות גם " +
+    "מועמדים שאינם עוברים דרך ההגשות. שלב מסומן «סלקטיבי» הוא שלב " +
+    "שרוב המגויסים אינם עוברים בו כלל.";
+
+  const head = el("tr");
+  const cols = ["שלב", "צריך שיעברו", "נמדד בפועל"];
+  if (days) cols.push("ליום", "פי כמה מהקצב");
+  cols.push("מהמגויסים עברו כאן");
+  cols.forEach(t => head.append(el("th", null, t)));
+  body.append(head);
+
+  plan.rows.forEach(r => {
+    const tr = el("tr", r.selective ? "late" : "");
+    tr.append(el("td", "stage", r.label +
+      (r.selective ? " · סלקטיבי" : "")));
+    if (!r.has_data) {
+      const td = el("td", "why", r.note);
+      td.setAttribute("colspan", String(cols.length - 1));
+      tr.append(td);
+      body.append(tr);
+      return;
+    }
+    tr.append(el("td", "num big hi", nf(r.required)));
+    tr.append(el("td", "num", nf(r.observed)));
+    if (days) {
+      tr.append(el("td", "num", nf(Math.round(r.per_day))));
+      const p = el("td", "num", "×" + r.pace.toFixed(2));
+      if (r.pace > 1) p.classList.add("blocked");
+      tr.append(p);
+    }
+    tr.append(el("td", "num", pct(r.coverage)));
+    body.append(tr);
+
+    const note = el("tr", "why");
+    let t = nf(r.observed) + " מועמדים עברו ב«" + r.label + "» ב-" +
+            nf(r.observed_days) + " ימי נתונים, לצד " +
+            nf(plan.observed_hires) + " גיוסים. פי " + plan.factor.toFixed(2) +
+            " מזה הם " + nf(r.required) + ".";
+    if (days) {
+      t += " בקצב הנמדד עוברים שם " + fmtRate(r.observed_per_day) +
+           " ליום, וצריך " + fmtRate(r.per_day) + " - פי " +
+           r.pace.toFixed(2) + ".";
+    }
+    if (r.selective) {
+      t += " רק " + pct(r.coverage) + " מהמגויסים בכלל עברו כאן: זהו שלב " +
+           "שרובם מדלגים עליו, ואין לקרוא אותו כתחנת חובה בדרך לגיוס.";
+    }
+    const td = el("td", "why", t);
+    td.setAttribute("colspan", String(cols.length));
+    note.append(td);
+    body.append(note);
+  });
+  return true;
+}
+
 /* --- הלוח של מנהלת הגיוס --- *
  * התשובה על "כמה אני צריכה בכל שלב, ומתי". לכל שלב שתי כמויות שונות,
  * ושתיהן נכונות - הצגת אחת מהן בלבד היא מה שמטעה:
@@ -2107,7 +2236,7 @@ function renderNotes(messages) {
 }
 
 /* --- חשיפת התוצאות --- */
-const ALL_CARDS = ["heroCard", "managerCard", "gapCardPlan", "pipelineCard",
+const ALL_CARDS = ["heroCard", "volumeCard", "managerCard", "gapCardPlan", "pipelineCard",
                    "planCard", "funnelCard", "matrixCard", "whenCard",
                    "timelineCard", "gapCard"];
 
@@ -2188,6 +2317,7 @@ function calculate() {
         : "כל כמות נגזרת משיעור הגיוס הנמדד של אותו שלב. " +
           "מילוי «תאריך היעד» יוסיף גם עד מתי הם צריכים להיות שם.");
 
+    const hasVolume = renderVolume(target, targetDate, planDays);
     const hasManager = renderManager({}, target, targetDate, planDays);
     renderPipeline(target, targetDate, planDays);
     renderPlan(target, targetDate, planDays);
@@ -2215,6 +2345,7 @@ function calculate() {
       n => notes.push(n));
     renderNotes(notes);
     const targetCards = ["heroCard"];
+    if (hasVolume) targetCards.push("volumeCard");
     if (hasManager) targetCards.push("managerCard");
     targetCards.push("pipelineCard", "planCard", "gapCard");
     revealResults(targetCards);
@@ -2316,10 +2447,13 @@ function calculate() {
   /* יעד יחד עם מלאי קיים: לחשב כמה עוד צריך, ולא כמה צריך מאפס */
   let hasGapPlan = false;
   let hasManagerBoard = false;
+  let hasVolumeCard = false;
   if (target !== null) {
     gapCounts = counts;
     gapTarget = target;
     gapDays = cutoffDays !== null && cutoffDays >= 0 ? cutoffDays : null;
+    hasVolumeCard = renderVolume(target,
+                                 gapDays === null ? null : targetDate, gapDays);
     hasManagerBoard = renderManager(counts, target,
                                     gapDays === null ? null : targetDate, gapDays);
     hasGapPlan = renderGapPlan(counts, target, gapDays, gapDays === null ? null : targetDate);
@@ -2338,6 +2472,7 @@ function calculate() {
   renderNotes(notes);
 
   const cards = ["heroCard"];
+  if (hasVolumeCard) cards.push("volumeCard");
   if (hasManagerBoard) cards.push("managerCard");
   if (hasGapPlan) cards.push("gapCardPlan");
   cards.push("funnelCard");

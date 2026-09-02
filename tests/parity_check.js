@@ -76,6 +76,8 @@ for (const sc of scenarios) {
     results.push(Engine.combinedMatrix(sc.counts));
   } else if (sc.op === "spread") {
     results.push(Engine.spread(sc.total, sc.buckets));
+  } else if (sc.op === "throughput_plan") {
+    results.push(Engine.throughputPlan(sc.target, sc.days));
   } else if (sc.op === "manager_plan") {
     results.push(Engine.managerPlan(sc.counts, sc.target, sc.days));
   } else if (sc.op === "gap_pipeline") {

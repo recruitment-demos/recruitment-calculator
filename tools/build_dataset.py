@@ -705,9 +705,20 @@ def main():
                                last_activity, conservative_date, last_hire,
                                first_date_of_data))
 
+    hire_span = int((last_hire - rec["date"].min()).days) + 1
     dataset = {
         "gap_tolerance": cfg["gap_tolerance"],
+        # היקף הגיוס שנמדד בפועל. זו נקודת הייחוס לתכנון לפי נפח:
+        # כדי לגייס פי X, כל המשפך צריך לרוץ פי X.
+        "hire_observed": {
+            "candidates": int(len(hired_ids)),
+            "first_date": rec["date"].min().date().isoformat(),
+            "last_date": last_hire.date().isoformat(),
+            "days": hire_span,
+            "per_day": round(len(hired_ids) / hire_span, 6),
+        },
         "coverage_warning_below": cfg["coverage_warning_below"],
+        "selective_below": cfg["selective_below"],
         "funnel": funnel,
         "segments": segments,
         "hire_key": HIRE_KEY,

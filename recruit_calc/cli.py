@@ -8,6 +8,7 @@
     python3 -m recruit_calc.cli --target 400
     python3 -m recruit_calc.cli --target 400 --by 2027-01-15
     python3 -m recruit_calc.cli --target 400 --entry file_check
+    python3 -m recruit_calc.cli --target 4000 --volume
     python3 -m recruit_calc.cli --target 400 --by 2027-01-15 --manager
     python3 -m recruit_calc.cli --funnel
     python3 -m recruit_calc.cli --segments
@@ -113,6 +114,41 @@ def print_segments(eng):
               f"{(f"{ff['days']['median']:.0f}" if ff else '—'):>7}{ratio:>6}")
 
 
+def print_volume(eng, target, days):
+    """כמה צריך שיעברו בכל שלב, לפי המשפך שנמדד בפועל."""
+    plan = eng.throughput_plan(target, days)
+    if plan is None:
+        raise SystemExit("אין נתוני נפח במאגר. יש להריץ make.")
+
+    print(f"\nכמה צריך שיעברו בכל שלב כדי לגייס {target:,}")
+    print(f"  בפועל: {plan['observed_hires']:,} גיוסים ב-"
+          f"{plan['observed_days']:,} ימים ({plan['observed_from']} עד "
+          f"{plan['observed_to']}).")
+    print(f"  כדי לגייס {target:,} צריך שכל המשפך ירוץ פי {plan['factor']:.2f}.\n")
+
+    head = f"  {'שלב':<20}{'צריך שיעברו':>13}{'נמדד':>10}"
+    if days:
+        head += f"{'ליום':>8}{'פי כמה':>8}"
+    head += f"{'עברו כאן':>10}"
+    print(head)
+
+    for r in plan["rows"]:
+        if not r["has_data"]:
+            print(f"  {r['label']:<20}{'—':>13}   {r['note']}")
+            continue
+        line = f"  {r['label']:<20}{r['required']:>13,}{r['observed']:>10,}"
+        if days:
+            line += f"{round(r['per_day']):>8,}{'×' + format(r['pace'], '.2f'):>8}"
+        line += f"{pct(r['coverage']):>10}"
+        if r["selective"]:
+            line += "   [סלקטיבי - רוב המגויסים אינם עוברים כאן]"
+        print(line)
+
+    print("\n  הכמויות פרופורציוניות ליעד ואינן תלויות בתאריך - התאריך "
+          "קובע רק את הקצב.\n  הן נגזרות מנפחי המשפך של הארגון כולו, ולכן "
+          "כוללות גם מי שאינו עובר\n  דרך ההגשות.")
+
+
 def print_manager(eng, target, by, days, counts=None):
     """הלוח של מנהלת הגיוס: כמה צריך בכל שלב, ועד מתי."""
     plan = eng.manager_plan(counts or {}, target, days)
@@ -157,6 +193,8 @@ def main():
                    help="משפך המיון המלא, כפי שנמדד בקבצים")
     p.add_argument("--segments", action="store_true",
                    help="הפער בין ערוצי הגיוס")
+    p.add_argument("--volume", action="store_true",
+                   help="כמה צריך שיעברו בכל שלב, לפי המשפך שנמדד בפועל")
     p.add_argument("--manager", action="store_true",
                    help="הלוח של מנהלת הגיוס: כמה צריך בכל שלב, ועד מתי")
     p.add_argument("--from", dest="cohorts", nargs=2, action="append",
@@ -267,7 +305,12 @@ def main():
                 raise SystemExit(f"התאריך {fmt_day(by)} כבר עבר.")
             days = left
 
+        if args.volume:
+            print_volume(eng, args.target, days)
+            return
+
         if args.manager:
+            print_volume(eng, args.target, days)
             print_manager(eng, args.target, by, days)
             return
 

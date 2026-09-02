@@ -69,6 +69,8 @@ def build_scenarios(eng):
 
     for t in TARGETS:
         scenarios.append({"op": "required_funnel", "target": t})
+        for d in (None, 10, 30, 122, 365, 400):
+            scenarios.append({"op": "throughput_plan", "target": t, "days": d})
         for d in (None, 10, 30, 122, 400):
             scenarios.append({"op": "required_plan", "target": t, "days": d})
             scenarios.append({"op": "feasible_stages", "target": t, "days": d})
@@ -215,6 +217,8 @@ def python_result(eng, sc):
         return eng.combined_matrix(sc["counts"])
     if op == "spread":
         return eng.spread(sc["total"], sc["buckets"])
+    if op == "throughput_plan":
+        return eng.throughput_plan(sc["target"], sc.get("days"))
     if op == "manager_plan":
         return eng.manager_plan(sc["counts"], sc["target"], sc.get("days"))
     if op == "lead_time_anomalies":

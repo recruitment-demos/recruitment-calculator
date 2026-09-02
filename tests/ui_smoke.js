@@ -571,6 +571,24 @@ check("הפער בין הערוצים מוצג ומוסבר", () => {
   return txt.includes("פי ") ? null : "אין השוואה מספרית בין הערוצים";
 });
 
+check("כמות המשפך עומדת מול מה שקרה בפועל", () => {
+  clearAll();
+  setVal("target", "4000");
+  sandbox.calculate();
+  if (!shown("volumeCard")) return "כרטיס הנפחים לא הוצג";
+  const plan = sandbox.Engine.throughputPlan(4000, null);
+  const rows = {};
+  plan.rows.forEach(r => { rows[r.key] = r; });
+  // 35,711 הגשות הניבו 2,328 גיוסים - 4,000 דורשים כ-61 אלף, לא 124
+  if (rows.submissions.required > 70000)
+    return "הגשות: " + rows.submissions.required + " - יותר מדי";
+  // ולא יותר מ-5,000 ביחב"מ כדי לגייס 4,000
+  if (rows.yachbam.required > 5000)
+    return "יחב\"מ: " + rows.yachbam.required + " - יותר מ-5,000";
+  const txt = allText(registry.volumeBody);
+  return txt.includes("סלקטיבי") ? null : "מרכז הערכה לא סומן כסלקטיבי";
+});
+
 check("הלוח של מנהלת הגיוס מציג כמות ותאריך לכל שלב", () => {
   clearAll();
   setVal("target", "400");
