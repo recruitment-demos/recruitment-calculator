@@ -38,8 +38,12 @@ def build_scenarios(eng):
 
     for k in keys + [hire]:
         scenarios.append({"op": "label", "stage": k})
+    scenarios.append({"op": "low_coverage"})
     for k in keys:
         scenarios.append({"op": "rate", "stage": k})
+        scenarios.append({"op": "coverage", "stage": k})
+        scenarios.append({"op": "covered_share", "stage": k})
+        scenarios.append({"op": "low_coverage", "keys": [k]})
         scenarios.append({"op": "forward", "stage": k})
         for d in DAYS:
             scenarios.append({"op": "curve_share", "stage": k, "days": d})
@@ -187,6 +191,12 @@ def python_result(eng, sc):
         return eng.combined_when(sc["counts"])
     if op == "combined_timeline":
         return eng.combined_timeline(sc["counts"])
+    if op == "coverage":
+        return eng.coverage(sc["stage"])
+    if op == "covered_share":
+        return eng.covered_share(sc["stage"])
+    if op == "low_coverage":
+        return eng.low_coverage(sc.get("keys"))
     if op == "combined_matrix":
         return eng.combined_matrix(sc["counts"])
     if op == "spread":

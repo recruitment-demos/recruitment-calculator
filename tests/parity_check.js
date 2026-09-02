@@ -58,6 +58,12 @@ for (const sc of scenarios) {
     results.push(Engine.feasibleStages(sc.target, sc.days));
   } else if (sc.op === "gap_plan") {
     results.push(Engine.gapPlan(sc.counts, sc.target, sc.days));
+  } else if (sc.op === "coverage") {
+    results.push(Engine.coverage(sc.stage));
+  } else if (sc.op === "covered_share") {
+    results.push(Engine.coveredShare(sc.stage));
+  } else if (sc.op === "low_coverage") {
+    results.push(Engine.lowCoverage(sc.keys));
   } else if (sc.op === "combined_matrix") {
     results.push(Engine.combinedMatrix(sc.counts));
   } else if (sc.op === "spread") {

@@ -4,6 +4,7 @@
     "pct": 0.02,
     "min_candidates": 1
   },
+  "coverage_warning_below": 0.75,
   "funnel": {
     "first_key": "submissions",
     "rows": [
@@ -15,6 +16,15 @@
         "last_date": "2026-08-17",
         "from_prev": null,
         "from_first": null,
+        "coverage": {
+          "overall": 0.30756,
+          "overall_n": 716,
+          "hires": 2328,
+          "covered": 0.514731,
+          "covered_n": 297,
+          "covered_hires": 577,
+          "covered_from": "2026-06-27"
+        },
         "is_hire": false
       },
       {
@@ -86,6 +96,15 @@
               "rate": 0.606736
             }
           }
+        },
+        "coverage": {
+          "overall": 0.719072,
+          "overall_n": 1674,
+          "hires": 2328,
+          "covered": 0.890428,
+          "covered_n": 707,
+          "covered_hires": 794,
+          "covered_from": "2026-05-29"
         },
         "is_hire": false
       },
@@ -159,6 +178,15 @@
             }
           }
         },
+        "coverage": {
+          "overall": 0.35567,
+          "overall_n": 828,
+          "hires": 2328,
+          "covered": 0.55603,
+          "covered_n": 521,
+          "covered_hires": 937,
+          "covered_from": "2026-05-24"
+        },
         "is_hire": false
       },
       {
@@ -230,6 +258,15 @@
               "rate": 0.131597
             }
           }
+        },
+        "coverage": {
+          "overall": 0.39433,
+          "overall_n": 918,
+          "hires": 2328,
+          "covered": 0.530612,
+          "covered_n": 546,
+          "covered_hires": 1029,
+          "covered_from": "2026-05-07"
         },
         "is_hire": false
       },
@@ -303,6 +340,15 @@
             }
           }
         },
+        "coverage": {
+          "overall": 0.54854,
+          "overall_n": 1277,
+          "hires": 2328,
+          "covered": 0.720387,
+          "covered_n": 894,
+          "covered_hires": 1241,
+          "covered_from": "2026-04-22"
+        },
         "is_hire": false
       },
       {
@@ -374,6 +420,15 @@
               "rate": 0.035469
             }
           }
+        },
+        "coverage": {
+          "overall": 0.252148,
+          "overall_n": 587,
+          "hires": 2328,
+          "covered": 0.279819,
+          "covered_n": 434,
+          "covered_hires": 1551,
+          "covered_from": "2026-03-22"
         },
         "is_hire": false
       },
@@ -447,6 +502,15 @@
             }
           }
         },
+        "coverage": {
+          "overall": 0.835481,
+          "overall_n": 1945,
+          "hires": 2328,
+          "covered": 0.919908,
+          "covered_n": 1608,
+          "covered_hires": 1748,
+          "covered_from": "2026-02-27"
+        },
         "is_hire": false
       },
       {
@@ -519,6 +583,14 @@
             }
           }
         },
+        "coverage": {
+          "overall": 1.0,
+          "overall_n": 2328,
+          "hires": 2328,
+          "covered": 1.0,
+          "covered_n": 2328,
+          "covered_hires": 2328
+        },
         "is_hire": true
       }
     ]
@@ -539,6 +611,15 @@
             "last_date": "2026-08-17",
             "from_prev": null,
             "from_first": null,
+            "coverage": {
+              "overall": 0.30756,
+              "overall_n": 716,
+              "hires": 2328,
+              "covered": 0.514731,
+              "covered_n": 297,
+              "covered_hires": 577,
+              "covered_from": "2026-06-27"
+            },
             "is_hire": false
           },
           {
@@ -610,6 +691,15 @@
                   "rate": 0.606736
                 }
               }
+            },
+            "coverage": {
+              "overall": 0.719072,
+              "overall_n": 1674,
+              "hires": 2328,
+              "covered": 0.890428,
+              "covered_n": 707,
+              "covered_hires": 794,
+              "covered_from": "2026-05-29"
             },
             "is_hire": false
           },
@@ -683,6 +773,15 @@
                 }
               }
             },
+            "coverage": {
+              "overall": 0.35567,
+              "overall_n": 828,
+              "hires": 2328,
+              "covered": 0.55603,
+              "covered_n": 521,
+              "covered_hires": 937,
+              "covered_from": "2026-05-24"
+            },
             "is_hire": false
           },
           {
@@ -754,6 +853,15 @@
                   "rate": 0.131597
                 }
               }
+            },
+            "coverage": {
+              "overall": 0.39433,
+              "overall_n": 918,
+              "hires": 2328,
+              "covered": 0.530612,
+              "covered_n": 546,
+              "covered_hires": 1029,
+              "covered_from": "2026-05-07"
             },
             "is_hire": false
           },
@@ -827,6 +935,15 @@
                 }
               }
             },
+            "coverage": {
+              "overall": 0.54854,
+              "overall_n": 1277,
+              "hires": 2328,
+              "covered": 0.720387,
+              "covered_n": 894,
+              "covered_hires": 1241,
+              "covered_from": "2026-04-22"
+            },
             "is_hire": false
           },
           {
@@ -898,6 +1015,15 @@
                   "rate": 0.035469
                 }
               }
+            },
+            "coverage": {
+              "overall": 0.252148,
+              "overall_n": 587,
+              "hires": 2328,
+              "covered": 0.279819,
+              "covered_n": 434,
+              "covered_hires": 1551,
+              "covered_from": "2026-03-22"
             },
             "is_hire": false
           },
@@ -971,6 +1097,15 @@
                 }
               }
             },
+            "coverage": {
+              "overall": 0.835481,
+              "overall_n": 1945,
+              "hires": 2328,
+              "covered": 0.919908,
+              "covered_n": 1608,
+              "covered_hires": 1748,
+              "covered_from": "2026-02-27"
+            },
             "is_hire": false
           },
           {
@@ -1043,6 +1178,14 @@
                 }
               }
             },
+            "coverage": {
+              "overall": 1.0,
+              "overall_n": 2328,
+              "hires": 2328,
+              "covered": 1.0,
+              "covered_n": 2328,
+              "covered_hires": 2328
+            },
             "is_hire": true
           }
         ]
@@ -1069,6 +1212,15 @@
             "last_date": "2026-08-17",
             "from_prev": null,
             "from_first": null,
+            "coverage": {
+              "overall": 0.970588,
+              "overall_n": 99,
+              "hires": 102,
+              "covered": 0.952381,
+              "covered_n": 40,
+              "covered_hires": 42,
+              "covered_from": "2026-06-26"
+            },
             "is_hire": false
           },
           {
@@ -1140,6 +1292,15 @@
                   "rate": 0.731844
                 }
               }
+            },
+            "coverage": {
+              "overall": 0.980392,
+              "overall_n": 100,
+              "hires": 102,
+              "covered": 0.979167,
+              "covered_n": 47,
+              "covered_hires": 48,
+              "covered_from": "2026-06-23"
             },
             "is_hire": false
           },
@@ -1213,6 +1374,15 @@
                 }
               }
             },
+            "coverage": {
+              "overall": 0.862745,
+              "overall_n": 88,
+              "hires": 102,
+              "covered": 0.863636,
+              "covered_n": 57,
+              "covered_hires": 66,
+              "covered_from": "2026-05-25"
+            },
             "is_hire": false
           },
           {
@@ -1284,6 +1454,15 @@
                   "rate": 0.060475
                 }
               }
+            },
+            "coverage": {
+              "overall": 0.745098,
+              "overall_n": 76,
+              "hires": 102,
+              "covered": 0.73494,
+              "covered_n": 61,
+              "covered_hires": 83,
+              "covered_from": "2026-04-18"
             },
             "is_hire": false
           },
@@ -1357,6 +1536,15 @@
                 }
               }
             },
+            "coverage": {
+              "overall": 0.941176,
+              "overall_n": 96,
+              "hires": 102,
+              "covered": 0.945055,
+              "covered_n": 86,
+              "covered_hires": 91,
+              "covered_from": "2026-03-31"
+            },
             "is_hire": false
           },
           {
@@ -1428,6 +1616,15 @@
                   "rate": 0.01578
                 }
               }
+            },
+            "coverage": {
+              "overall": 0.460784,
+              "overall_n": 47,
+              "hires": 102,
+              "covered": 0.46875,
+              "covered_n": 45,
+              "covered_hires": 96,
+              "covered_from": "2026-03-20"
             },
             "is_hire": false
           },
@@ -1501,6 +1698,15 @@
                 }
               }
             },
+            "coverage": {
+              "overall": 0.960784,
+              "overall_n": 98,
+              "hires": 102,
+              "covered": 0.970297,
+              "covered_n": 98,
+              "covered_hires": 101,
+              "covered_from": "2026-02-05"
+            },
             "is_hire": false
           },
           {
@@ -1573,6 +1779,14 @@
                 }
               }
             },
+            "coverage": {
+              "overall": 1.0,
+              "overall_n": 102,
+              "hires": 102,
+              "covered": 1.0,
+              "covered_n": 102,
+              "covered_hires": 102
+            },
             "is_hire": true
           }
         ]
@@ -1597,6 +1811,15 @@
             "last_date": "2026-08-17",
             "from_prev": null,
             "from_first": null,
+            "coverage": {
+              "overall": 0.8125,
+              "overall_n": 143,
+              "hires": 176,
+              "covered": 0.949153,
+              "covered_n": 56,
+              "covered_hires": 59,
+              "covered_from": "2026-07-05"
+            },
             "is_hire": false
           },
           {
@@ -1668,6 +1891,15 @@
                   "rate": 0.832817
                 }
               }
+            },
+            "coverage": {
+              "overall": 0.9375,
+              "overall_n": 165,
+              "hires": 176,
+              "covered": 0.989011,
+              "covered_n": 90,
+              "covered_hires": 91,
+              "covered_from": "2026-06-09"
             },
             "is_hire": false
           },
@@ -1741,6 +1973,15 @@
                 }
               }
             },
+            "coverage": {
+              "overall": 0.670455,
+              "overall_n": 118,
+              "hires": 176,
+              "covered": 0.798165,
+              "covered_n": 87,
+              "covered_hires": 109,
+              "covered_from": "2026-05-20"
+            },
             "is_hire": false
           },
           {
@@ -1812,6 +2053,15 @@
                   "rate": 0.230238
                 }
               }
+            },
+            "coverage": {
+              "overall": 0.642045,
+              "overall_n": 113,
+              "hires": 176,
+              "covered": 0.725,
+              "covered_n": 87,
+              "covered_hires": 120,
+              "covered_from": "2026-05-07"
             },
             "is_hire": false
           },
@@ -1885,6 +2135,15 @@
                 }
               }
             },
+            "coverage": {
+              "overall": 0.789773,
+              "overall_n": 139,
+              "hires": 176,
+              "covered": 0.894737,
+              "covered_n": 119,
+              "covered_hires": 133,
+              "covered_from": "2026-04-24"
+            },
             "is_hire": false
           },
           {
@@ -1956,6 +2215,15 @@
                   "rate": 0.074274
                 }
               }
+            },
+            "coverage": {
+              "overall": 0.431818,
+              "overall_n": 76,
+              "hires": 176,
+              "covered": 0.434483,
+              "covered_n": 63,
+              "covered_hires": 145,
+              "covered_from": "2026-04-05"
             },
             "is_hire": false
           },
@@ -2029,6 +2297,15 @@
                 }
               }
             },
+            "coverage": {
+              "overall": 0.931818,
+              "overall_n": 164,
+              "hires": 176,
+              "covered": 0.93865,
+              "covered_n": 153,
+              "covered_hires": 163,
+              "covered_from": "2026-03-05"
+            },
             "is_hire": false
           },
           {
@@ -2101,6 +2378,14 @@
                 }
               }
             },
+            "coverage": {
+              "overall": 1.0,
+              "overall_n": 176,
+              "hires": 176,
+              "covered": 1.0,
+              "covered_n": 176,
+              "covered_hires": 176
+            },
             "is_hire": true
           }
         ]
@@ -2111,7 +2396,7 @@
   "hire_key": "hire",
   "hire_label": "גיוס",
   "meta": {
-    "generated_at": "2026-09-02 13:17",
+    "generated_at": "2026-09-02 15:11",
     "activities_files": [
       "נתונים למערכת/פעילויות למחשבון.xlsx",
       "נתונים למערכת/כלל פעולות למערכת.xlsx",
@@ -2206,6 +2491,15 @@
       ],
       "has_data": true,
       "note": "הקמת מועמדות היא אירוע ההגשה. שלושת הסוגים - רגיל, מתעדוף וידני - הם אותו שלב, ומועמד נספר לפי המוקדם שבהם.",
+      "hire_coverage": {
+        "overall": 0.30756,
+        "overall_n": 716,
+        "hires": 2328,
+        "covered": 0.514731,
+        "covered_n": 297,
+        "covered_hires": 577,
+        "covered_from": "2026-06-27"
+      },
       "hire_rate": {
         "low": 0.028588,
         "high": 0.035526,
@@ -3457,6 +3751,15 @@
       "activity_type": "בדיקת קבצים",
       "has_data": true,
       "note": "",
+      "hire_coverage": {
+        "overall": 0.719072,
+        "overall_n": 1674,
+        "hires": 2328,
+        "covered": 0.890428,
+        "covered_n": 707,
+        "covered_hires": 794,
+        "covered_from": "2026-05-29"
+      },
       "hire_rate": {
         "low": 0.068998,
         "high": 0.084686,
@@ -4714,6 +5017,15 @@
       "activity_type": "זימון למבחן מקוון",
       "has_data": true,
       "note": "",
+      "hire_coverage": {
+        "overall": 0.35567,
+        "overall_n": 828,
+        "hires": 2328,
+        "covered": 0.55603,
+        "covered_n": 521,
+        "covered_hires": 937,
+        "covered_from": "2026-05-24"
+      },
       "hire_rate": {
         "low": 0.171441,
         "high": 0.191319,
@@ -5833,6 +6145,15 @@
       "activity_type": "תוצאות מבחן דפ\"ר",
       "has_data": true,
       "note": "",
+      "hire_coverage": {
+        "overall": 0.39433,
+        "overall_n": 918,
+        "hires": 2328,
+        "covered": 0.530612,
+        "covered_n": 546,
+        "covered_hires": 1029,
+        "covered_from": "2026-05-07"
+      },
       "hire_rate": {
         "low": 0.217416,
         "high": 0.228841,
@@ -6818,6 +7139,15 @@
       "activity_type": "ראיון התאמה",
       "has_data": true,
       "note": "",
+      "hire_coverage": {
+        "overall": 0.54854,
+        "overall_n": 1277,
+        "hires": 2328,
+        "covered": 0.720387,
+        "covered_n": 894,
+        "covered_hires": 1241,
+        "covered_from": "2026-04-22"
+      },
       "hire_rate": {
         "low": 0.402444,
         "high": 0.429684,
@@ -7745,6 +8075,15 @@
       "activity_type": "תוצאות מרכז הערכה/מבדק",
       "has_data": true,
       "note": "",
+      "hire_coverage": {
+        "overall": 0.252148,
+        "overall_n": 587,
+        "hires": 2328,
+        "covered": 0.279819,
+        "covered_n": 434,
+        "covered_hires": 1551,
+        "covered_from": "2026-03-22"
+      },
       "hire_rate": {
         "low": 0.501101,
         "high": 0.503099,
@@ -8430,6 +8769,15 @@
       "activity_type": "תשובת יחב\"מ",
       "has_data": true,
       "note": "",
+      "hire_coverage": {
+        "overall": 0.835481,
+        "overall_n": 1945,
+        "hires": 2328,
+        "covered": 0.919908,
+        "covered_n": 1608,
+        "covered_hires": 1748,
+        "covered_from": "2026-02-27"
+      },
       "hire_rate": {
         "low": 0.77284,
         "high": 0.777711,

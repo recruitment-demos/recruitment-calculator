@@ -523,8 +523,25 @@ check("משפך המיון המלא מוצג", () => {
   // שתי שורות כותרת ועוד שורה לכל שלב, כולל הגיוס
   if (rows.length !== 2 + D.funnel.rows.length) return "מספר שורות לא צפוי";
   const txt = allText(registry.fullFunnelBody);
-  return D.funnel.rows.every(r => txt.includes(r.label))
-    ? null : "חסר שלב במשפך המלא";
+  if (!D.funnel.rows.every(r => txt.includes(r.label))) return "חסר שלב במשפך המלא";
+  // עמודת הכיסוי חייבת להיות שם: בלעדיה שיעור המעבר נקרא כאילו הוא
+  // מסביר את כלל הגיוסים
+  const body = rows.filter((r, i) => i >= 2);
+  return body.every(r => r.children.length === 7)
+    ? null : "חסרה עמודת הכיסוי";
+});
+
+check("שלב עם כיסוי נמוך מפיק אזהרה מפורשת", () => {
+  clearAll();
+  setVal("submissions", "35711");
+  sandbox.calculate();
+  const low = sandbox.Engine.lowCoverage(["submissions"]);
+  if (!low.length) return "ההגשות לא סומנו ככיסוי נמוך";
+  const warned = registry.gapBody.children.some(
+    c => c.classList.contains("warn") &&
+         c.textContent.includes("נרשמו בכלל") &&
+         c.textContent.includes("הגשות"));
+  return warned ? null : "לא הוצגה אזהרת כיסוי";
 });
 
 check("הפער בין הערוצים מוצג ומוסבר", () => {

@@ -65,6 +65,7 @@ class Engine:
         self.by_key = {s["key"]: s for s in self.stages}
         self.buckets = dataset["time_buckets"]
         self.tolerance = dataset["gap_tolerance"]
+        self.coverage_floor = dataset.get("coverage_warning_below")
         self.hire_key = dataset["hire_key"]
         self.hire_label = dataset["hire_label"]
 
@@ -89,6 +90,52 @@ class Engine:
 
     def label(self, key):
         return self.hire_label if key == self.hire_key else self.stage(key)["label"]
+
+    def coverage(self, key):
+        """איזה חלק מהמגויסים בכלל עברו דרך השלב הזה, לפי הקבצים.
+
+        שיעור המעבר אומר מה קורה למי שנמצא בשלב. הכיסוי אומר דבר אחר
+        לגמרי: כמה מהגיוסים בכלל עוברים שם. שלב שרק חצי מהמגויסים
+        נרשמו בו אינו יושב מעל כל המשפך, וכמות שמוזנת בו אינה יכולה
+        להסביר את כלל הגיוסים - חלק מהם מגיעים בדרך אחרת.
+
+        בלי המספר הזה, «35,711 הגשות מניבות 1,145 גיוסים» נראה כמו
+        טעות בשיעור, בעוד שהארגון גייס באותה תקופה 2,328. ההסבר אינו
+        בשיעור אלא בכיסוי: רק כמחצית מהמגויסים בכלל נרשמו כהגשה.
+        """
+        if not self.has_rate(key):
+            return None
+        return self.stage(key)["hire_coverage"]
+
+    def covered_share(self, key):
+        """הכיסוי בחלון שבו הקטיעה משמאל כבר אינה פועלת.
+
+        המספר הכולל מוטה כלפי מטה: מי שהתגייס בתחילת התקופה ביצע את
+        השלב לפני תחילת הקובץ. כאן נספרים רק מגויסים שהחלון שלפניהם
+        מכוסה, ולכן מה שנשאר הוא כיסוי חסר אמיתי.
+        """
+        c = self.coverage(key)
+        if c is None:
+            return None
+        return c["covered"] if c["covered"] is not None else c["overall"]
+
+    def low_coverage(self, keys=None):
+        """השלבים שאינם מסבירים את רוב הגיוסים, ולכן דורשים אזהרה."""
+        if not self.coverage_floor:
+            return []
+        out = []
+        for k in (keys if keys is not None else self.stage_keys()):
+            if not self.has_rate(k):
+                continue
+            share = self.covered_share(k)
+            if share is not None and share < self.coverage_floor:
+                c = self.coverage(k)
+                out.append({
+                    "key": k, "label": self.label(k), "share": share,
+                    "covered_n": c["covered_n"], "covered_hires": c["covered_hires"],
+                    "overall": c["overall"], "hires": c["hires"],
+                })
+        return out
 
     def stage_keys(self, with_data_only=False):
         return [s["key"] for s in self.stages

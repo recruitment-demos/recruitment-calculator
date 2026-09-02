@@ -1196,5 +1196,75 @@ class TestManagerPlan(unittest.TestCase):
 
 
 
+
+class TestCoverage(unittest.TestCase):
+    """כיסוי: איזה חלק מהמגויסים בכלל עבר דרך כל שלב.
+
+    זה מספר נפרד לגמרי משיעור המעבר, והבלבול ביניהם הוא הטעות
+    שהמשתמש תפס: 35,711 הגשות מניבות כ-1,145 גיוסים לפי השיעור,
+    בעוד שהארגון גייס באותה תקופה 2,328. ההסבר אינו בשיעור אלא
+    בכיסוי - רק כמחצית מהמגויסים בכלל נרשמו כהגשה.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.eng = load_engine()
+
+    def test_every_measured_stage_reports_its_coverage(self):
+        for k in self.eng.stage_keys(with_data_only=True):
+            c = self.eng.coverage(k)
+            self.assertIsNotNone(c, k)
+            self.assertEqual(c["hires"], self.eng.data["meta"]["hire_candidates"])
+            self.assertLessEqual(c["overall_n"], c["hires"], k)
+            self.assertGreaterEqual(c["overall"], 0, k)
+            self.assertLessEqual(c["overall"], 1, k)
+
+    def test_the_covered_window_is_never_worse_than_the_whole(self):
+        """נטרול הקטיעה משמאל יכול רק לשפר את הכיסוי, לא להרע אותו."""
+        for k in self.eng.stage_keys(with_data_only=True):
+            c = self.eng.coverage(k)
+            if c["covered"] is None:
+                continue
+            self.assertGreaterEqual(c["covered"], c["overall"], k)
+
+    def test_a_stage_without_data_has_no_coverage(self):
+        eng = blank_engine()
+        self.assertIsNone(eng.coverage(BLANK))
+        self.assertIsNone(eng.covered_share(BLANK))
+
+    def test_submissions_do_not_cover_the_whole_hire_flow(self):
+        """הממצא עצמו, נעול בבדיקה.
+
+        אם קובץ עתידי יכסה את כל הגיוסים, הבדיקה תיפול ותאלץ
+        להסיר את האזהרה במקום להשאיר אותה כשהיא כבר לא נכונה.
+        """
+        share = self.eng.covered_share("submissions")
+        self.assertLess(share, 0.75,
+                        "ההגשות מכסות עכשיו את רוב הגיוסים - יש לעדכן "
+                        "את האזהרה ואת התיעוד")
+        self.assertIn("submissions",
+                      [c["key"] for c in self.eng.low_coverage()])
+
+    def test_the_warning_fires_only_below_the_configured_floor(self):
+        floor = self.eng.coverage_floor
+        self.assertIsNotNone(floor)
+        flagged = {c["key"] for c in self.eng.low_coverage()}
+        for k in self.eng.stage_keys(with_data_only=True):
+            share = self.eng.covered_share(k)
+            self.assertEqual(k in flagged, share < floor, k)
+
+    def test_a_high_coverage_stage_is_not_flagged(self):
+        """יחב"מ מכסה את רוב הגיוסים, ואסור שיקבל אזהרה מיותרת."""
+        self.assertGreater(self.eng.covered_share("yachbam"), 0.75)
+        self.assertNotIn("yachbam", [c["key"] for c in self.eng.low_coverage()])
+
+    def test_the_funnel_carries_the_same_coverage_as_the_stage(self):
+        rows = {r["key"]: r for r in self.eng.data["funnel"]["rows"]}
+        for k in self.eng.stage_keys(with_data_only=True):
+            self.assertEqual(rows[k]["coverage"]["overall"],
+                             self.eng.coverage(k)["overall"], k)
+
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -387,8 +387,52 @@ def measure(source_dates, event_dates, horizon, conservative_date, cfg,
     return out
 
 
+def hire_coverage(stage_dates, hire_date, activity_first, p90_lead):
+    """איזה חלק מהמגויסים בכלל עברו דרך השלב הזה, לפי הקבצים.
+
+    זה המספר שמונע את הטעות הקשה ביותר בקריאת המשפך: שיעור המעבר
+    אומר מה קורה למי שנמצא בשלב, ולא אומר דבר על כמה מהגיוסים בכלל
+    עוברים שם. שלב שרק שליש מהמגויסים נרשמו בו אינו יושב מעל כל
+    המשפך, וכמות שמוזנת בו אינה יכולה להסביר את כלל הגיוסים.
+
+    שתי מדידות, כי יש שתי סיבות שונות לכיסוי חלקי:
+
+      overall - מכלל המגויסים. מוטה כלפי מטה בגלל קטיעה משמאל:
+                מי שהתגייס בינואר 2026 הגיש ב-2025, לפני תחילת
+                הקובץ, ולכן ההגשה שלו אינה קיימת בו.
+
+      covered - רק מגויסים שהחלון שלפניהם מכוסה בקובץ, כלומר
+                שתאריך הגיוס פחות האחוזון ה-90 של זמן ההגעה נופל
+                אחרי תחילת הנתונים. כאן הקטיעה משמאל כבר לא פועלת,
+                ומה שנשאר הוא כיסוי אמיתי חסר.
+    """
+    ids = hire_date.index.intersection(stage_dates.index)
+    before = sum(1 for c in ids if stage_dates[c] <= hire_date[c])
+    total = len(hire_date)
+
+    if p90_lead is None:
+        return {"overall": round(before / total, 6) if total else None,
+                "overall_n": before, "hires": total,
+                "covered": None, "covered_n": None, "covered_hires": None}
+
+    edge = activity_first + pd.Timedelta(days=p90_lead)
+    late = hire_date[hire_date >= edge]
+    late_ids = late.index.intersection(stage_dates.index)
+    late_before = sum(1 for c in late_ids if stage_dates[c] <= late[c])
+
+    return {
+        "overall": round(before / total, 6) if total else None,
+        "overall_n": before,
+        "hires": total,
+        "covered": round(late_before / len(late), 6) if len(late) else None,
+        "covered_n": late_before,
+        "covered_hires": int(len(late)),
+        "covered_from": edge.date().isoformat(),
+    }
+
+
 def build_funnel(cfg, first, hire_date, data_keys, last_activity,
-                 conservative_date, last_hire):
+                 conservative_date, last_hire, first_date_of_data):
     """המשפך המלא: כמה מועמדים ייחודיים נמדדו בכל שלב, ומה עובר הלאה.
 
     שתי מדידות נפרדות לכל שלב, ושתיהן ישירות:
@@ -416,6 +460,7 @@ def build_funnel(cfg, first, hire_date, data_keys, last_activity,
             "last_date": src.max().date().isoformat() if len(src) else None,
             "from_prev": None,
             "from_first": None,
+            "coverage": None,
             "is_hire": False,
         }
         if prev is not None:
@@ -438,6 +483,11 @@ def build_funnel(cfg, first, hire_date, data_keys, last_activity,
                                   if x["key"] == first_key),
                     "reach": m["reach"], "days": m["days"], "basis": m["basis"],
                 }
+        m = measure(src, hire_date, last_hire, conservative_date, cfg,
+                    pair=f"{key}->hire")
+        row["coverage"] = hire_coverage(
+            src, hire_date, first_date_of_data,
+            m["days"]["p90"] if m else None)
         rows.append(row)
         prev = key
 
@@ -447,7 +497,12 @@ def build_funnel(cfg, first, hire_date, data_keys, last_activity,
         "candidates": int(len(hired)),
         "first_date": hired.min().date().isoformat() if len(hired) else None,
         "last_date": hired.max().date().isoformat() if len(hired) else None,
-        "from_prev": None, "from_first": None, "is_hire": True,
+        "from_prev": None, "from_first": None,
+        "coverage": {"overall": 1.0, "overall_n": int(len(hired)),
+                     "hires": int(len(hired)), "covered": 1.0,
+                     "covered_n": int(len(hired)),
+                     "covered_hires": int(len(hired))},
+        "is_hire": True,
     }
     m = measure(first[prev], hired, last_hire, conservative_date, cfg,
                 pair=f"{prev}->hire")
@@ -505,7 +560,8 @@ def assign_segments(act, cfg, first):
 
 
 def segment_funnel(groups, first, hire_date, data_keys, cfg,
-                   last_activity, conservative_date, last_hire):
+                   last_activity, conservative_date, last_hire,
+                   first_date_of_data):
     """אותו משפך, בנפרד לכל פלח. זה מה שמראה את הפער בין הערוצים."""
     out = []
     for g in groups:
@@ -524,7 +580,8 @@ def segment_funnel(groups, first, hire_date, data_keys, cfg,
         out.append({
             "key": g["key"], "label": g["label"], "match": g["match"],
             "funnel": build_funnel(cfg, sub_first, sub_hire, data_keys,
-                                   last_activity, conservative_date, last_hire),
+                                   last_activity, conservative_date, last_hire,
+                                   first_date_of_data),
             "note": "",
         })
     return out
@@ -562,6 +619,7 @@ def main():
             stages.append({
                 "key": s["key"], "label": s["label"], "activity_type": None,
                 "has_data": False, "note": s.get("note", ""),
+                "hire_coverage": None,
                 "hire_rate": None, "days_to_hire": None,
                 "buckets": None, "hire_curve": None, "hire_window": None,
                 "basis": None, "forward": None,
@@ -602,10 +660,15 @@ def main():
             "window": hire_m["window"], "basis": hire_m["basis"],
         })
 
+        coverage = hire_coverage(
+            src, hire_date, act["date"].min(),
+            hire_m["days"]["p90"] if hire_m["days"] else None)
+
         stages.append({
             "key": s["key"], "label": s["label"],
             "activity_type": s["activity_type"],
             "has_data": True, "note": s.get("note", ""),
+            "hire_coverage": coverage,
             "hire_rate": hire_m["reach"],
             "days_to_hire": hire_m["days"],
             "hire_window": hire_m["window"],
@@ -619,15 +682,18 @@ def main():
     unmapped = sorted(set(act["activity"].dropna().unique()) - known_types)
     hires_without_activity = int(len(hired_ids - set(act["candidate"])))
 
+    first_date_of_data = act["date"].min()
     funnel = build_funnel(cfg, first, hire_date, data_keys, last_activity,
-                          conservative_date, last_hire)
+                          conservative_date, last_hire, first_date_of_data)
     groups, req = assign_segments(act, cfg, first)
     segments = (None if groups is None else
                 segment_funnel(groups, first, hire_date, data_keys, cfg,
-                               last_activity, conservative_date, last_hire))
+                               last_activity, conservative_date, last_hire,
+                               first_date_of_data))
 
     dataset = {
         "gap_tolerance": cfg["gap_tolerance"],
+        "coverage_warning_below": cfg["coverage_warning_below"],
         "funnel": funnel,
         "segments": segments,
         "hire_key": HIRE_KEY,

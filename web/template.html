@@ -501,6 +501,7 @@ const Engine = (() => {
   const byKey = {};
   DATA.stages.forEach(s => { byKey[s.key] = s; });
   const TOL = DATA.gap_tolerance;
+  const COVERAGE_FLOOR = DATA.coverage_warning_below;
   const HIRE = DATA.hire_key;
 
   // עיגול שמתנהג זהה בפייתון וב-JS. כל הערכים אינם שליליים.
@@ -525,6 +526,33 @@ const Engine = (() => {
   const rate = k => hasRate(k) ? stage(k).hire_rate.mid : null;
 
   const label = k => k === HIRE ? DATA.hire_label : stage(k).label;
+
+  // איזה חלק מהמגויסים בכלל עברו דרך השלב הזה. שיעור המעבר אומר מה
+  // קורה למי שנמצא בשלב; הכיסוי אומר כמה מהגיוסים בכלל עוברים שם.
+  const coverage = k => hasRate(k) ? stage(k).hire_coverage : null;
+
+  // הכיסוי בחלון שבו הקטיעה משמאל כבר אינה פועלת
+  const coveredShare = k => {
+    const c = coverage(k);
+    if (c === null || c === undefined) return null;
+    return c.covered !== null && c.covered !== undefined ? c.covered : c.overall;
+  };
+
+  const lowCoverage = (keys) => {
+    if (!COVERAGE_FLOOR) return [];
+    const out = [];
+    (keys === undefined || keys === null ? stageKeys() : keys).forEach(k => {
+      if (!hasRate(k)) return;
+      const share = coveredShare(k);
+      if (share !== null && share < COVERAGE_FLOOR) {
+        const c = coverage(k);
+        out.push({ key: k, label: label(k), share: share,
+                   covered_n: c.covered_n, covered_hires: c.covered_hires,
+                   overall: c.overall, hires: c.hires });
+      }
+    });
+    return out;
+  };
 
   const stageKeys = (withDataOnly) =>
     DATA.stages.filter(s => !withDataOnly || (s.has_data && s.hire_rate)).map(s => s.key);
@@ -1032,6 +1060,7 @@ const Engine = (() => {
   };
 
   return { stage, hasRate, rate, label, stageKeys, forward, roundHalfUp, roundTo,
+           coverage, coveredShare, lowCoverage,
            projectCohort, timeline, combine, combinedWhen, combinedTimeline,
            spread, combinedMatrix, managerPlan,
            curveShare, hiresByDay, combinedByDay,
@@ -1867,6 +1896,15 @@ function funnelRowCells(tr, r, showCandidates) {
     tr.append(el("td", "num", x ? pct(x.reach.mid) : "—"));
     tr.append(el("td", "num", x ? Math.round(x.days.median) : "—"));
   });
+  // כיסוי: איזה חלק מהמגויסים בכלל עבר דרך השלב. עמודה נפרדת לגמרי
+  // משיעור המעבר, ואסור לבלבל ביניהן.
+  const c = r.coverage;
+  const share = !c ? null
+    : (c.covered !== null && c.covered !== undefined ? c.covered : c.overall);
+  const td = el("td", "num", share === null ? "—" : pct(share));
+  if (share !== null && DATA.coverage_warning_below &&
+      share < DATA.coverage_warning_below) td.classList.add("blocked");
+  tr.append(td);
 }
 
 function renderFullFunnel() {
@@ -1882,18 +1920,25 @@ function renderFullFunnel() {
     "עמודות המעבר נמדדו ישירות: אחת מהשלב שלפניו, ואחת מ«" + firstLabel +
     "». השנייה אינה מכפלה של הראשונות - המשפך אינו סדרתי, ויש מועמדים " +
     "שנכנסים באמצע או מדלגים על שלב, ולכן מספר המועמדים בשלב אינו יורד " +
-    "בהכרח משלב לשלב.";
+    "בהכרח משלב לשלב. " +
+    "העמודה האחרונה היא הדבר החשוב ביותר בטבלה, והיא אומרת משהו אחר " +
+    "לגמרי משיעור המעבר: איזה חלק מהמגויסים בכלל נרשמו בשלב הזה. שלב " +
+    "עם כיסוי נמוך אינו יושב מעל כל המשפך - רוב הגיוסים לא עברו שם - " +
+    "ולכן אי אפשר להסיק ממנו את סך הגיוס של הארגון. הכיסוי נמדד רק על " +
+    "מגויסים שהחלון שלפניהם מכוסה בקבצים, כדי שתחילת הנתונים לא תיראה " +
+    "כמו כיסוי חסר.";
 
   const h1 = el("tr");
   [["שלב", 1, 2], ["מועמדים", 1, 2], ["מהשלב הקודם", 2, 1],
-   ["מ«" + firstLabel + "»", 2, 1]].forEach(([t, cs, rs]) => {
+   ["מ«" + firstLabel + "»", 2, 1],
+   ["מהמגויסים עברו כאן", 1, 2]].forEach(([t, cs, rs]) => {
     const th = el("th", null, t);
     if (cs > 1) th.setAttribute("colspan", String(cs));
     if (rs > 1) th.setAttribute("rowspan", String(rs));
     h1.append(th);
   });
   const h2 = el("tr");
-  ["עוברים", "חציון ימים", "עוברים", "חציון ימים"].forEach(t =>
+  ["מגיעים", "חציון ימים", "מגיעים", "חציון ימים"].forEach(t =>
     h2.append(el("th", null, t)));
   body.append(h1, h2);
 
@@ -1954,6 +1999,20 @@ function renderSegments() {
     note.append(td);
     body.append(note);
   });
+}
+
+/* --- אזהרת כיסוי --- *
+ * שיעור המעבר אומר מה קורה למי שנמצא בשלב. הכיסוי אומר דבר אחר: כמה
+ * מהגיוסים בכלל עוברים שם. בלי זה, "35,711 הגשות מניבות 1,145 גיוסים"
+ * נראה כמו טעות בשיעור, בעוד שהארגון גייס באותה תקופה 2,328.          */
+function coverageNotes(keys) {
+  return Engine.lowCoverage(keys).map(c => ({ kind: "warn", text:
+    "רק " + pct(c.share) + " מהמגויסים נרשמו בכלל ב«" + c.label + "» (" +
+    nf(c.covered_n) + " מתוך " + nf(c.covered_hires) + " שהחלון שלפניהם " +
+    "מכוסה בקבצים). המשמעות: שיעור המעבר של השלב נכון למי שנמצא בו, אבל " +
+    "כמות שמוזנת בו אינה יכולה להסביר את כלל הגיוסים - השאר מגיעים בדרך " +
+    "שאינה עוברת דרך השלב הזה, ואינה מתועדת בקבצים שהתקבלו. אין להסיק " +
+    "מכאן את סך הגיוס של הארגון." }));
 }
 
 /* --- הערות ובדיקות --- */
@@ -2071,6 +2130,8 @@ function calculate() {
           "בפועל, והקבוצה שנמדדת בכל שלב היא אחרת." });
       });
     }
+    coverageNotes(Engine.feasibleStages(target, planDays)).forEach(
+      n => notes.push(n));
     renderNotes(notes);
     const targetCards = ["heroCard"];
     if (hasManager) targetCards.push("managerCard");
@@ -2131,6 +2192,8 @@ function calculate() {
   const hasMatrix = renderMatrix(counts, targetDate, cutoffDays);
   const hasWhen = renderWhen(counts);
   const hasTimeline = renderTimeline(counts, cutoffDays);
+
+  coverageNotes(entered).forEach(n => notes.push(n));
 
   if (result.overlap_warning) {
     notes.push({ kind: "warn", text:
@@ -2278,6 +2341,15 @@ function renderBasis() {
       "נופו " + nf(m.activity_duplicate_rows_dropped) + " שורות.",
     "הגזירה היא קדימה בלבד. ממספר שהוזן בשלב מסוים אי אפשר לדעת כמה מועמדים היו בשלבים שלפניו, ולכן הם אינם מוצגים.",
     "המשפך אינו סדרתי: לא כל מועמד עובר דרך כל השלבים. כל מעבר נמדד ישירות בין שני השלבים, ולא כמכפלה של אחוזי מעבר. לכן שיעור ההגעה לגיוס יכול להיות גבוה משיעור ההגעה לשלב שלפניו.",
+    "שלב אינו יושב מעל כל המשפך. עמודת «מהמגויסים עברו כאן» מראה איזה " +
+      "חלק מהמגויסים בכלל נרשמו בכל שלב: " +
+      DATA.funnel.rows.filter(r => !r.is_hire && r.coverage).map(r =>
+        r.label + " " + pct(r.coverage.covered !== null ? r.coverage.covered
+                                                        : r.coverage.overall)
+      ).join(", ") + ". שלב עם כיסוי נמוך אינו יכול להסביר את סך הגיוס " +
+      "של הארגון - השאר מגיעים בדרך שאינה עוברת שם ואינה מתועדת בקבצים.",
+    "כל השיעורים מודדים הגעה לשלב, לא מעבר בו. לבדיקת קבצים אין בקבצים " +
+      "עמודת תוצאה כלל, ולכן אי אפשר לדעת מי עבר אותה ומי נכשל בה.",
     "מרכז הערכה הוא שלב סלקטיבי שרק חלק מהמועמדים עוברים בו.",
     "הזמן שנותר עד הגיוס אינו יורד בהכרח ככל שמתקדמים בתהליך, כי הוא " +
       "נמדד בכל שלב על קבוצה אחרת - רק על מי שהתגייס בפועל.",
