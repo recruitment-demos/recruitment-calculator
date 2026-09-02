@@ -267,6 +267,11 @@
   tr.nodata td { color: var(--warn); background: var(--warn-soft); white-space: normal; }
   .scroller { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
+  .hist {
+    background: var(--warn-soft); color: var(--warn); font-size: 13px;
+    border-radius: 10px; padding: 9px 12px; margin: 0 0 10px;
+  }
+
   /* ---------- טבלאות התוצאה ---------- */
   .mtable td.big { font-size: 15px; font-weight: 700; }
   .mtable td.hi { background: var(--brand-soft); }
@@ -385,7 +390,9 @@
     </div>
 
     <div class="card reveal" id="pipelineCard">
-      <h2>כמה צריך שיעברו בכל שלב</h2>
+      <h2>המשפך שלך - כמה צריך שיעברו בכל שלב</h2>
+      <p class="hist" style="background:var(--good-soft);color:var(--good)">
+        שורת הגיוס שבתחתית הטבלה הזו היא היעד שהזנת.</p>
       <p class="cardsub" id="pipelineSub"></p>
       <div class="pick">
         <label for="planEntry">נקודת הכניסה לתהליך</label>
@@ -431,7 +438,9 @@
   </div>
 
   <div class="card" id="fullFunnelCard">
-    <h2>משפך המיון המלא</h2>
+    <h2>מה קרה בפועל - משפך המיון כפי שנמדד בקבצים</h2>
+    <p class="hist">טבלה היסטורית. היא אינה מושפעת ממה שהוזן למעלה,
+      והמספרים שבה הם מה שקרה בתקופת הנתונים - לא התחזית שלך.</p>
     <p class="cardsub" id="fullFunnelSub"></p>
     <div class="scroller"><table class="mtable" id="fullFunnelBody"></table></div>
     <details>
@@ -859,8 +868,30 @@ const Engine = (() => {
   /* הקוהורט הגדול ביותר שנמדד אי פעם בשלב. אמת מידה לדרישה ענקית. */
   const observedCandidates = (k) => {
     if (!hasRate(k)) return null;
-    const b = stage(k).basis;
-    return Math.max(b.conservative.candidates, b.mature.candidates);
+    const o = stage(k).observed;
+    return o === null || o === undefined ? null : o.candidates;
+  };
+
+  const observedPerDay = (k) => {
+    if (!hasRate(k)) return null;
+    const o = stage(k).observed;
+    return o === null || o === undefined ? null : o.per_day;
+  };
+
+  // תקרה אמיתית קיימת רק כשיש חלון זמן. בלי תאריך יעד אין תקרה:
+  // «4,000 גיוסים» בלי מועד הוא יעד לגיטימי, הוא פשוט לוקח יותר זמן.
+  const capacity = (k, days) => {
+    if (days === null || days === undefined || !hasRate(k)) return null;
+    const pd = observedPerDay(k);
+    return pd === null ? null : pd * days;
+  };
+
+  // המחיר בזמן, במקום פסילה: כמה ימים של הקצב הנמדד דרושים לכמות הזו
+  const paceDays = (k, required) => {
+    if (required === null || required === undefined || !hasRate(k)) return null;
+    const pd = observedPerDay(k);
+    if (!pd) return null;
+    return roundTo(required / pd, 1);
   };
 
   /* שורות הדרישה - מקור האמת היחיד. משמש גם את requiredPlan וגם את
@@ -874,7 +905,8 @@ const Engine = (() => {
                share_in_time: null, effective_rate: null, required: null,
                in_time: false, feasible: false,
                lead_days_median: null, lead_days_mean: null,
-               measured_on: null, observed: null, note: st.note };
+               measured_on: null, observed: null, observed_per_day: null,
+               capacity: null, pace_days: null, note: st.note };
     }
     const d = st.days_to_hire;
     const share = (days === null || days === undefined) ? 1.0 : curveShare(k, days);
@@ -884,14 +916,23 @@ const Engine = (() => {
     else if (eff > 0) required = roundHalfUp(needed / eff);
     else required = null;
     const observed = observedCandidates(k);
-    // דרישה שגדולה מכל קוהורט שנמדד אי פעם בשלב אינה בת-ביצוע
-    const feasible = required !== null && (required === 0 || required <= observed);
+    const cap = capacity(k, days);
+    // דרישה נפסלת רק כשיש חלון זמן שאינו יכול להכיל אותה, לפי הקצב
+    // הנמדד. בלי תאריך יעד אין תקרה - הדרישה פשוט לוקחת זמן.
+    let feasible;
+    if (required === null) feasible = false;
+    else if (required === 0 || cap === null) feasible = true;
+    else feasible = required <= cap;
     return {
       key: k, label: st.label, has_data: true, rate: rate(k),
       share_in_time: share, effective_rate: eff, required: required,
       in_time: eff > 0, feasible: feasible,
       lead_days_median: d.median, lead_days_mean: d.mean,
-      measured_on: d.n, observed: observed, note: ""
+      measured_on: d.n, observed: observed,
+      observed_per_day: observedPerDay(k),
+      capacity: cap === null ? null : roundHalfUp(cap),
+      pace_days: paceDays(k, required),
+      note: ""
     };
   });
 
@@ -947,7 +988,11 @@ const Engine = (() => {
         stage: k, label: st.label, target: target, required: null, exact: null,
         rate: rate(k), effective_rate: eff, share_in_time: curveShare(k, days),
         days: days, lead_days_median: d.median, lead_days_mean: d.mean,
-        measured_on: d.n, observed: observedCandidates(k), feasible: false,
+        measured_on: d.n, observed: observedCandidates(k),
+        observed_per_day: observedPerDay(k),
+        capacity: capacity(k, days) === null ? null
+                  : roundHalfUp(capacity(k, days)),
+        pace_days: null, feasible: false,
         projection: null, hires: 0, hires_in_time: 0
       };
     }
@@ -955,12 +1000,16 @@ const Engine = (() => {
     const required = roundHalfUp(exact);
     const projection = projectCohort(k, required);
     const observed = observedCandidates(k);
+    const cap = capacity(k, days);
     return {
       stage: k, label: st.label, target: target, required: required,
       exact: roundTo(exact, 1), rate: rate(k), effective_rate: eff,
       share_in_time: days === null ? 1.0 : curveShare(k, days), days: days,
       lead_days_median: d.median, lead_days_mean: d.mean, measured_on: d.n,
-      observed: observed, feasible: required <= observed,
+      observed: observed, observed_per_day: observedPerDay(k),
+      capacity: cap === null ? null : roundHalfUp(cap),
+      pace_days: paceDays(k, required),
+      feasible: cap === null || required <= cap,
       projection: projection,
       // בסך הכול, בלי הגבלת זמן. כשיש תאריך יעד זהו מספר אחר מהיעד.
       hires: projection.hires,
@@ -1021,9 +1070,11 @@ const Engine = (() => {
       else if (r.rate) requiredBy = roundHalfUp(needed / r.rate);
       else requiredBy = null;
 
+      // required_by אינו מוגבל בזמן מעצם הגדרתו - הוא הכמות שצריכה
+      // לעמוד בשלב כשיגיע תורה. לכן אין לו תקרה, ורק המחיר בזמן מלווה אותו.
       row.required_by = requiredBy;
-      row.required_by_feasible = requiredBy !== null &&
-        (requiredBy === 0 || requiredBy <= r.observed);
+      row.required_by_feasible = requiredBy !== null;
+      row.required_by_pace_days = paceDays(r.key, requiredBy);
       row.deadline_days = dd === null ? null :
         roundTo(dd - r.lead_days_median, 1);
       row.late = row.deadline_days !== null && row.deadline_days < 0;
@@ -1065,7 +1116,8 @@ const Engine = (() => {
            spread, combinedMatrix, managerPlan,
            curveShare, hiresByDay, combinedByDay,
            crossCheck, requiredForTarget, requiredFunnel, requiredPlan,
-           effectiveRate, observedCandidates, feasibleStages,
+           effectiveRate, observedCandidates, observedPerDay, capacity,
+           paceDays, feasibleStages,
            leadTimeAnomalies, planFromTarget, gapPlan, gapPipeline,
            targetVerdict };
 })();
@@ -1390,14 +1442,36 @@ function renderTimeline(counts, cutoffDays) {
  * שתי קריאות לאותה שאלה, ושתיהן מוצגות.
  *   planBody     - כל שלב לבדו. שש תשובות חלופיות, שאינן מצטברות.
  *   pipelineBody - משפך אחד רציף מנקודת כניסה נבחרת.                    */
+/* המחיר בזמן, במקום פסילה. «124,778 הגשות» אינן בלתי אפשריות - הן
+   כשנתיים של קצב ההגשות הנמדד, וזו תשובה שאפשר לעבוד לפיה.        */
+function fmtRate(perDay) {
+  if (perDay === null || perDay === undefined) return "—";
+  return perDay >= 10 ? nf(Math.round(perDay))
+                      : perDay.toFixed(1).replace(/\.0$/, "");
+}
+
+function fmtSpan(days) {
+  if (days === null || days === undefined) return "—";
+  if (days < 45) return nf(Math.round(days)) + " ימים";
+  if (days < 400) return "כ-" + (days / 30.4).toFixed(1).replace(/\.0$/, "") +
+                          " חודשים";
+  return "כ-" + (days / 365).toFixed(1).replace(/\.0$/, "") + " שנים";
+}
+
+function paceText(label, perDay, paceDays) {
+  return "בקצב הנמדד, " + fmtRate(perDay) + " ב«" + label + "» ליום, " +
+         "צבירת הכמות הזו לוקחת " + fmtSpan(paceDays);
+}
+
 function planSourceText(r, target, targetDate, days) {
   const timed = days !== null && days !== undefined;
 
   if (!r.feasible) {
     let t = "כדי לגייס " + nf(target) + (timed ? " תוך " + nf(days) + " ימים" : "") +
             " מ«" + r.label + "» היו נדרשים " + nf(r.required) + " מועמדים שם. " +
-            "הקבוצה הגדולה ביותר שנמדדה אי פעם ב«" + r.label + "» מנתה " +
-            nf(r.observed) + ", כלומר הכמות הזו מעולם לא היתה קיימת.";
+            "בקצב הנמדד, " + fmtRate(r.observed_per_day) + " ב«" + r.label +
+            "» ליום, נכנסים לשם " + nf(r.capacity) + " בלבד בתוך " +
+            nf(days) + " ימים.";
     if (timed && r.share_in_time < 1) {
       t += " הסיבה: רק " + pct(r.share_in_time) + " ממי שמתגייס מ«" + r.label +
            "» מספיק לעשות זאת תוך " + nf(days) + " ימים, ולכן השיעור שבשימוש " +
@@ -1414,6 +1488,9 @@ function planSourceText(r, target, targetDate, days) {
          nf(days) + " ימים, ולכן השיעור שבשימוש הוא " + pct(r.effective_rate);
   }
   t += ". חציון " + Math.round(r.lead_days_median) + " ימים מהשלב הזה ועד הגיוס";
+  if (r.pace_days !== null && r.pace_days !== undefined) {
+    t += ". " + paceText(r.label, r.observed_per_day, r.pace_days);
+  }
   if (targetDate) {
     t += ", כלומר צריך להיות שם עד " +
          fmtDay(shiftDays(targetDate, -r.lead_days_median));
@@ -1437,7 +1514,8 @@ function renderPlan(target, targetDate, days) {
       ? (ok.length
           ? " שלבים שמהם היעד אינו בר-השגה בזמן הזה מסומנים ככאלה, בלי מספר."
           : " אף שלב אינו יכול לספק את היעד בזמן הזה.")
-      : "");
+      : " בלי תאריך יעד אין תקרה: כל כמות אפשרית, והמחיר שלה הוא זמן. " +
+        "מתחת לכל שורה כתוב כמה זמן לוקח לצבור אותה בקצב הנמדד.");
 
   const max = Math.max.apply(null, ok.map(r => r.required).concat([1]));
 
@@ -1449,7 +1527,7 @@ function renderPlan(target, targetDate, days) {
       const head = el("div", "fhead");
       head.append(el("span", "fname", r.label));
       const label = !r.has_data ? "—"
-        : (r.required === null ? "לא יספיק" : "לא בר-השגה");
+        : (r.required === null ? "לא יספיק" : "לא בזמן הזה");
       row.append(head, el("div", "ftrack"), el("div", "fval blocked", label),
         el("div", "fsrc", !r.has_data ? r.note
           : (r.required === null
@@ -1729,10 +1807,14 @@ function managerRowNote(r, target, targetDate, days) {
         Math.round(r.lead_days_median) + " ימים, ועד " + fmtDay(targetDate) +
         " נשארו " + nf(days) + ". החלון של השלב הזה כבר נסגר עבור התאריך הזה.";
   }
-  if (r.required_by !== null && !r.required_by_feasible) {
-    t += " " + nf(r.required_by) + " ב«" + r.label + "» הם יותר מהקבוצה " +
-         "הגדולה ביותר שנמדדה שם אי פעם (" + nf(r.observed) + "), ולכן " +
-         "המספר אינו מוצג ככמות שאפשר לעבוד לפיה.";
+  if (r.required_by_pace_days !== null && r.required_by_pace_days !== undefined) {
+    t += " " + paceText(r.label, r.observed_per_day, r.required_by_pace_days) +
+         ", לפי " + nf(r.observed) + " מועמדים שנמדדו שם ב-" +
+         nf(Engine.stage(r.key).observed.days) + " ימי נתונים.";
+  }
+  if (timed && !r.feasible && r.capacity !== null) {
+    t += " העמודה «אם הם שם היום» מסומנת כי בקצב הזה נכנסים ל«" + r.label +
+         "» רק " + nf(r.capacity) + " מועמדים בתוך " + nf(days) + " ימים.";
   }
   // ההסבר על הפער בין שתי הכמויות נאמר רק כשיש פער. כשכמעט כולם
   // מספיקים בזמן, "רק 99.4%" נשמע כמו בעיה במקום כמו הערה.
@@ -1777,9 +1859,7 @@ function renderManager(counts, target, targetDate, days) {
 
     const by = el("td", "num big");
     if (!r.has_data || r.required_by === null) { by.textContent = "—"; }
-    else if (!r.required_by_feasible) {
-      by.textContent = "לא בר-השגה"; by.className = "num blocked";
-    } else { by.textContent = nf(r.required_by); by.classList.add("hi"); }
+    else { by.textContent = nf(r.required_by); by.classList.add("hi"); }
     tr.append(by);
 
     const when = el("td", "num");
@@ -1791,7 +1871,7 @@ function renderManager(counts, target, targetDate, days) {
 
     const now = el("td", "num");
     if (!r.has_data || r.required_now === null) now.textContent = "—";
-    else if (!r.feasible) { now.textContent = "לא בר-השגה"; now.className = "num blocked"; }
+    else if (!r.feasible) { now.textContent = "לא בזמן הזה"; now.className = "num blocked"; }
     else now.textContent = nf(r.required_now);
     tr.append(now);
 
@@ -1805,8 +1885,9 @@ function renderManager(counts, target, targetDate, days) {
   });
 
   $("managerFoot").textContent =
-    "«כמה צריך שיעמדו שם» היא הכמות בלי לחץ זמן, והמחיר שלה הוא התאריך " +
-    "שבעמודה שלידה. «אם הם שם היום» היא הכמות הדרושה ממי שכבר עומד בשלב " +
+    "«כמה צריך שיעמדו שם» היא הכמות בלי לחץ זמן, ולכן אין לה תקרה - " +
+    "המחיר שלה הוא התאריך שבעמודה שלידה, ובהסבר כתוב כמה זמן לוקח " +
+    "לצבור אותה בקצב הנמדד. «אם הם שם היום» היא הכמות הדרושה ממי שכבר עומד בשלב " +
     "הזה עכשיו, כשנשאר רק הזמן שעד היעד" +
     (timed ? "" : " - בלי תאריך יעד שתי העמודות זהות") + ". " +
     "התאריכים אינם בסדר השלבים, כי הזמן עד הגיוס נמדד בכל שלב על קבוצה " +

@@ -43,6 +43,12 @@ def build_scenarios(eng):
         scenarios.append({"op": "rate", "stage": k})
         scenarios.append({"op": "coverage", "stage": k})
         scenarios.append({"op": "covered_share", "stage": k})
+        scenarios.append({"op": "observed_candidates", "stage": k})
+        scenarios.append({"op": "observed_per_day", "stage": k})
+        for d in DAYS + [None]:
+            scenarios.append({"op": "capacity", "stage": k, "days": d})
+        for c in COUNTS:
+            scenarios.append({"op": "pace_days", "stage": k, "required": c})
         scenarios.append({"op": "low_coverage", "keys": [k]})
         scenarios.append({"op": "forward", "stage": k})
         for d in DAYS:
@@ -191,6 +197,14 @@ def python_result(eng, sc):
         return eng.combined_when(sc["counts"])
     if op == "combined_timeline":
         return eng.combined_timeline(sc["counts"])
+    if op == "observed_per_day":
+        return eng.observed_per_day(sc["stage"])
+    if op == "capacity":
+        return eng.capacity(sc["stage"], sc["days"])
+    if op == "pace_days":
+        return eng.pace_days(sc["stage"], sc["required"])
+    if op == "observed_candidates":
+        return eng.observed_candidates(sc["stage"])
     if op == "coverage":
         return eng.coverage(sc["stage"])
     if op == "covered_share":

@@ -44,6 +44,17 @@ def fmt_day(d):
     return f"{d.day}.{d.month}.{d.year}"
 
 
+def fmt_span(days):
+    """המחיר בזמן, בלשון קריאה."""
+    if days is None:
+        return "—"
+    if days < 45:
+        return f"{round(days):,} ימים"
+    if days < 400:
+        return f"כ-{days / 30.4:.1f} חודשים".replace(".0 ", " ")
+    return f"כ-{days / 365:.1f} שנים".replace(".0 ", " ")
+
+
 def print_basis(eng):
     m = eng.data["meta"]
     print("מקורות הנתונים")
@@ -120,8 +131,7 @@ def print_manager(eng, target, by, days, counts=None):
         if not row["has_data"]:
             print(f"  {row['label']:<20}{'—':>16}{'—':>16}{'—':>16}   {row['note']}")
             continue
-        by_txt = ("לא בר-השגה" if not row["required_by_feasible"]
-                  else f"{row['required_by']:,}")
+        by_txt = f"{row['required_by']:,}"
         if days is None:
             when = f"בעוד {row['lead_days_median']:.0f} ימים"
         elif row["late"]:
@@ -130,9 +140,11 @@ def print_manager(eng, target, by, days, counts=None):
             when = fmt_day(today + datetime.timedelta(
                 days=round(row["deadline_days"])))
         now_txt = ("—" if row["required_now"] is None
-                   else "לא בר-השגה" if not row["feasible"]
+                   else "לא בזמן הזה" if not row["feasible"]
                    else f"{row['required_now']:,}")
-        print(f"  {row['label']:<20}{by_txt:>16}{when:>16}{now_txt:>16}")
+        pace = ("" if row["required_by_pace_days"] is None else
+                f"   ({fmt_span(row['required_by_pace_days'])} של הקצב הנמדד)")
+        print(f"  {row['label']:<20}{by_txt:>16}{when:>16}{now_txt:>16}{pace}")
 
     print("\n  התאריכים אינם בסדר השלבים: הזמן עד הגיוס נמדד בכל שלב על "
           "קבוצה אחרת,\n  רק על מי שהתגייס בפועל.")
@@ -274,9 +286,8 @@ def main():
                 continue
             when = (f"   עד {fmt_day(day_before(by, row['lead_days_median']))}"
                     if by else "")
-            flag = ("   [לא מעשי: גדול מ-"
-                    f"{row['observed']:,} שנמדדו אי פעם]"
-                    if row["observed"] and row["required"] > row["observed"] else "")
+            flag = ("" if row.get("pace_days") is None else
+                    f"   [{fmt_span(row['pace_days'])} של הקצב הנמדד]")
             print(f"  {row['label']:<22}{row['required']:>10,}   "
                   f"שיעור {pct(row['effective_rate'])}   "
                   f"חציון {row['lead_days_median']:>5.0f} ימים{when}{flag}")

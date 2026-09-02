@@ -619,7 +619,7 @@ def main():
             stages.append({
                 "key": s["key"], "label": s["label"], "activity_type": None,
                 "has_data": False, "note": s.get("note", ""),
-                "hire_coverage": None,
+                "hire_coverage": None, "observed": None,
                 "hire_rate": None, "days_to_hire": None,
                 "buckets": None, "hire_curve": None, "hire_window": None,
                 "basis": None, "forward": None,
@@ -660,6 +660,19 @@ def main():
             "window": hire_m["window"], "basis": hire_m["basis"],
         })
 
+        # היקף התנועה האמיתי בשלב: כמה מועמדים ייחודיים עברו בו, על פני
+        # כמה ימים. זו אמת המידה לשאלה אם דרישה היא מעשית - אבל רק מול
+        # חלון זמן באותו אורך. דרישה בלי תאריך יעד אינה מוגבלת בכלל,
+        # ואין להשוות אותה לכמות שנמדדה ב-229 ימים.
+        span_days = int((src.max() - src.min()).days) + 1 if len(src) else 0
+        observed = {
+            "candidates": int(len(src)),
+            "first_date": src.min().date().isoformat() if len(src) else None,
+            "last_date": src.max().date().isoformat() if len(src) else None,
+            "days": span_days,
+            "per_day": round(len(src) / span_days, 6) if span_days else None,
+        }
+
         coverage = hire_coverage(
             src, hire_date, act["date"].min(),
             hire_m["days"]["p90"] if hire_m["days"] else None)
@@ -669,6 +682,7 @@ def main():
             "activity_type": s["activity_type"],
             "has_data": True, "note": s.get("note", ""),
             "hire_coverage": coverage,
+            "observed": observed,
             "hire_rate": hire_m["reach"],
             "days_to_hire": hire_m["days"],
             "hire_window": hire_m["window"],

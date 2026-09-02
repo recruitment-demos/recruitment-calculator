@@ -952,8 +952,18 @@ class TestPlanning(unittest.TestCase):
         self.assertFalse(row["feasible"])
         self.assertGreater(row["required"], row["observed"])
 
-    def test_only_the_last_stage_can_deliver_in_a_month(self):
-        self.assertEqual(self.eng.feasible_stages(400, 30), ["yachbam"])
+    def test_a_month_is_not_enough_for_a_target_of_400(self):
+        """הארגון מגייס כ-300 בחודש, ודרך יחב"מ עוברים כ-12 מועמדים ליום.
+
+        400 גיוסים תוך חודש אינם אפשריים משום שלב, וזו התשובה הנכונה.
+        """
+        self.assertEqual(self.eng.feasible_stages(400, 30), [])
+
+    def test_a_quarter_is_enough_only_from_the_later_stages(self):
+        feasible = self.eng.feasible_stages(400, 90)
+        self.assertTrue(feasible)
+        self.assertNotIn("submissions", feasible)
+        self.assertIn("yachbam", feasible)
 
     def test_a_far_deadline_is_feasible_from_the_start_of_the_funnel(self):
         self.assertIn("file_check", self.eng.feasible_stages(400, 122))
@@ -961,6 +971,44 @@ class TestPlanning(unittest.TestCase):
     def test_an_open_target_is_feasible_everywhere(self):
         self.assertEqual(self.eng.feasible_stages(400),
                          self.eng.stage_keys(with_data_only=True))
+
+    def test_an_open_target_has_no_ceiling_at_all(self):
+        """התקלה: יעד שנתי סביר הוחזר כ«לא בר-השגה» בכל שלב.
+
+        הארגון מגייס כ-3,700 בשנה, ו-4,000 בלי מועד הוא יעד לגיטימי.
+        הגרסה הקודמת השוותה כל דרישה לכמות שנמדדה ב-229 ימים ופסלה
+        אותה. בלי חלון זמן אין תקרה, והמחיר הוא זמן בלבד.
+        """
+        self.assertEqual(self.eng.feasible_stages(4000),
+                         self.eng.stage_keys(with_data_only=True))
+        for row in self.eng.required_plan(4000)["rows"]:
+            if not row["has_data"]:
+                continue
+            self.assertIsNotNone(row["required"], row["key"])
+            self.assertIsNone(row["capacity"], row["key"])
+            self.assertGreater(row["pace_days"], 0, row["key"])
+
+    def test_the_pace_is_the_requirement_at_the_measured_rate(self):
+        for t in (400, 4000):
+            for row in self.eng.required_plan(t)["rows"]:
+                if not row["has_data"]:
+                    continue
+                self.assertAlmostEqual(
+                    row["pace_days"],
+                    round(row["required"] / row["observed_per_day"], 1),
+                    places=1, msg=row["key"])
+
+    def test_the_capacity_guard_still_catches_the_reported_failure(self):
+        """«400 תוך חודש» דרש 152,470 בדיקות קבצים. זה חייב להיפסל.
+
+        זו ההגנה שבגללה כלל הפסילה נולד, והיא נשמרת במלואה: שם יש
+        תאריך יעד, ולכן יש תקרה.
+        """
+        row = next(r for r in self.eng.required_plan(400, 30)["rows"]
+                   if r["key"] == "file_check")
+        self.assertGreater(row["required"], 100000)
+        self.assertFalse(row["feasible"])
+        self.assertLess(row["capacity"], 5000)
 
     def test_a_huge_target_is_feasible_nowhere(self):
         self.assertEqual(self.eng.feasible_stages(100000, 30), [])
@@ -1175,14 +1223,36 @@ class TestManagerPlan(unittest.TestCase):
             self.assertEqual(r["required_by"], 0, r["key"])
             self.assertEqual(r["required_now"], 0, r["key"])
 
-    def test_an_impossible_quantity_is_flagged_and_not_dressed_as_an_answer(self):
-        """מספר שגדול מכל קוהורט שנמדד אי פעם אינו תשובה."""
-        plan = self.eng.manager_plan({}, 100000)
-        blocked = [r for r in plan["rows"]
-                   if r["has_data"] and not r["required_by_feasible"]]
+    def test_the_standing_quantity_never_gets_a_ceiling(self):
+        """«כמה צריך שיעמדו שם» אינו מוגבל בזמן, ולכן אין לו תקרה.
+
+        המחיר שלו הוא הזמן: pace_days אומר כמה זמן לוקח לצבור אותו
+        בקצב הנמדד. פסילה כאן היתה חוזרת על התקלה שבה יעד שנתי סביר
+        הוצג כ«לא בר-השגה».
+        """
+        for target in (400, 4000, 100000):
+            for r in self.eng.manager_plan({}, target)["rows"]:
+                if not r["has_data"]:
+                    continue
+                self.assertTrue(r["required_by_feasible"], r["key"])
+                self.assertIsNotNone(r["required_by"], r["key"])
+                self.assertGreater(r["required_by_pace_days"], 0, r["key"])
+
+    def test_the_time_price_grows_with_the_target(self):
+        small = self.eng.manager_plan({}, 400)["rows"]
+        big = self.eng.manager_plan({}, 4000)["rows"]
+        for a, b in zip(small, big):
+            if not a["has_data"]:
+                continue
+            self.assertGreater(b["required_by_pace_days"],
+                               a["required_by_pace_days"], a["key"])
+
+    def test_a_deadline_still_flags_what_cannot_be_done_in_time(self):
+        plan = self.eng.manager_plan({}, 400, 30)
+        blocked = [r for r in plan["rows"] if r["has_data"] and not r["feasible"]]
         self.assertTrue(blocked)
         for r in blocked:
-            self.assertGreater(r["required_by"], r["observed"], r["key"])
+            self.assertGreater(r["required_now"], r["capacity"], r["key"])
 
     def test_it_agrees_with_the_gap_plan_it_is_built_on(self):
         """אין חישוב דרישה משוכפל - מקור אמת אחד."""

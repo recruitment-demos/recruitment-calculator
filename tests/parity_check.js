@@ -58,6 +58,14 @@ for (const sc of scenarios) {
     results.push(Engine.feasibleStages(sc.target, sc.days));
   } else if (sc.op === "gap_plan") {
     results.push(Engine.gapPlan(sc.counts, sc.target, sc.days));
+  } else if (sc.op === "observed_per_day") {
+    results.push(Engine.observedPerDay(sc.stage));
+  } else if (sc.op === "capacity") {
+    results.push(Engine.capacity(sc.stage, sc.days));
+  } else if (sc.op === "pace_days") {
+    results.push(Engine.paceDays(sc.stage, sc.required));
+  } else if (sc.op === "observed_candidates") {
+    results.push(Engine.observedCandidates(sc.stage));
   } else if (sc.op === "coverage") {
     results.push(Engine.coverage(sc.stage));
   } else if (sc.op === "covered_share") {

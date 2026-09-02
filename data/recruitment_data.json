@@ -2396,7 +2396,7 @@
   "hire_key": "hire",
   "hire_label": "גיוס",
   "meta": {
-    "generated_at": "2026-09-02 15:11",
+    "generated_at": "2026-09-02 15:30",
     "activities_files": [
       "נתונים למערכת/פעילויות למחשבון.xlsx",
       "נתונים למערכת/כלל פעולות למערכת.xlsx",
@@ -2499,6 +2499,13 @@
         "covered_n": 297,
         "covered_hires": 577,
         "covered_from": "2026-06-27"
+      },
+      "observed": {
+        "candidates": 35711,
+        "first_date": "2026-01-01",
+        "last_date": "2026-08-17",
+        "days": 229,
+        "per_day": 155.943231
       },
       "hire_rate": {
         "low": 0.028588,
@@ -3759,6 +3766,13 @@
         "covered_n": 707,
         "covered_hires": 794,
         "covered_from": "2026-05-29"
+      },
+      "observed": {
+        "candidates": 24277,
+        "first_date": "2026-01-01",
+        "last_date": "2026-08-17",
+        "days": 229,
+        "per_day": 106.0131
       },
       "hire_rate": {
         "low": 0.068998,
@@ -5026,6 +5040,13 @@
         "covered_hires": 937,
         "covered_from": "2026-05-24"
       },
+      "observed": {
+        "candidates": 6877,
+        "first_date": "2026-01-01",
+        "last_date": "2026-08-17",
+        "days": 229,
+        "per_day": 30.030568
+      },
       "hire_rate": {
         "low": 0.171441,
         "high": 0.191319,
@@ -6154,6 +6175,13 @@
         "covered_hires": 1029,
         "covered_from": "2026-05-07"
       },
+      "observed": {
+        "candidates": 7819,
+        "first_date": "2026-01-01",
+        "last_date": "2026-08-17",
+        "days": 229,
+        "per_day": 34.144105
+      },
       "hire_rate": {
         "low": 0.217416,
         "high": 0.228841,
@@ -7148,6 +7176,13 @@
         "covered_hires": 1241,
         "covered_from": "2026-04-22"
       },
+      "observed": {
+        "candidates": 4272,
+        "first_date": "2026-01-01",
+        "last_date": "2026-08-17",
+        "days": 229,
+        "per_day": 18.655022
+      },
       "hire_rate": {
         "low": 0.402444,
         "high": 0.429684,
@@ -8084,6 +8119,13 @@
         "covered_hires": 1551,
         "covered_from": "2026-03-22"
       },
+      "observed": {
+        "candidates": 1437,
+        "first_date": "2026-01-01",
+        "last_date": "2026-08-17",
+        "days": 229,
+        "per_day": 6.275109
+      },
       "hire_rate": {
         "low": 0.501101,
         "high": 0.503099,
@@ -8777,6 +8819,13 @@
         "covered_n": 1608,
         "covered_hires": 1748,
         "covered_from": "2026-02-27"
+      },
+      "observed": {
+        "candidates": 2762,
+        "first_date": "2026-01-01",
+        "last_date": "2026-08-17",
+        "days": 229,
+        "per_day": 12.061135
       },
       "hire_rate": {
         "low": 0.77284,

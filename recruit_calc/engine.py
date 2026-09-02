@@ -547,15 +547,50 @@ class Engine:
         return None if share is None else self.rate(key) * share
 
     def observed_candidates(self, key):
-        """הקוהורט הגדול ביותר שנמדד אי פעם בשלב הזה.
-
-        משמש כאמת מידה: דרישה שגדולה בהרבה מכל מה שנמדד אינה מעשית,
-        וזו עובדה שאפשר להצביע עליה במקום להשאיר מספר ענק בלי הקשר.
-        """
+        """כמה מועמדים ייחודיים עברו בשלב הזה בכל תקופת הנתונים."""
         if not self.has_rate(key):
             return None
-        b = self.stage(key)["basis"]
-        return max(b["conservative"]["candidates"], b["mature"]["candidates"])
+        o = self.stage(key)["observed"]
+        return None if o is None else o["candidates"]
+
+    def observed_per_day(self, key):
+        """קצב התנועה בשלב: מועמדים ליום, כפי שנמדד בקבצים."""
+        if not self.has_rate(key):
+            return None
+        o = self.stage(key)["observed"]
+        return None if o is None else o["per_day"]
+
+    def capacity(self, key, days):
+        """כמה מועמדים יכולים לעבור בשלב בתוך מספר ימים, לפי הקצב הנמדד.
+
+        זו אמת המידה היחידה ההוגנת לשאלה אם דרישה מעשית, והיא תקפה רק
+        כשיש חלון זמן. בלי תאריך יעד אין תקרה בכלל: «4,000 גיוסים»
+        בלי מועד הוא יעד לגיטימי לחלוטין - הארגון מגייס כ-3,700 בשנה -
+        והוא פשוט ייקח יותר זמן.
+
+        הגרסה הקודמת השוותה כל דרישה לכמות שנמדדה ב-229 ימים, וכך
+        פסלה יעד שנתי סביר בתור «לא בר-השגה» בכל שלב. זו היתה תקלה.
+        ההגנה שבגללה הכלל נולד - «400 תוך חודש» שדרש 152,000 בדיקות
+        קבצים - נשמרת במלואה, כי שם יש תאריך ולכן יש תקרה.
+        """
+        if days is None or not self.has_rate(key):
+            return None
+        per_day = self.observed_per_day(key)
+        return None if per_day is None else per_day * days
+
+    def pace_days(self, key, required):
+        """כמה ימים של הקצב הנמדד דרושים כדי לצבור את הכמות הזו.
+
+        זה מה שמחליף את «לא בר-השגה» כשאין תאריך יעד: לא פסילה, אלא
+        המחיר בזמן. 124,778 הגשות אינן בלתי אפשריות - הן כשנתיים
+        של קצב ההגשות הנוכחי.
+        """
+        if required is None or not self.has_rate(key):
+            return None
+        per_day = self.observed_per_day(key)
+        if not per_day:
+            return None
+        return round_to(required / per_day, 1)
 
     def _requirement_rows(self, needed, days):
         """שורות הדרישה לכל שלב. מקור האמת היחיד לחישוב הזה.
@@ -574,7 +609,9 @@ class Engine:
                     "rate": None, "share_in_time": None, "effective_rate": None,
                     "required": None, "in_time": False, "feasible": False,
                     "lead_days_median": None, "lead_days_mean": None,
-                    "measured_on": None, "observed": None, "note": st["note"],
+                    "measured_on": None, "observed": None,
+                    "observed_per_day": None, "capacity": None,
+                    "pace_days": None, "note": st["note"],
                 })
                 continue
 
@@ -589,10 +626,16 @@ class Engine:
                 required = None
 
             observed = self.observed_candidates(k)
-            # דרישה שגדולה מכל קוהורט שנמדד אי פעם בשלב אינה בת-ביצוע.
-            # זו אמת מידה מהנתונים, לא סף שנקבע מראש.
-            feasible = (required is not None and
-                        (required == 0 or required <= observed))
+            cap = self.capacity(k, days)
+            # דרישה נפסלת רק כשיש חלון זמן שאינו יכול להכיל אותה, לפי
+            # הקצב הנמדד בשלב. בלי תאריך יעד אין תקרה: הדרישה פשוט
+            # לוקחת זמן, וזה מה ש-pace_days אומר.
+            if required is None:
+                feasible = False
+            elif required == 0 or cap is None:
+                feasible = True
+            else:
+                feasible = required <= cap
             rows.append({
                 "key": k, "label": st["label"], "has_data": True,
                 "rate": self.rate(k),
@@ -605,6 +648,9 @@ class Engine:
                 "lead_days_mean": d["mean"],
                 "measured_on": d["n"],
                 "observed": observed,
+                "observed_per_day": self.observed_per_day(k),
+                "capacity": None if cap is None else round_half_up(cap),
+                "pace_days": self.pace_days(k, required),
                 "note": "",
             })
         return rows
@@ -687,6 +733,10 @@ class Engine:
                 "lead_days_mean": st["days_to_hire"]["mean"],
                 "measured_on": st["days_to_hire"]["n"],
                 "observed": self.observed_candidates(key),
+                "observed_per_day": self.observed_per_day(key),
+                "capacity": None if self.capacity(key, days) is None
+                            else round_half_up(self.capacity(key, days)),
+                "pace_days": None,
                 "feasible": False,
                 "projection": None, "hires": 0, "hires_in_time": 0,
             }
@@ -695,6 +745,7 @@ class Engine:
         projection = self.project_cohort(key, required)
         d = st["days_to_hire"]
         observed = self.observed_candidates(key)
+        cap = self.capacity(key, days)
         return {
             "stage": key,
             "label": st["label"],
@@ -709,7 +760,10 @@ class Engine:
             "lead_days_mean": d["mean"],
             "measured_on": d["n"],
             "observed": observed,
-            "feasible": required <= observed,
+            "observed_per_day": self.observed_per_day(key),
+            "capacity": None if cap is None else round_half_up(cap),
+            "pace_days": self.pace_days(key, required),
+            "feasible": cap is None or required <= cap,
             "projection": projection,
             # מספר המגויסים בסך הכול, בלי הגבלת זמן. כשיש תאריך יעד זהו
             # מספר אחר מהיעד, ואסור להציג אותו כאילו הוא התשובה.
@@ -805,11 +859,12 @@ class Engine:
             else:
                 required_by = None
 
-            observed = r["observed"]
+            # required_by אינו מוגבל בזמן מעצם הגדרתו - הוא הכמות
+            # שצריכה לעמוד בשלב כשיגיע תורה. לכן אין לו תקרה, ורק
+            # המחיר בזמן (pace_days) מלווה אותו.
             row["required_by"] = required_by
-            row["required_by_feasible"] = (
-                required_by is not None
-                and (required_by == 0 or required_by <= observed))
+            row["required_by_feasible"] = required_by is not None
+            row["required_by_pace_days"] = self.pace_days(k := r["key"], required_by)
             row["deadline_days"] = (None if days is None else
                                     round_to(days - r["lead_days_median"], 1))
             row["late"] = (row["deadline_days"] is not None
