@@ -1088,6 +1088,397 @@ class Engine:
             "aside": aside,
         }
 
+    # ------------------------------------------------------------------
+    # הכיוון ההפוך: מכמות בשלב אל מספר הגיוסים
+    # ------------------------------------------------------------------
+    # constrained_plan עונה «כמה צריך כדי לגייס X». כאן הכיוון ההפוך:
+    # «כמה יתגייסו אם יש לי X בשלב הזה». שני הכיוונים חייבים לעמוד על
+    # אותה אריתמטיקה - הזנת כמות ההגשות שהתקבלה מהיעד חייבת להחזיר את
+    # היעד. המספר שהיה חסר עד 2026-09-03 הוא האוכלוסייה המוכרת: היא
+    # מתגייסת בלי קשר לכמות שבמשפך, ולכן 60,000 הגשות בשנה נתנו 1,923
+    # גיוסים במקום כ-3,300.
+
+    def _flow_rows(self):
+        """שרשרת התזרים עם שורת הגיוס בסופה, ומפתח שם->אינדקס."""
+        af = self.annual_flow()
+        if af is None:
+            return None
+        rows = list(af["chain"]) + [af["hire_row"]]
+        return af, rows, {r["key"]: i for i, r in enumerate(rows)}
+
+    def _flow_span(self, days):
+        """אורך החלון וכמה גיוסים תורם בו הנתיב המוכר.
+
+        הנתיב המוכר קבוע ומתחלק אחיד על פני השנה, ולכן חלון קצר מקבל
+        ממנו פחות - וזו הסיבה שדרישת ההגשות גדלה כשהחלון מתקצר.
+        """
+        af = self.annual_flow()
+        if af is None:
+            return None, None
+        year = af["year_days"]
+        span = year if days is None else days
+        if span is None or span <= 0:
+            return None, None
+        return span, af["known"]["hires_per_year"] * span / year
+
+    def _measured_days(self, from_key, to_key):
+        """חציון הימים מהשלב האחד לשני, כפי שנמדד בקבצים.
+
+        התזרים נותן יחסים בלבד ואינו נושא זמנים. הזמנים ממשיכים לבוא
+        מהמדידה, וזוג שלא נמדד מחזיר None ואינו נכנס לממוצע.
+        """
+        if from_key == to_key:
+            return 0.0
+        if not self.has_rate(from_key):
+            return None
+        for f in self.forward(from_key):
+            if f["key"] == to_key:
+                return f["days"]["median"]
+        return None
+
+    def constrained_entry(self, key, count, days=None):
+        """מיפוי כמות שהוזנה בשלב כלשהו אל שרשרת התזרים.
+
+        שלושה מקרים, ובכולם נאמר במפורש דרך מה נעשה המיפוי:
+          chain    - השלב יושב על השרשרת. מנכים ממנו את האוכלוסייה
+                     המוכרת אם היא עוברת שם, כי היא אינה נגזרת מהמשפך.
+          aside    - תחנת צד (מרכז הערכה). היא נתלית על המארח שלה לפי
+                     חלקה בו, שגם הוא מהתרשים.
+          measured - שלב שאינו בתרשים כלל (זימון למבחן מקוון). הגשר אל
+                     השלב הבא בשרשרת נמדד מהקבצים, ונאמר שכך נעשה.
+        """
+        packed = self._flow_rows()
+        if packed is None or count is None:
+            return None
+        af, rows, idx = packed
+        span, known_span = self._flow_span(days)
+        if span is None:
+            return None
+
+        if key in idx:
+            row = rows[idx[key]]
+            known_here = known_span if row["known_passes"] else 0.0
+            new = count - known_here
+            return {
+                "key": key, "label": row["label"], "count": count,
+                "chain_key": key, "chain_label": row["label"],
+                "known_here": round_half_up(known_here),
+                "new": new if new > 0 else 0.0,
+                # הכמות המוזנת היא נפח לאורך החלון, ולכן היא כוללת גם
+                # את האוכלוסייה המוכרת שעוברת באותו שלב. כמות שקטנה
+                # ממנה אינה מותירה דבר לאוכלוסייה החדשה, וזו הודעה
+                # למשתמש ולא תוצאה שקטה.
+                "below_known": new <= 0 and known_here > 0,
+                "via": "chain", "via_rate": None, "via_label": None,
+            }
+
+        for a in af["aside"]:
+            if a["key"] == key:
+                share = a["share_of_host"]
+                if not share:
+                    return None
+                host = rows[idx[a["after"]]]
+                return {
+                    "key": key, "label": a["label"], "count": count,
+                    "chain_key": host["key"], "chain_label": host["label"],
+                    "known_here": 0,
+                    "new": count / share,
+                    "below_known": False,
+                    "via": "aside", "via_rate": round_to(share, 6),
+                    "via_label": host["label"],
+                }
+
+        if not self.has_rate(key):
+            return None
+        for f in self.forward(key):
+            if f["key"] in idx:
+                reach = f["reach"]["mid"]
+                if not reach:
+                    return None
+                target = rows[idx[f["key"]]]
+                return {
+                    "key": key, "label": self.label(key), "count": count,
+                    "chain_key": target["key"], "chain_label": target["label"],
+                    "known_here": 0,
+                    "new": count * reach,
+                    "below_known": False,
+                    "via": "measured", "via_rate": round_to(reach, 6),
+                    "via_label": target["label"],
+                }
+        return None
+
+    def constrained_combine(self, counts, days=None):
+        """כמה יתגייסו מהכמויות שהוזנו, לפי תזרים הליך הגיוס.
+
+        הפלט בנוי כמו זה של constrained_plan - אותן שורות, אותם שני
+        נתיבים - כדי ששני הכיוונים ייראו וייקראו אותו דבר.
+
+        הזמנים (days_median) ממשיכים לבוא מהמדידה בקבצים. הכמויות
+        באות מהתזרים בלבד.
+        """
+        packed = self._flow_rows()
+        if packed is None:
+            return None
+        af, rows, idx = packed
+        span, known_span = self._flow_span(days)
+        if span is None:
+            return None
+
+        entries = []
+        for key in self.stage_keys():
+            n = counts.get(key)
+            if n is None:
+                continue
+            e = self.constrained_entry(key, n, days)
+            if e is not None:
+                entries.append(e)
+        if not entries:
+            return None
+
+        chain = af["chain"]
+        n_chain = len(chain)
+        new_at = [0.0] * len(rows)
+        sources = [[] for _ in rows]
+
+        for e in entries:
+            i = idx[e["chain_key"]]
+            v = e["new"]
+            new_at[i] += v
+            sources[i].append({"entry": e, "new": v, "days_median": 0.0})
+            for j in range(i, n_chain):
+                v = v * chain[j]["rate_to_next"]
+                new_at[j + 1] += v
+                sources[j + 1].append({
+                    "entry": e, "new": v,
+                    "days_median": self._measured_days(e["key"], rows[j + 1]["key"]),
+                })
+
+        # מאיזו שורה מתחילה התצוגה. גזירה קדימה בלבד: שלב שנתלה על
+        # מארח מוקדם יותר (תחנת צד) אינו מציג את המארח, אלא את עצמו
+        # ואת מה שאחריו.
+        def entry_start(e):
+            i = idx[e["chain_key"]]
+            return i + 1 if e["via"] == "aside" else i
+
+        start = min(entry_start(e) for e in entries)
+
+        def source_list(items):
+            return [{
+                "from": s["entry"]["key"],
+                "from_label": s["entry"]["label"],
+                "from_count": s["entry"]["count"],
+                "count": round_half_up(s["new"]),
+                "days_median": s["days_median"],
+            } for s in items]
+
+        def weighted_days(items):
+            timed = [s for s in items if s["days_median"] is not None]
+            if not timed:
+                return None
+            weight = sum(s["new"] for s in timed)
+            if weight:
+                return round_to(
+                    sum(s["new"] * s["days_median"] for s in timed) / weight, 1)
+            return round_to(sum(s["days_median"] for s in timed) / len(timed), 1)
+
+        out = []
+        for i in range(start, len(rows)):
+            row = rows[i]
+            new_i = round_half_up(new_at[i])
+            known_i = round_half_up(known_span) if row["known_passes"] else 0
+            total = new_i + known_i
+            out.append({
+                "key": row["key"], "label": row["label"],
+                "is_hire": i == len(rows) - 1,
+                "is_source": any(s["entry"]["key"] == row["key"]
+                                 for s in sources[i]),
+                "total": total, "new": new_i, "known": known_i,
+                "known_passes": row["known_passes"],
+                "rate_to_next": row["rate_to_next"],
+                "to_next": row["to_next"],
+                "per_day": round_to(total / span, 3),
+                "days_median": weighted_days(sources[i]),
+                "weighted": len(sources[i]) > 1,
+                "sources": source_list(sources[i]),
+            })
+
+        entered_keys = [e["key"] for e in entries]
+        aside = []
+        for a in af["aside"]:
+            i = idx[a["after"]]
+            is_src = a["key"] in entered_keys
+            if i < start and not is_src:
+                continue
+            total = (next(e["count"] for e in entries if e["key"] == a["key"])
+                     if is_src else round_half_up(new_at[i] * a["share_of_host"]))
+            aside.append({
+                "key": a["key"], "label": a["label"], "after": a["after"],
+                "total": total, "share_of_host": a["share_of_host"],
+                "per_day": round_to(total / span, 3),
+                "days_median": 0.0 if is_src else weighted_days(sources[i]),
+                "is_source": is_src,
+                # תחנת צד שהוזנה יושבת לפני השורה הראשונה שמוצגת, ולכן
+                # היא מצוירת בראש ולא אחרי המארח שלה - שאינו מוצג.
+                "before_start": is_src and i < start,
+            })
+
+        # שלב שאינו על השרשרת ואינו תחנת צד (זימון למבחן מקוון) מוצג
+        # כשורת מקור לפני השרשרת, עם הגשר שדרכו הוא נכנס אליה.
+        extra = [{
+            "key": e["key"], "label": e["label"], "total": e["count"],
+            "is_source": True, "via": e["via"], "via_rate": e["via_rate"],
+            "via_label": e["via_label"],
+            "per_day": round_to(e["count"] / span, 3),
+        } for e in entries if e["via"] == "measured"]
+
+        hire = out[-1]
+        # מה מזה נכנס בתוך החלון. האוכלוסייה המוכרת מתחלקת אחיד ולכן
+        # כולה בפנים; החדשה נמדדת מעקומת הגיוס של השלב שממנו היא באה.
+        in_time = None
+        if days is not None and days >= 0:
+            acc = float(hire["known"])
+            for s in sources[len(rows) - 1]:
+                share = self.curve_share(s["entry"]["key"], days)
+                acc += s["new"] * (0.0 if share is None else share)
+            in_time = round_half_up(acc)
+
+        return {
+            "days": days, "span_days": span, "annual": days is None,
+            "year": af["year"], "source": af["source"],
+            "known": {
+                "label": af["known"]["label"], "hires": hire["known"],
+                "per_year": af["known"]["hires_per_year"],
+                "ratio": af["known"]["ratio"],
+            },
+            "new": {
+                "label": af["new"]["label"], "hires": hire["new"],
+                "ratio": af["new"]["ratio_measured"],
+                "hire_rate": af["new"]["hire_rate"],
+            },
+            "hires": hire["total"],
+            "hires_in_time": in_time,
+            "entries": entries,
+            "start_key": rows[start]["key"],
+            "rows": out,
+            "aside": aside,
+            "extra": extra,
+            "overlap_warning": len(entries) > 1,
+        }
+
+    def constrained_gap(self, counts, target_hires, days=None):
+        """כמה עוד צריך: היעד פחות מה שכבר בדרך, לפי אותו תזרים.
+
+        מה שכבר בדרך כולל את האוכלוסייה המוכרת גם כשלא הוזן שום שלב -
+        היא מתגייסת בלי תלות במשפך. כל תוספת נופלת על האוכלוסייה
+        החדשה בלבד, ולכן הדרישה בכל שלב היא הפער חלקי מכפלת שיעורי
+        המעבר מאותו שלב ועד הגיוס.
+        """
+        packed = self._flow_rows()
+        if packed is None or target_hires is None:
+            return None
+        af, rows, idx = packed
+        span, known_span = self._flow_span(days)
+        if span is None:
+            return None
+
+        proj = self.constrained_combine(counts, days)
+        have = proj["hires"] if proj else round_half_up(known_span)
+        gap = target_hires - have
+
+        to_hire = {}
+        p = 1.0
+        for r in reversed(af["chain"]):
+            p = p * r["rate_to_next"]
+            to_hire[r["key"]] = p
+
+        out = []
+        for r in af["chain"]:
+            share = to_hire[r["key"]]
+            required = (round_half_up(gap / share)
+                        if gap > 0 and share else (0 if gap <= 0 else None))
+            out.append({
+                "key": r["key"], "label": r["label"],
+                "rate": round_to(share, 6),
+                "required": required,
+                "per_day": (None if required is None
+                            else round_to(required / span, 3)),
+            })
+
+        return {
+            "target": target_hires, "have": have, "gap": gap,
+            "days": days, "span_days": span, "annual": days is None,
+            "year": af["year"],
+            "known": {"label": af["known"]["label"],
+                      "hires": round_half_up(known_span),
+                      "per_year": af["known"]["hires_per_year"]},
+            "projected": proj,
+            "rows": out,
+        }
+
+    def constrained_timeline(self, counts, days=None):
+        """מתי יתגייסו: הגיוסים הצפויים מפוזרים על חלונות הזמן.
+
+        האוכלוסייה החדשה מתפזרת לפי התפלגות הזמנים שנמדדה לשלב שממנו
+        היא נגזרת. האוכלוסייה המוכרת אינה נגזרת משום שלב - היא
+        מתחלקת אחיד על פני החלון, ולכן היא מפוזרת לפי אורך כל חלון.
+        """
+        proj = self.constrained_combine(counts, days)
+        if proj is None:
+            return None
+        af, rows, idx = self._flow_rows()
+        span, known_span = self._flow_span(days)
+
+        base = [{"key": b["key"], "label": b["label"], "share": 0.0,
+                 "hires": 0, "sources": []} for b in self.buckets]
+
+        chain = af["chain"]
+        to_hire = {}
+        p = 1.0
+        for r in reversed(chain):
+            p = p * r["rate_to_next"]
+            to_hire[r["key"]] = p
+        to_hire[af["hire_row"]["key"]] = 1.0
+
+        for e in proj["entries"]:
+            hires = e["new"] * to_hire[e["chain_key"]]
+            stage = self.stage(e["key"])
+            parts = self.spread(hires, stage["buckets"])
+            for i, part in enumerate(parts):
+                base[i]["hires"] += part["count"]
+                base[i]["sources"].append({
+                    "from": e["key"], "from_label": e["label"],
+                    "from_count": e["count"], "hires": part["count"],
+                    "share": part["share"],
+                })
+
+        # הנתיב המוכר: אחיד על פני החלון. חלון זמן שכולו אחרי סוף
+        # התקופה אינו מקבל דבר, והשאר מנורמלים לסכום אחד.
+        widths = []
+        for b in self.buckets:
+            lo = b["min_days"]
+            hi = span if b["max_days"] is None else min(b["max_days"], span)
+            widths.append(max(0.0, hi - lo) if lo < span else 0.0)
+        total_width = sum(widths)
+        known_buckets = [{
+            "key": b["key"], "label": b["label"],
+            "share": (widths[i] / total_width) if total_width else None,
+        } for i, b in enumerate(self.buckets)]
+        known_parts = self.spread(proj["known"]["hires"], known_buckets)
+        for i, part in enumerate(known_parts):
+            base[i]["hires"] += part["count"]
+            if part["count"]:
+                base[i]["sources"].append({
+                    "from": None, "from_label": proj["known"]["label"],
+                    "from_count": proj["known"]["hires"],
+                    "hires": part["count"], "share": part["share"],
+                })
+
+        total = sum(r["hires"] for r in base)
+        for r in base:
+            r["share"] = round_to(r["hires"] / total, 6) if total else 0.0
+        return {"rows": base, "total": total, "buckets": len(base),
+                "known": proj["known"]["hires"], "new": proj["new"]["hires"]}
+
     def gap_pipeline(self, counts, target_hires, key, days=None):
         """אותה השלמה, כמשפך רציף אחד משלב כניסה נבחר."""
         plan = self.gap_plan(counts, target_hires, days)

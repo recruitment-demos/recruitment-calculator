@@ -88,9 +88,16 @@ def build_scenarios(eng):
             scenarios.append({"op": "combined_when", "counts": dict(counts)})
             scenarios.append({"op": "combined_timeline", "counts": dict(counts)})
             scenarios.append({"op": "combined_matrix", "counts": dict(counts)})
+            for d in (None, 10, 30, 122, 365, 400):
+                scenarios.append({"op": "constrained_combine",
+                                  "counts": dict(counts), "days": d})
+                scenarios.append({"op": "constrained_timeline",
+                                  "counts": dict(counts), "days": d})
             for t in TARGETS:
                 for d in (None, 10, 30, 122, 400):
                     scenarios.append({"op": "manager_plan", "counts": dict(counts),
+                                      "target": t, "days": d})
+                    scenarios.append({"op": "constrained_gap", "counts": dict(counts),
                                       "target": t, "days": d})
             for d in DAYS:
                 scenarios.append({"op": "combined_by_day",
@@ -116,6 +123,13 @@ def build_scenarios(eng):
                 scenarios.append({"op": "combined_matrix", "counts": dict(counts)})
                 scenarios.append({"op": "manager_plan", "counts": dict(counts),
                                   "target": 400, "days": 122})
+                for d in (None, 122, 365):
+                    scenarios.append({"op": "constrained_combine",
+                                      "counts": dict(counts), "days": d})
+                    scenarios.append({"op": "constrained_timeline",
+                                      "counts": dict(counts), "days": d})
+                    scenarios.append({"op": "constrained_gap", "counts": dict(counts),
+                                      "target": 4000, "days": d})
                 for d in DAYS:
                     scenarios.append({"op": "combined_by_day",
                                       "counts": dict(counts), "days": d})
@@ -135,6 +149,13 @@ def build_scenarios(eng):
 
     # כל השלבים יחד, וגם שלב ללא נתונים
     counts_all = {k: (500 if eng.has_rate(k) else 999) for k in keys}
+    for d in (None, -1, 0, 30, 365):
+        scenarios.append({"op": "constrained_combine",
+                          "counts": dict(counts_all), "days": d})
+        scenarios.append({"op": "constrained_timeline",
+                          "counts": dict(counts_all), "days": d})
+        scenarios.append({"op": "constrained_gap", "counts": dict(counts_all),
+                          "target": 4000, "days": d})
     scenarios.append({"op": "combine", "counts": dict(counts_all)})
     scenarios.append({"op": "cross_check", "counts": dict(counts_all)})
     scenarios.append({"op": "combined_when", "counts": dict(counts_all)})
@@ -176,6 +197,24 @@ def build_scenarios(eng):
     for t in (0, 1, 700, 1418, 1419, 3294, 4000, 9999):
         for d in (None, -1, 0, 1, 30, 122, 182, 365, 730):
             scenarios.append({"op": "constrained_plan", "target": t, "days": d})
+            scenarios.append({"op": "constrained_gap", "counts": {}, "target": t,
+                              "days": d})
+
+    # הכיוון ההפוך: כמות בכל שלב, כולל כמות שקטנה מהנתיב המוכר וכמות
+    # שאינה על השרשרת כלל
+    for k in keys:
+        for c in (0, 1, 700, 1418, 5000, 60000, 82016):
+            for d in (None, -1, 0, 30, 122, 365, 730):
+                counts = {x: None for x in keys}
+                counts[k] = c
+                scenarios.append({"op": "constrained_entry", "stage": k,
+                                  "count": c, "days": d})
+                scenarios.append({"op": "constrained_combine",
+                                  "counts": dict(counts), "days": d})
+                scenarios.append({"op": "constrained_timeline",
+                                  "counts": dict(counts), "days": d})
+                scenarios.append({"op": "constrained_gap", "counts": dict(counts),
+                                  "target": 4000, "days": d})
 
     return scenarios
 
@@ -226,6 +265,14 @@ def python_result(eng, sc):
         return eng.spread(sc["total"], sc["buckets"])
     if op == "constrained_plan":
         return eng.constrained_plan(sc["target"], sc.get("days"))
+    if op == "constrained_entry":
+        return eng.constrained_entry(sc["stage"], sc["count"], sc.get("days"))
+    if op == "constrained_combine":
+        return eng.constrained_combine(sc["counts"], sc.get("days"))
+    if op == "constrained_gap":
+        return eng.constrained_gap(sc["counts"], sc["target"], sc.get("days"))
+    if op == "constrained_timeline":
+        return eng.constrained_timeline(sc["counts"], sc.get("days"))
     if op == "throughput_plan":
         return eng.throughput_plan(sc["target"], sc.get("days"))
     if op == "manager_plan":

@@ -1629,6 +1629,177 @@ class TestConstrainedPlan(unittest.TestCase):
 
 
 
+class TestConstrainedForward(unittest.TestCase):
+    """הכיוון ההפוך של המחשבון עם האילוצים.
+
+    התקלה שדווחה: 60,000 הגשות החזירו 1,923 גיוסים - רק המסלול החדש.
+    האוכלוסייה המוכרת, 1,418 גיוסים בשנה שאינם עוברים בהליך המיון,
+    לא נספרה כלל. המשתמש דרש ששני הכיוונים יעמדו על אותה אריתמטיקה.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.eng = load_engine()
+        cls.keys = [s["key"] for s in cls.eng.stages]
+
+    def counts(self, key, value):
+        c = {k: None for k in self.keys}
+        c[key] = value
+        return c
+
+    def test_the_known_lane_is_counted_and_the_bug_is_gone(self):
+        """1,418 המגויסים שאינם עוברים מיון נספרים גם בכיוון הזה."""
+        flow = self.eng.constrained_combine(self.counts("submissions", 60000))
+        self.assertEqual(flow["known"]["hires"], 1418)
+        self.assertEqual(flow["hires"],
+                         flow["known"]["hires"] + flow["new"]["hires"])
+        # המספר הישן, בלי הנתיב המוכר, היה 1,923
+        self.assertGreater(flow["hires"], 3000)
+        self.assertLess(flow["hires"], 3600)
+
+    def test_the_two_directions_are_an_exact_inverse(self):
+        """הזנת מה שהתכנון החזיר חייבת להחזיר את היעד עצמו.
+
+        זו הדרישה המפורשת: אותה אריתמטיקה בשני הכיוונים. היא גם הסיבה
+        שהאוכלוסייה המוכרת מנוכה מהכמות שמוזנת - בתרשים היא עוברת
+        בהגשות ככל השאר, ולכן היא כלולה בכמות ההגשות.
+        """
+        for target in (1419, 2000, 3294, 4000, 9999):
+            for days in (None, 30, 182, 365, 730):
+                plan = self.eng.constrained_plan(target, days)
+                back = self.eng.constrained_combine(
+                    self.counts("submissions", plan["submissions"]), days)
+                if plan["shortfall"]:
+                    # יעד שקטן מהנתיב הקבוע מושג בלי אף הגשה, ולכן
+                    # הנתיב לבדו כבר עובר אותו. אין כאן היפוך, ואין
+                    # צריך להיות - זו תשובה אמיתית ולא קצה שלא טופל.
+                    self.assertGreaterEqual(back["hires"], target)
+                    continue
+                self.assertLessEqual(
+                    abs(back["hires"] - target), 1,
+                    f"יעד {target} בחלון {days}: חזר {back['hires']}")
+
+    def test_a_short_window_gets_less_of_the_fixed_lane(self):
+        """הנתיב הקבוע מתחלק אחיד, ולכן חלון קצר מקבל ממנו פחות."""
+        year = self.eng.constrained_combine(self.counts("submissions", 60000))
+        half = self.eng.constrained_combine(
+            self.counts("submissions", 60000), 182)
+        self.assertLess(half["known"]["hires"], year["known"]["hires"])
+        self.assertEqual(half["known"]["hires"], round_half_up(1418 * 182 / 365))
+
+    def test_it_never_derives_backwards(self):
+        """מכמות בשלב מסוים לא נגזר דבר על השלבים שלפניו."""
+        flow = self.eng.constrained_combine(self.counts("yachbam", 5000))
+        self.assertEqual([r["key"] for r in flow["rows"]], ["yachbam", "hire"])
+        self.assertEqual(flow["start_key"], "yachbam")
+
+    def test_a_side_station_hangs_on_its_host_without_showing_it(self):
+        """מרכז הערכה נתלה על «יום מיון», אך המארח אינו מוצג - הוא מוקדם יותר."""
+        flow = self.eng.constrained_combine(self.counts("assessment", 1000))
+        self.assertEqual([r["key"] for r in flow["rows"]], ["yachbam", "hire"])
+        entry = flow["entries"][0]
+        self.assertEqual(entry["via"], "aside")
+        self.assertEqual(entry["chain_key"], "screening_day")
+        src = [a for a in flow["aside"] if a["is_source"]]
+        self.assertEqual(len(src), 1)
+        self.assertTrue(src[0]["before_start"])
+
+    def test_a_stage_outside_the_chart_says_so(self):
+        """«זימון למבחן מקוון» אינו בתרשים, והגשר אליו נמדד מהקבצים."""
+        flow = self.eng.constrained_combine(self.counts("online_invite", 10000))
+        entry = flow["entries"][0]
+        self.assertEqual(entry["via"], "measured")
+        self.assertEqual(entry["chain_key"], "online_day")
+        self.assertIsNotNone(entry["via_rate"])
+        self.assertEqual([x["key"] for x in flow["extra"]], ["online_invite"])
+
+    def test_a_quantity_below_the_fixed_lane_is_flagged(self):
+        """הכמות היא נפח לאורך החלון, ולכן היא כוללת את הנתיב הקבוע."""
+        flow = self.eng.constrained_combine(self.counts("yachbam", 500))
+        entry = flow["entries"][0]
+        self.assertTrue(entry["below_known"])
+        self.assertEqual(entry["new"], 0.0)
+        self.assertEqual(flow["hires"], flow["known"]["hires"])
+
+    def test_the_times_come_from_the_files_not_from_the_chart(self):
+        """התרשים נושא יחסים בלבד. הזמנים ממשיכים להימדד בקבצים."""
+        flow = self.eng.constrained_combine(self.counts("submissions", 60000))
+        self.assertEqual(flow["rows"][0]["days_median"], 0.0)
+        later = [r for r in flow["rows"] if r["key"] != "submissions"]
+        self.assertTrue(all(r["days_median"] > 0 for r in later))
+        # הזמן עולה ככל שמתקדמים בשרשרת
+        days = [r["days_median"] for r in flow["rows"]]
+        self.assertEqual(days, sorted(days))
+
+    def test_the_gap_is_measured_against_the_same_engine(self):
+        """«כמה עוד צריך» נשען על אותו תזרים, ולא על מודל אחר."""
+        counts = self.counts("submissions", 30000)
+        flow = self.eng.constrained_combine(counts)
+        gap = self.eng.constrained_gap(counts, 4000)
+        self.assertEqual(gap["have"], flow["hires"])
+        self.assertEqual(gap["gap"], 4000 - flow["hires"])
+        full = self.eng.constrained_plan(4000)["submissions"]
+        # מה שכבר יש ועוד ההשלמה = הדרישה המלאה, עד עיגול לאנשים שלמים
+        self.assertLessEqual(abs(30000 + gap["rows"][0]["required"] - full), 40)
+
+    def test_an_empty_pipeline_still_has_the_fixed_lane(self):
+        """בלי שום מלאי עדיין מתגייסים אלה שאינם עוברים בהליך."""
+        gap = self.eng.constrained_gap({k: None for k in self.keys}, 4000)
+        self.assertEqual(gap["have"], 1418)
+        self.assertEqual(gap["gap"], 4000 - 1418)
+
+    def test_the_timeline_adds_up_to_the_hires(self):
+        """פיזור הגיוסים על הזמן מסתכם בדיוק במספר הגיוסים."""
+        for key, n in (("submissions", 60000), ("file_check", 20000),
+                       ("yachbam", 6000)):
+            for days in (None, 122, 365):
+                counts = self.counts(key, n)
+                flow = self.eng.constrained_combine(counts, days)
+                tl = self.eng.constrained_timeline(counts, days)
+                self.assertEqual(sum(r["hires"] for r in tl["rows"]),
+                                 tl["total"])
+                self.assertEqual(tl["total"], flow["hires"])
+
+    def test_the_fixed_lane_is_spread_evenly_over_the_window(self):
+        """הנתיב הקבוע אינו נגזר משלב, ולכן הוא מתחלק לפי אורך החלון."""
+        counts = self.counts("submissions", 0)
+        tl = self.eng.constrained_timeline(counts)
+        self.assertEqual(tl["new"], 0)
+        self.assertEqual(tl["total"], 1418)
+        # כל חלון קיבל משהו, והחלון הארוך ביותר קיבל את הרוב
+        self.assertTrue(all(r["hires"] > 0 for r in tl["rows"]))
+        widest = max(tl["rows"], key=lambda r: r["hires"])
+        self.assertEqual(widest["key"], tl["rows"][-1]["key"])
+
+    def test_every_stage_that_can_be_entered_gets_an_answer(self):
+        """הדרישה: המחשבון עובד לכל שלב ולכל כיוון."""
+        for key in self.eng.stage_keys(True):
+            flow = self.eng.constrained_combine(self.counts(key, 20000))
+            self.assertIsNotNone(flow, key)
+            self.assertGreater(flow["hires"], 0, key)
+            self.assertEqual(flow["rows"][-1]["key"], self.eng.hire_key, key)
+
+    def test_a_deadline_shows_what_fits_inside_it(self):
+        """עם מועד, מוצג מה שמספיק להתגייס עד אליו - ולא סך הכול."""
+        counts = self.counts("submissions", 60000)
+        timed = self.eng.constrained_combine(counts, 60)
+        self.assertIsNotNone(timed["hires_in_time"])
+        self.assertLess(timed["hires_in_time"], timed["hires"])
+        # הנתיב הקבוע כולו בתוך החלון, ולכן לעולם לא פחות ממנו
+        self.assertGreaterEqual(timed["hires_in_time"], timed["known"]["hires"])
+        self.assertIsNone(
+            self.eng.constrained_combine(counts, None)["hires_in_time"])
+
+    def test_the_required_pace_is_the_quantity_over_the_window(self):
+        """הקצב הנדרש: כמה מועמדים ביום בכל שלב."""
+        plan = self.eng.constrained_plan(4000, 200)
+        for row in plan["rows"]:
+            self.assertAlmostEqual(row["per_day"], row["total"] / 200, places=2)
+        gap = self.eng.constrained_gap({k: None for k in self.keys}, 4000, 200)
+        for row in gap["rows"]:
+            self.assertAlmostEqual(row["per_day"], row["required"] / 200,
+                                   places=2)
+
 
 if __name__ == "__main__":
     unittest.main()

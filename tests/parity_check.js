@@ -78,6 +78,14 @@ for (const sc of scenarios) {
     results.push(Engine.spread(sc.total, sc.buckets));
   } else if (sc.op === "constrained_plan") {
     results.push(Engine.constrainedPlan(sc.target, sc.days));
+  } else if (sc.op === "constrained_entry") {
+    results.push(Engine.constrainedEntry(sc.stage, sc.count, sc.days));
+  } else if (sc.op === "constrained_combine") {
+    results.push(Engine.constrainedCombine(sc.counts, sc.days));
+  } else if (sc.op === "constrained_gap") {
+    results.push(Engine.constrainedGap(sc.counts, sc.target, sc.days));
+  } else if (sc.op === "constrained_timeline") {
+    results.push(Engine.constrainedTimeline(sc.counts, sc.days));
   } else if (sc.op === "throughput_plan") {
     results.push(Engine.throughputPlan(sc.target, sc.days));
   } else if (sc.op === "manager_plan") {

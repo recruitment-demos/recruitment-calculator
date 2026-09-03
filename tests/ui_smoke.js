@@ -108,8 +108,11 @@ const infoOf = node => {
   (node.children || []).forEach(c => { out += " " + infoOf(c); });
   return out;
 };
+const at = id => registry[id] || { children: [], attributes: {}, textContent: "" };
 const hasInfo = (row, min) => infoOf(row).trim().length > (min || 10);
 const fval = row => {
+  // הטקסט של התא עצמו בלבד. מתחתיו יושב small עם הזמן או הקצב, ואסור
+  // שהספרות שלו ייספרו כחלק מהכמות.
   const v = (row.children || []).filter(c => c.classList.contains("fval"))[0];
   return v ? v.textContent : "";
 };
@@ -119,6 +122,8 @@ const inDays = n => {
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") +
          "-" + String(d.getDate()).padStart(2, "0");
 };
+const flowRows = () => registry.flowBody.children;
+const constraintRows = () => registry.constraintBody.children;
 
 check("שדות הקלט נבנו", () =>
   stageKeys.every(k => registry["in_" + k]) && registry.in_target ? null : "חסר שדה קלט");
@@ -126,7 +131,9 @@ check("שדות הקלט נבנו", () =>
 check("ההסבר הכללי יושב בחלון ולא בעמוד", () => {
   const t = infoOf(registry.aboutBtn);
   if (t.length < 400) return "ההסבר הכללי קצר מדי או חסר";
-  return t.includes("מגבלות") ? null : "אין מגבלות בהסבר הכללי";
+  if (!t.includes("מגבלות")) return "אין מגבלות בהסבר הכללי";
+  return t.includes("שני כיוונים") || t.includes("בשני כיוונים")
+    ? null : "ההסבר אינו אומר שהמחשבון עובד בשני כיוונים";
 });
 
 check("חלון ההסבר נפתח ונסגר", () => {
@@ -144,142 +151,9 @@ check("בלי קלט התוצאות נשארות מוסתרות", () => {
   return shown("results") ? "התוצאות הוצגו בלי קלט" : null;
 });
 
-for (const key of withData) {
-  check("גזירה קדימה משלב " + key, () => {
-    clearAll();
-    setVal(key, "1000");
-    sandbox.calculate();
-    if (!shown("results")) return "אזור התוצאות מוסתר";
-    ["heroCard", "funnelCard", "whenCard", "gapCard"].forEach(id => {
-      if (!revealed(id)) throw new Error("הכרטיס " + id + " לא הופיע");
-    });
-    const proj = sandbox.Engine.projectCohort(key, 1000);
-    if (num(registry.heroValue.textContent) !== proj.hires)
-      return "מספר המגויסים אינו תואם את המנוע";
-    // מספר שורות המשפך = שלבי הקבוצה + שלבים ללא נתונים
-    const noData = D.stages.filter(s => !s.has_data).length;
-    if (registry.funnelBody.children.length !== proj.steps.length + noData)
-      return "מספר שורות משפך שגוי: " + registry.funnelBody.children.length;
-    if (!registry.whenBody.children.length) return "גרף הזמנים ריק";
-    return null;
-  });
-}
-
-check("כל מספר במשפך מסומן ממה נגזר", () => {
-  clearAll();
-  setVal("file_check", "5000");
-  sandbox.calculate();
-  const missing = registry.funnelBody.children.filter(r => !hasInfo(r, 3));
-  return missing.length ? missing.length + " שורות בלי מקור" : null;
-});
-
-check("שורת המשפך מציגה שם וכמות בלבד", () => {
-  // שם השלב (עם ⓘ ואחוז), פס, כמות. שורת מלל רביעית אינה קיימת עוד.
-  clearAll();
-  setVal("file_check", "5000");
-  sandbox.calculate();
-  const bad = registry.funnelBody.children.filter(r => r.children.length !== 3);
-  if (bad.length) return bad.length + " שורות עם יותר משלושה חלקים";
-  const prose = registry.funnelBody.children.filter(r =>
-    (r.children || []).some(c => c.classList.contains("fsrc")));
-  return prose.length ? "נשאר מלל בגוף השורה" : null;
-});
-
-check("אין גזירה לאחור", () => {
-  clearAll();
-  setVal("yachbam", "300");
-  sandbox.calculate();
-  const text = allText(registry.funnelBody);
-  // בדיקת קבצים קודמת ליחב"מ ולכן אסור שתופיע עם מספר גזור
-  const proj = sandbox.Engine.projectCohort("yachbam", 300);
-  const keys = proj.steps.map(s => s.key);
-  return keys.indexOf("file_check") === -1 && !text.includes("בדיקת קבצים ")
-    ? null : "הופיע שלב מוקדם יותר";
-});
-
-const whenRows = () => registry.whenBody.children
-  .filter(c => c.classList.contains("tl"))[0].children
-  .filter(c => c.classList.contains("tlrow"));
-
-check("גרף הזמנים מציג שלב, כמות וימים", () => {
-  clearAll();
-  setVal("file_check", "5000");
-  sandbox.calculate();
-  const proj = sandbox.Engine.projectCohort("file_check", 5000);
-  const rows = whenRows();
-  if (rows.length !== proj.steps.length - 1)
-    return "מספר שורות זמן שגוי: " + rows.length;
-  const txt = allText(rows[0]);
-  return txt.includes("מועמדים") ? null : "אין כמות בשורת הזמן";
-});
-
-check("גרף הזמנים הוא גרף אחד, לא גרף לכל קבוצה", () => {
-  clearAll();
-  setVal("file_check", "5000");
-  setVal("yachbam", "300");
-  sandbox.calculate();
-  const charts = registry.whenBody.children.filter(c => c.classList.contains("tl"));
-  if (charts.length !== 1) return "נמצאו " + charts.length + " גרפים במקום אחד";
-  const keys = sandbox.Engine.combinedWhen({ file_check: 5000, yachbam: 300 })
-    .map(r => r.key);
-  if (new Set(keys).size !== keys.length) return "שלב הופיע יותר מפעם אחת";
-  return whenRows().length === keys.length ? null : "מספר שורות שגוי";
-});
-
-check("שורה מאוחדת מפרטת את כל הקבוצות שתרמו לה", () => {
-  clearAll();
-  setVal("file_check", "5000");
-  setVal("online_day", "800");
-  sandbox.calculate();
-  const hire = whenRows().filter(r => r.classList.contains("hire"))[0];
-  const txt = infoOf(hire);
-  return txt.includes("בדיקת קבצים") && txt.includes("יום מיון מקוון")
-    ? null : "השורה המאוחדת לא מפרטת את שתי הקבוצות";
-});
-
-check("גרף מועדי הגיוס הוא גרף אחד", () => {
-  clearAll();
-  setVal("file_check", "5000");
-  setVal("yachbam", "300");
-  sandbox.calculate();
-  if (registry.timelineBody.children.length !== 1)
-    return "נמצאו " + registry.timelineBody.children.length + " גרפים במקום אחד";
-  const merged = sandbox.Engine.combinedTimeline({ file_check: 5000, yachbam: 300 });
-  const rows = registry.timelineBody.children[0].children
-    .filter(c => c.classList.contains("bars"))[0].children;
-  if (rows.length !== merged.rows.length) return "מספר חלונות זמן שגוי";
-  const missing = rows.filter(r => !hasInfo(r, 3));
-  return missing.length ? missing.length + " שורות בלי מקור" : null;
-});
-
-check("שתי קבוצות מסתכמות ומזהירות מכפילות", () => {
-  clearAll();
-  setVal("file_check", "5000");
-  setVal("yachbam", "300");
-  sandbox.calculate();
-  const a = sandbox.Engine.projectCohort("file_check", 5000).hires;
-  const b = sandbox.Engine.projectCohort("yachbam", 300).hires;
-  if (num(registry.heroValue.textContent) !== a + b) return "הסכום שגוי";
-  const warned = registry.gapBody.children.some(c => c.classList.contains("warn"));
-  if (!warned) return "אין אזהרת חפיפה";
-  if (registry.whenBody.children.filter(c => c.classList.contains("tl")).length !== 1)
-    return "גרף הזמנים אינו מאוחד";
-  return null;
-});
-
-check("בדיקת עקביות מוצגת", () => {
-  clearAll();
-  setVal("file_check", "5000");
-  setVal("yachbam", "10");
-  sandbox.calculate();
-  return registry.gapBody.children.some(c => c.textContent.includes("חסרים"))
-    ? null : "לא הוצגה בדיקת עקביות";
-});
-
 /* ------------------------------------------------------------------ *
- *  מצב תכנון מיעד. התשובה היחידה היא המחשבון עם האילוצים.              *
+ *  כיוון א': רק יעד                                                    *
  * ------------------------------------------------------------------ */
-const constraintRows = () => registry.constraintBody.children;
 
 check("מצב תכנון מיעד נפתח כשהוזן רק יעד", () => {
   clearAll();
@@ -291,40 +165,54 @@ check("מצב תכנון מיעד נפתח כשהוזן רק יעד", () => {
     return "ההגשות הדרושות לא הוצגו: " + registry.heroValue.textContent;
   if (!registry.heroCap.textContent.includes("400")) return "היעד לא נזכר";
   if (!registry.heroCap.textContent.includes("הגשות")) return "כותרת שגויה";
-  if (!shown("constraintCard")) return "המחשבון עם האילוצים מוסתר";
-  if (shown("whenCard")) return "גרף הזמנים היה צריך להיות מוסתר";
-  if (shown("timelineCard")) return "גרף ההתפלגות היה צריך להיות מוסתר";
-  return null;
+  return shown("constraintCard") ? null : "המחשבון עם האילוצים מוסתר";
 });
 
 check("במצב יעד מוצגת תשובה אחת בלבד", () => {
-  // התקלה שדווחה: העמוד הציג שלוש תשובות שונות לאותה שאלה, ואחת מהן
-  // (61,359 הגשות) הכפילה גם את הנתיב המוכר - מה שאינו אפשרי.
   clearAll();
   setVal("target", "4000");
   sandbox.calculate();
-  const open = ["heroCard", "constraintCard", "gapCardPlan", "funnelCard",
-                "matrixCard", "whenCard", "timelineCard"].filter(shown);
+  const open = ["heroCard", "constraintCard", "flowCard", "gapCardPlan",
+                "timelineCard"].filter(shown);
   return JSON.stringify(open) === JSON.stringify(["heroCard", "constraintCard"])
     ? null : "הוצגו כרטיסים נוספים: " + open.join(", ");
+});
+
+check("ההגשות הדרושות ל-4,000 הן כ-82 אלף", () => {
+  clearAll();
+  setVal("target", "4000");
+  sandbox.calculate();
+  const v = num(registry.heroValue.textContent);
+  if (v !== sandbox.Engine.constrainedPlan(4000, null).submissions)
+    return "המספר אינו של מודל האילוצים: " + v;
+  if (v < 70000 || v > 95000) return "כמות ההגשות אינה סבירה: " + v;
+  const thr = sandbox.Engine.throughputPlan(4000, null);
+  const thrSub = thr.rows.filter(r => r.key === "submissions")[0].required;
+  const req = sandbox.Engine.requiredPlan(4000, null)
+    .rows.filter(r => r.key === "submissions")[0].required;
+  const page = allText(registry.constraintBody) + " " +
+               allText(registry.constraintLanes) + " " +
+               registry.heroValue.textContent;
+  if (page.includes(thrSub.toLocaleString("he-IL")))
+    return "מספר ההכפלה הרוחבית עדיין בעמוד";
+  if (page.includes(req.toLocaleString("he-IL")))
+    return "מספר שיעור הקוהורט עדיין בעמוד";
+  return null;
 });
 
 check("המשפך עם האילוצים מציג את כל השרשרת ואת תחנת הצד", () => {
   clearAll();
   setVal("target", "4000");
   sandbox.calculate();
-  if (!shown("constraintCard")) return "הכרטיס מוסתר";
   const plan = sandbox.Engine.constrainedPlan(4000, null);
   const rows = constraintRows();
   if (rows.length !== plan.rows.length + plan.aside.length)
     return "מספר שורות שגוי: " + rows.length;
-  // מרכז הערכה מסומן כתחנת צד ואינו בשרשרת
   const asideRows = rows.filter(r => r.classList.contains("aside"));
   if (asideRows.length !== plan.aside.length)
     return "מרכז הערכה אינו מסומן כתחנת צד";
-  if (!infoOf(asideRows[0]).includes("לא בשרשרת"))
-    return "תחנת הצד אינה אומרת שהיא מחוץ לשרשרת";
-  return null;
+  return infoOf(asideRows[0]).includes("לא בשרשרת")
+    ? null : "תחנת הצד אינה אומרת שהיא מחוץ לשרשרת";
 });
 
 check("הכמויות במשפך האילוצים תואמות את המנוע", () => {
@@ -335,8 +223,7 @@ check("הכמויות במשפך האילוצים תואמות את המנוע",
   const shownNums = constraintRows()
     .filter(r => !r.classList.contains("aside"))
     .map(r => num(fval(r)));
-  const expected = plan.rows.map(r => r.total);
-  return JSON.stringify(shownNums) === JSON.stringify(expected)
+  return JSON.stringify(shownNums) === JSON.stringify(plan.rows.map(r => r.total))
     ? null : "הכמויות אינן תואמות: " + shownNums;
 });
 
@@ -347,18 +234,19 @@ check("כל שורה במשפך האילוצים אומרת ממה היא נגז
   const missing = constraintRows().filter(r => !hasInfo(r, 20));
   if (missing.length) return missing.length + " שורות בלי מקור";
   const txt = infoOf(constraintRows()[0]);
-  if (!txt.includes("אוכלוסייה מוכרת") || !txt.includes("אוכלוסייה חדשה"))
-    return "שורת ההגשות אינה מפרידה בין שני הנתיבים";
-  return null;
+  return txt.includes("אוכלוסייה מוכרת") && txt.includes("אוכלוסייה חדשה")
+    ? null : "שורת ההגשות אינה מפרידה בין שני הנתיבים";
 });
 
-check("שורת האילוצים מציגה שם, אחוז מעבר וכמות בלבד", () => {
+check("שורה מציגה שם, אחוז וכמות בלבד", () => {
   clearAll();
   setVal("target", "4000");
   sandbox.calculate();
   const bad = constraintRows().filter(r => r.children.length !== 3);
   if (bad.length) return bad.length + " שורות עם יותר משלושה חלקים";
-  // שורה שנייה ואילך נושאת את אחוז המעבר מהשלב הקודם
+  const prose = constraintRows().filter(r =>
+    (r.children || []).some(c => c.classList.contains("fsrc")));
+  if (prose.length) return "נשאר מלל בגוף השורה";
   const second = constraintRows()[1];
   const chip = second.children[0].children.filter(c => c.classList.contains("fpct"))[0];
   if (!chip || !chip.textContent.includes("%")) return "אין אחוז מעבר בשורה";
@@ -367,25 +255,7 @@ check("שורת האילוצים מציגה שם, אחוז מעבר וכמות �
     ? null : "אחוז המעבר אינו של השלב הקודם: " + chip.textContent;
 });
 
-check("ההגשות הדרושות ל-4,000 הן כ-82 אלף", () => {
-  // התיקון שהתבקש: מודל האילוצים, שאינו מכפיל את הנתיב המוכר, ולא
-  // ההכפלה הרוחבית שנתנה 61,359.
-  clearAll();
-  setVal("target", "4000");
-  sandbox.calculate();
-  const v = num(registry.heroValue.textContent);
-  if (v !== sandbox.Engine.constrainedPlan(4000, null).submissions)
-    return "המספר אינו של מודל האילוצים: " + v;
-  if (v < 70000 || v > 95000)
-    return "כמות ההגשות ל-4,000 גיוסים אינה סבירה: " + v;
-  const thr = sandbox.Engine.throughputPlan(4000, null);
-  const thrSub = thr.rows.filter(r => r.key === "submissions")[0].required;
-  return v !== thrSub ? null : "המספר הוא של ההכפלה הרוחבית";
-});
-
 check("אין נתוני אמת גולמיים בגוף העמוד", () => {
-  // «נמדד בפועל» והמספרים ההיסטוריים ירדו מהעמוד. הם קיימים בחלון
-  // ההסבר בלבד.
   clearAll();
   setVal("target", "4000");
   sandbox.calculate();
@@ -398,6 +268,10 @@ check("אין נתוני אמת גולמיים בגוף העמוד", () => {
   return body.includes("נמדד בפועל") ? "נשארה עמודת «נמדד בפועל»" : null;
 });
 
+/* ------------------------------------------------------------------ *
+ *  תאריך יעד                                                          *
+ * ------------------------------------------------------------------ */
+
 check("תאריך יעד משנה את הכמות ולא רק את התאריך", () => {
   clearAll();
   setVal("target", "4000");
@@ -407,190 +281,63 @@ check("תאריך יעד משנה את הכמות ולא רק את התאריך"
   sandbox.calculate();
   const half = num(registry.heroValue.textContent);
   if (half === annual) return "התאריך לא שינה את הכמות";
-  const cp = sandbox.Engine.constrainedPlan(4000, 180);
-  if (half !== cp.submissions) return "הכמות אינה תואמת את המנוע";
-  // חצי שנה ליעד שנתי דורשת יותר הגשות, לא פחות: הנתיב המוכר תורם מחצית
+  if (half !== sandbox.Engine.constrainedPlan(4000, 180).submissions)
+    return "הכמות אינה תואמת את המנוע";
+  // הנתיב המוכר תורם רק מחצית, ולכן חלון קצר דורש יותר הגשות
   return half > annual ? null : "חלון קצר לא הגדיל את הדרישה: " + half;
 });
 
-check("יעד קטן מהנתיב המוכר אינו דורש הגשות", () => {
+check("תאריך יעד מציג כמה זמן נשאר", () => {
   clearAll();
-  const known = sandbox.Engine.constrainedPlan(4000, null).known.hires;
-  setVal("target", String(Math.max(1, known - 100)));
-  sandbox.calculate();
-  const plan = sandbox.Engine.constrainedPlan(known - 100, null);
-  if (!plan.shortfall) return "התרחיש אינו מתאים";
-  return infoOf(registry.constraintInfo).includes("בלי אף הגשה")
-    ? null : "לא נאמר שהיעד מושג בלי הגשות";
-});
-
-check("תאריך יעד מופיע בכותרת המשנה", () => {
-  clearAll();
-  setVal("target", "400");
+  setVal("target", "4000");
   setVal("targetDate", inDays(200));
   sandbox.calculate();
   const t = registry.heroNote.textContent;
-  return /\d{4}/.test(t) && t.includes("ימים") ? null : "אין תאריך בכותרת: " + t;
+  if (!t.includes("נותרו")) return "לא נאמר כמה זמן נשאר: " + t;
+  return /\d{4}/.test(t) ? null : "אין תאריך בכותרת: " + t;
 });
 
-check("אין מלל באנגלית בשום מקום בתצוגה", () => {
-  // דרישה מפורשת: ללא מלל או מושגים באנגלית בכלל.
-  const nodes = ["heroCap", "heroNote", "constraintBody", "constraintLanes",
-                 "funnelBody", "whenBody", "timelineBody", "matrixBody",
-                 "gapBody", "gapPlanBody", "gapPipeBody", "gapPlanSub",
-                 "infoTitle", "infoText"];
-  const scan = () => {
-    let t = "";
-    const at = id => registry[id] || { children: [], attributes: {} };
-    nodes.forEach(id => { t += " " + allText(at(id)) + " " + infoOf(at(id)); });
-    ["aboutBtn", "inputInfo", "heroInfo", "constraintInfo", "funnelInfo",
-     "matrixInfo", "whenInfo", "timelineInfo", "gapPlanInfo"].forEach(id => {
-       t += " " + infoOf(at(id));
-     });
-    const m = /[A-Za-z]+/.exec(t);
-    return m ? m[0] : null;
-  };
+check("תאריך יעד מציג קצב נדרש לכל שלב", () => {
   clearAll();
   setVal("target", "4000");
+  setVal("targetDate", inDays(200));
   sandbox.calculate();
-  let bad = scan();
-  if (bad) return "אנגלית במצב יעד: " + bad;
-  clearAll();
-  setVal("file_check", "5000");
-  setVal("target", "300");
-  setVal("targetDate", inDays(120));
-  sandbox.calculate();
-  bad = scan();
-  return bad ? "אנגלית במצב גזירה: " + bad : null;
-});
-
-check("יעד מול תחזית", () => {
-  clearAll();
-  setVal("file_check", "5000");
-  setVal("target", "400");
-  sandbox.calculate();
-  return registry.gapBody.children.some(c => c.textContent.includes("יעד הגיוס"))
-    ? null : "אין הודעת יעד";
-});
-
-check("שלב ההגשות נכנס לחישוב ככל שלב אחר", () => {
-  clearAll();
-  setVal("submissions", "9999");
-  setVal("yachbam", "100");
-  sandbox.calculate();
-  const cohorts = sandbox.Engine.combine({ submissions: 9999, yachbam: 100 }).cohorts;
-  if (cohorts.length !== 2) return "ההגשות לא נכנסו לחישוב";
-  const warned = registry.gapBody.children.some(
-    c => c.classList.contains("warn") && c.textContent.includes("קבוצות"));
-  if (!warned) return "לא הוצגה אזהרת חפיפה";
-  return allText(registry.funnelBody).includes("הגשות")
-    ? null : "ההגשות אינן מופיעות במשפך";
-});
-
-check("שלב עם כיסוי נמוך מפיק אזהרה מפורשת", () => {
-  clearAll();
-  setVal("submissions", "35711");
-  sandbox.calculate();
-  const low = sandbox.Engine.lowCoverage(["submissions"]);
-  if (!low.length) return "ההגשות לא סומנו ככיסוי נמוך";
-  const warned = registry.gapBody.children.some(
-    c => c.classList.contains("warn") &&
-         c.textContent.includes("נרשמו בכלל") &&
-         c.textContent.includes("הגשות"));
-  return warned ? null : "לא הוצגה אזהרת כיסוי";
-});
-
-check("הטבלה האחת מסתכמת בדיוק", () => {
-  clearAll();
-  setVal("file_check", "5000");
-  setVal("yachbam", "200");
-  sandbox.calculate();
-  if (!shown("matrixCard")) return "הטבלה לא הוצגה";
-  const m = sandbox.Engine.combinedMatrix({ file_check: 5000, yachbam: 200 });
-  const off = m.rows.filter(r => {
-    let sum = 0;
-    r.cells.forEach(c => { sum += c.count; });
-    return sum !== r.count;
+  const plan = sandbox.Engine.constrainedPlan(4000, 200);
+  const rows = constraintRows().filter(r => !r.classList.contains("aside"));
+  const missing = rows.filter(r => {
+    const v = r.children.filter(c => c.classList.contains("fval"))[0];
+    const small = (v.children || []).filter(c => c.tagName === "small")[0];
+    return !small || !/[0-9]/.test(small.textContent);
   });
-  if (off.length) return off.length + " שורות שסכום החלונות בהן אינו הסך הכול";
-  const rows = registry.matrixBody.children;
-  // שורת כותרת אחת, ואז שורה אחת לכל שלב. שורות המלל ירדו.
-  if (rows.length !== 1 + m.rows.length) return "מספר שורות לא צפוי: " + rows.length;
-  const missing = rows.filter((r, i) => i > 0 && !hasInfo(r, 20));
-  return missing.length ? "יש שורה בלי מקור" : null;
+  if (missing.length) return missing.length + " שורות בלי קצב";
+  const first = rows[0].children.filter(c => c.classList.contains("fval"))[0]
+    .children.filter(c => c.tagName === "small")[0].textContent;
+  if (!/ליום|לשבוע|לחודש/.test(first)) return "הקצב אינו ליום/לשבוע: " + first;
+  return num(first) === Math.round(plan.rows[0].per_day)
+    ? null : "הקצב אינו תואם את המנוע: " + first;
 });
 
-check("אין טווחים בתצוגה", () => {
-  const texts = [];
-  clearAll();
-  setVal("file_check", "5000");
-  setVal("target", "300");
-  sandbox.calculate();
-  texts.push(registry.heroValue.textContent, allText(registry.funnelBody),
-             allText(registry.whenBody), allText(registry.timelineBody),
-             allText(registry.gapBody), allText(registry.gapPlanBody));
-
+check("הנתיב המוכר נחתך לפי אורך החלון", () => {
   clearAll();
   setVal("target", "4000");
   sandbox.calculate();
-  texts.push(allText(registry.constraintBody), allText(registry.constraintLanes),
-             registry.heroNote.textContent);
-
-  const bad = texts.find(t => /\d\s*[-–]\s*\d/.test(t));
-  return bad ? "נמצא טווח בתצוגה: " + bad.slice(0, 90) : null;
+  const yearKnown = num(registry.constraintLanes.children[0].children[1].textContent);
+  setVal("targetDate", inDays(182));
+  sandbox.calculate();
+  const halfKnown = num(registry.constraintLanes.children[0].children[1].textContent);
+  if (!(halfKnown < yearKnown)) return "הנתיב המוכר לא הצטמצם: " + halfKnown;
+  return halfKnown === sandbox.Engine.constrainedPlan(4000, 182).known.hires
+    ? null : "אינו תואם את המנוע";
 });
 
-check("הסרגל הדביק מקבל את המספר", () => {
+check("תאריך שעבר מפיק אזהרה ואינו משנה את החישוב", () => {
   clearAll();
-  setVal("file_check", "5000");
-  sandbox.calculate();
-  const hires = sandbox.Engine.projectCohort("file_check", 5000).hires;
-  if (num(registry.stickyValue.textContent) !== hires) return "הסרגל לא עודכן";
-  return registry.stickyLabel.textContent.includes("מגויסים")
-    ? null : "הסרגל אינו אומר מה המספר";
-});
-
-check("תאריך יעד בזרימה קדימה מקטין את המספר הגדול", () => {
-  clearAll();
-  setVal("file_check", "1000");
-  sandbox.calculate();
-  const eventual = sandbox.Engine.projectCohort("file_check", 1000).hires;
-  if (num(registry.heroValue.textContent) !== eventual)
-    return "בלי תאריך המספר אינו מספר הגיוסים הכולל";
-
-  setVal("targetDate", inDays(30));
-  sandbox.calculate();
-
-  const expected = sandbox.Engine.hiresByDay("file_check", 1000, 30);
-  const got = num(registry.heroValue.textContent);
-  if (got !== expected) return "המספר " + got + " אינו " + expected;
-  if (got >= eventual) return "התאריך לא הקטין את המספר";
-  if (!registry.heroCap.textContent.includes("עד ")) return "הכותרת לא מזכירה תאריך";
-  return allText(registry.gapBody).includes(String(eventual))
-    ? null : "לא נאמר מהו מספר הגיוסים הכולל";
-});
-
-check("חלונות שמאוחרים מתאריך היעד מסומנים", () => {
-  clearAll();
-  setVal("file_check", "1000");
-  setVal("targetDate", inDays(30));
-  sandbox.calculate();
-  const rows = registry.timelineBody.children[0].children
-    .filter(c => c.classList.contains("bars"))[0].children;
-  const late = rows.filter(r => r.classList.contains("late"));
-  // החלונות "חודש עד חודשיים" ואילך מתחילים אחרי יום 30
-  if (late.length !== 3) return "סומנו " + late.length + " חלונות במקום 3";
-  return allText(late[0]).includes("אחרי תאריך היעד") ? null : "אין הסבר לסימון";
-});
-
-check("תאריך שעבר אינו משנה את המספר ומפיק אזהרה", () => {
-  clearAll();
-  setVal("file_check", "1000");
+  setVal("target", "4000");
   setVal("targetDate", "2020-01-01");
   sandbox.calculate();
-  const eventual = sandbox.Engine.projectCohort("file_check", 1000).hires;
-  if (num(registry.heroValue.textContent) !== eventual)
-    return "תאריך שעבר שינה את המספר";
+  if (num(registry.heroValue.textContent) !==
+      sandbox.Engine.constrainedPlan(4000, null).submissions)
+    return "תאריך שעבר שינה את החישוב";
   return registry.gapBody.children.some(
     c => c.classList.contains("warn") && c.textContent.includes("כבר עבר"))
     ? null : "אין אזהרה על תאריך שעבר";
@@ -598,89 +345,329 @@ check("תאריך שעבר אינו משנה את המספר ומפיק אזהר
 
 check("תאריך לא תקין מפיק אזהרה ואינו נבלע", () => {
   clearAll();
-  setVal("file_check", "1000");
+  setVal("target", "4000");
   setVal("targetDate", "2026-09-31");
   sandbox.calculate();
-  const eventual = sandbox.Engine.projectCohort("file_check", 1000).hires;
-  if (num(registry.heroValue.textContent) !== eventual)
-    return "תאריך לא תקין השפיע על החישוב";
   return registry.gapBody.children.some(
     c => c.classList.contains("warn") && c.textContent.includes("אינו תאריך תקין"))
     ? null : "אין אזהרה על תאריך לא תקין";
 });
 
-check("היעד נמדד מול מה שיתגייס עד התאריך", () => {
+/* ------------------------------------------------------------------ *
+ *  כיוון ב': מכמות בשלב אל הגיוסים                                     *
+ * ------------------------------------------------------------------ */
+
+check("60,000 הגשות מחזירות את הנתיב המוכר יחד עם החדש", () => {
+  // התקלה שדווחה: התקבלו 1,923 גיוסים - רק המסלול החדש, בלי 1,418
+  // האוכלוסייה המוכרת.
   clearAll();
-  setVal("file_check", "1000");
-  setVal("target", "50");
-  setVal("targetDate", inDays(30));
+  setVal("submissions", "60000");
   sandbox.calculate();
-  // 99 בסך הכול עוברים את היעד 50, אבל עד 30 יום רק 25 - כלומר חוסר
-  const txt = allText(registry.gapBody);
-  return txt.includes("חסרים") ? null : "היעד נמדד מול המספר הכולל ולא עד התאריך";
+  const counts = {}; stageKeys.forEach(k => { counts[k] = null; });
+  counts.submissions = 60000;
+  const flow = sandbox.Engine.constrainedCombine(counts, null);
+  const v = num(registry.heroValue.textContent);
+  if (v !== flow.hires) return "המספר אינו תואם את המנוע: " + v;
+  if (v < 3000 || v > 3600) return "מספר הגיוסים אינו סביר: " + v;
+  if (flow.known.hires !== 1418) return "הנתיב המוכר אינו 1,418";
+  if (flow.new.hires + flow.known.hires !== v) return "שני הנתיבים אינם מסתכמים";
+  return null;
 });
+
+check("שני הכיוונים הם היפוך מדויק זה של זה", () => {
+  const plan = sandbox.Engine.constrainedPlan(4000, null);
+  clearAll();
+  setVal("submissions", String(plan.submissions));
+  sandbox.calculate();
+  const back = num(registry.heroValue.textContent);
+  if (back !== 4000) return "החזרה נתנה " + back + " במקום 4,000";
+  // וגם עם חלון זמן
+  const p2 = sandbox.Engine.constrainedPlan(4000, 182);
+  const counts = {}; stageKeys.forEach(k => { counts[k] = null; });
+  counts.submissions = p2.submissions;
+  const f2 = sandbox.Engine.constrainedCombine(counts, 182);
+  return Math.abs(f2.hires - 4000) <= 1
+    ? null : "עם חלון זמן החזרה נתנה " + f2.hires;
+});
+
+check("כרטיס הזרימה מציג את שני הנתיבים ואת השרשרת", () => {
+  clearAll();
+  setVal("submissions", "60000");
+  sandbox.calculate();
+  if (!shown("flowCard")) return "הכרטיס מוסתר";
+  const counts = {}; stageKeys.forEach(k => { counts[k] = null; });
+  counts.submissions = 60000;
+  const flow = sandbox.Engine.constrainedCombine(counts, null);
+  const rows = flowRows();
+  if (rows.length !== flow.rows.length + flow.aside.length + flow.extra.length)
+    return "מספר שורות שגוי: " + rows.length;
+  const nums = rows.filter(r => !r.classList.contains("aside")).map(r => num(fval(r)));
+  if (JSON.stringify(nums) !== JSON.stringify(flow.rows.map(r => r.total)))
+    return "הכמויות אינן תואמות את המנוע";
+  if (registry.flowLanes.children.length !== 3) return "אין שלוש תיבות";
+  const missing = rows.filter(r => !hasInfo(r, 20));
+  return missing.length ? missing.length + " שורות בלי מקור" : null;
+});
+
+check("שורת הזרימה מציגה את זמן ההגעה מתחת לכמות", () => {
+  clearAll();
+  setVal("submissions", "60000");
+  sandbox.calculate();
+  const rows = flowRows().filter(r => !r.classList.contains("source"));
+  const withTime = rows.filter(r => {
+    const v = r.children.filter(c => c.classList.contains("fval"))[0];
+    return (v.children || []).some(c => c.tagName === "small" &&
+                                        /[0-9]/.test(c.textContent));
+  });
+  return withTime.length >= rows.length - 1
+    ? null : "רק " + withTime.length + " שורות נושאות זמן";
+});
+
+check("גזירה קדימה בלבד: שלב מוקדם אינו מופיע", () => {
+  clearAll();
+  setVal("yachbam", "5000");
+  sandbox.calculate();
+  const txt = allText(registry.flowBody);
+  return !txt.includes("הגשות") && !txt.includes("בדיקת קבצים")
+    ? null : "הופיע שלב מוקדם יותר";
+});
+
+check("תחנת צד שהוזנה מוצגת ראשונה ובלי המארח שלה", () => {
+  clearAll();
+  setVal("assessment", "1000");
+  sandbox.calculate();
+  const rows = flowRows();
+  if (!rows.length) return "אין שורות";
+  if (!rows[0].classList.contains("aside")) return "תחנת הצד אינה ראשונה";
+  const txt = allText(registry.flowBody);
+  return !txt.includes("יום מיון") ? null : "המארח הוצג למרות שהוא מוקדם יותר";
+});
+
+check("שלב שאינו בתזרים נקשר אליו ונאמר שכך נעשה", () => {
+  clearAll();
+  setVal("online_invite", "10000");
+  sandbox.calculate();
+  const rows = flowRows();
+  if (!rows[0].classList.contains("source")) return "שורת הכניסה חסרה";
+  if (num(fval(rows[0])) !== 10000) return "הכמות שהוזנה אינה מוצגת";
+  const warned = registry.gapBody.children.some(
+    c => c.classList.contains("warn") && c.textContent.includes("אינו מופיע בתזרים"));
+  return warned ? null : "לא הוזהר שהשלב אינו בתזרים";
+});
+
+check("כמות שקטנה מהנתיב המוכר מפיקה אזהרה", () => {
+  clearAll();
+  setVal("yachbam", "500");
+  sandbox.calculate();
+  return registry.gapBody.children.some(
+    c => c.classList.contains("warn") && c.textContent.includes("נפח לאורך החלון"))
+    ? null : "לא הוזהר שהכמות קטנה מהנתיב המוכר";
+});
+
+check("תאריך יעד בזרימה קדימה מקטין את המספר הגדול", () => {
+  clearAll();
+  setVal("submissions", "60000");
+  sandbox.calculate();
+  const counts = {}; stageKeys.forEach(k => { counts[k] = null; });
+  counts.submissions = 60000;
+  const full = sandbox.Engine.constrainedCombine(counts, null);
+  if (num(registry.heroValue.textContent) !== full.hires)
+    return "בלי תאריך המספר אינו מספר הגיוסים הכולל";
+
+  setVal("targetDate", inDays(60));
+  sandbox.calculate();
+  const timed = sandbox.Engine.constrainedCombine(counts, 60);
+  const got = num(registry.heroValue.textContent);
+  if (got !== timed.hires_in_time) return "המספר אינו מה שנכנס בזמן: " + got;
+  if (got >= timed.hires) return "התאריך לא הקטין את המספר";
+  return registry.heroCap.textContent.includes("עד ") ? null : "אין תאריך בכותרת";
+});
+
+check("מתי יתגייסו מוצג ומסתכם", () => {
+  clearAll();
+  setVal("submissions", "60000");
+  sandbox.calculate();
+  if (!shown("timelineCard")) return "הכרטיס מוסתר";
+  const counts = {}; stageKeys.forEach(k => { counts[k] = null; });
+  counts.submissions = 60000;
+  const tl = sandbox.Engine.constrainedTimeline(counts, null);
+  const rows = registry.timelineBody.children[0].children;
+  if (rows.length !== tl.rows.length) return "מספר חלונות שגוי";
+  let sum = 0;
+  tl.rows.forEach(r => { sum += r.hires; });
+  if (sum !== tl.total) return "החלונות אינם מסתכמים";
+  if (tl.total !== sandbox.Engine.constrainedCombine(counts, null).hires)
+    return "הסכום אינו מספר הגיוסים";
+  const missing = rows.filter(r => !hasInfo(r, 5));
+  return missing.length ? missing.length + " חלונות בלי מקור" : null;
+});
+
+check("הנתיב המוכר מפוזר על פני הזמן ונאמר שכך", () => {
+  clearAll();
+  setVal("submissions", "60000");
+  sandbox.calculate();
+  const txt = infoOf(registry.timelineBody) + " " + infoOf(registry.timelineInfo);
+  return txt.includes("אחיד") ? null : "לא נאמר שהנתיב הקבוע מתחלק אחיד";
+});
+
+/* ------------------------------------------------------------------ *
+ *  יעד יחד עם שלבים                                                    *
+ * ------------------------------------------------------------------ */
 
 check("יעד עם מלאי קיים מציג כמה עוד צריך", () => {
   clearAll();
-  setVal("yachbam", "200");
-  setVal("target", "400");
+  setVal("submissions", "30000");
+  setVal("target", "4000");
   sandbox.calculate();
   if (!shown("gapCardPlan")) return "כרטיס ההשלמה מוסתר";
-  const plan = sandbox.Engine.gapPlan({ yachbam: 200 }, 400, null);
+  const counts = {}; stageKeys.forEach(k => { counts[k] = null; });
+  counts.submissions = 30000;
+  const plan = sandbox.Engine.constrainedGap(counts, 4000, null);
   const rows = registry.gapPlanBody.children.filter(r => !r.classList.contains("msg"));
   const nums = rows.map(r => num(fval(r)));
-  const expected = plan.rows.filter(r => r.has_data).map(r => r.required);
-  if (JSON.stringify(nums) !== JSON.stringify(expected))
+  if (JSON.stringify(nums) !== JSON.stringify(plan.rows.map(r => r.required)))
     return "הכמויות אינן תואמות את המנוע";
   const missing = rows.filter(r => !hasInfo(r, 20));
   if (missing.length) return missing.length + " שורות בלי מקור";
-  // חייב להיות קטן מהדרישה כשאין מלאי כלל
-  const bare = sandbox.Engine.gapPlan({}, 400, null);
-  const bareFirst = bare.rows.filter(r => r.has_data)[0].required;
-  return nums[0] < bareFirst ? null : "המלאי הקיים לא הקטין את הדרישה";
+  // ההשלמה חייבת להיות קטנה מהדרישה המלאה
+  const bare = sandbox.Engine.constrainedPlan(4000, null);
+  return nums[0] < bare.submissions ? null : "המלאי הקיים לא הקטין את הדרישה";
 });
 
 check("כמה כבר בדרך נאמר במפורש", () => {
   clearAll();
-  setVal("yachbam", "200");
-  setVal("target", "400");
+  setVal("submissions", "30000");
+  setVal("target", "4000");
   sandbox.calculate();
-  const plan = sandbox.Engine.gapPlan({ yachbam: 200 }, 400, null);
+  const counts = {}; stageKeys.forEach(k => { counts[k] = null; });
+  counts.submissions = 30000;
+  const plan = sandbox.Engine.constrainedGap(counts, 4000, null);
   const sub = registry.gapPlanSub.textContent;
-  return sub.includes(String(plan.have)) && sub.includes(String(plan.gap))
-    ? null : "לא נאמר כמה כבר בדרך וכמה חסר";
+  const fmt = n => n.toLocaleString("he-IL");
+  return sub.includes(fmt(plan.have)) && sub.includes(fmt(plan.gap))
+    ? null : "לא נאמר כמה כבר בדרך וכמה חסר: " + sub;
+});
+
+check("הפער נמדד מול אותו מנוע ולא מול מודל אחר", () => {
+  clearAll();
+  setVal("submissions", "30000");
+  setVal("target", "4000");
+  sandbox.calculate();
+  const counts = {}; stageKeys.forEach(k => { counts[k] = null; });
+  counts.submissions = 30000;
+  const flow = sandbox.Engine.constrainedCombine(counts, null);
+  const gap = sandbox.Engine.constrainedGap(counts, 4000, null);
+  if (gap.have !== flow.hires) return "«כבר בדרך» אינו המספר שבכרטיס הזרימה";
+  // 30,000 הגשות + ההשלמה בהגשות = הדרישה המלאה, עד עיגול
+  const full = sandbox.Engine.constrainedPlan(4000, null).submissions;
+  // עיגול הגיוסים לאנשים שלמים משאיר סטייה זעירה, ולא יותר מזה
+  const together = 30000 + gap.rows[0].required;
+  return Math.abs(together - full) <= 40
+    ? null : "ההשלמה אינה משלימה לדרישה המלאה: " + together + " מול " + full;
 });
 
 check("יעד שכבר הושג אינו מבקש תוספת", () => {
   clearAll();
-  setVal("yachbam", "1000");
+  setVal("submissions", "90000");
   setVal("target", "400");
   sandbox.calculate();
-  const txt = allText(registry.gapPlanBody);
-  return txt.includes("אין צורך בתוספת") ? null : "לא נאמר שהיעד מושג";
+  return allText(registry.gapPlanBody).includes("אין צורך בתוספת")
+    ? null : "לא נאמר שהיעד מושג";
 });
 
-check("שלב שלא יספיק עד התאריך מסומן", () => {
+check("יעד מול תחזית", () => {
   clearAll();
-  setVal("file_check", "100");
-  setVal("target", "400");
-  setVal("targetDate", inDays(10));
+  setVal("submissions", "30000");
+  setVal("target", "4000");
   sandbox.calculate();
-  const rows = registry.gapPlanBody.children.filter(r => r.classList.contains("nodata"));
-  if (!rows.length) return "אף שלב לא סומן כלא מספיק";
-  if (fval(rows[0]) !== "לא יספיק") return "אין סימון בשורה: " + fval(rows[0]);
-  return infoOf(rows[0]).includes("לא יספיק") ? null : "אין הסבר לסימון";
+  return registry.gapBody.children.some(c => c.textContent.includes("יעד הגיוס"))
+    ? null : "אין הודעת יעד";
 });
 
-check("החלפת נקודת הכניסה בהשלמה מציירת מחדש", () => {
+check("שתי קבוצות מזהירות מכפילות", () => {
   clearAll();
-  setVal("yachbam", "100");
-  setVal("target", "400");
+  setVal("file_check", "5000");
+  setVal("yachbam", "3000");
   sandbox.calculate();
-  const before = allText(registry.gapPipeBody);
-  registry.gapEntry.value = "screening_day";
-  registry.gapEntry._on.change();
-  return allText(registry.gapPipeBody) !== before ? null : "לא צויר מחדש";
+  return registry.gapBody.children.some(
+    c => c.classList.contains("warn") && c.textContent.includes("נספרים פעמיים"))
+    ? null : "אין אזהרת חפיפה";
+});
+
+/* ------------------------------------------------------------------ *
+ *  כללי                                                               *
+ * ------------------------------------------------------------------ */
+
+check("אין טווחים בתצוגה", () => {
+  const texts = [];
+  clearAll();
+  setVal("submissions", "60000");
+  setVal("target", "3000");
+  sandbox.calculate();
+  texts.push(allText(registry.flowBody), allText(registry.flowLanes),
+             allText(registry.timelineBody), allText(registry.gapBody),
+             allText(registry.gapPlanBody), registry.heroNote.textContent);
+  clearAll();
+  setVal("target", "4000");
+  sandbox.calculate();
+  texts.push(allText(registry.constraintBody), allText(registry.constraintLanes),
+             registry.heroNote.textContent);
+  const bad = texts.find(t => /\d\s*[-–]\s*\d/.test(t));
+  return bad ? "נמצא טווח בתצוגה: " + bad.slice(0, 90) : null;
+});
+
+check("אין מלל באנגלית בשום מקום בתצוגה", () => {
+  const nodes = ["heroCap", "heroNote", "constraintBody", "constraintLanes",
+                 "flowBody", "flowLanes", "timelineBody", "gapBody",
+                 "gapPlanBody", "gapPlanSub", "infoTitle", "infoText"];
+  const btns = ["aboutBtn", "inputInfo", "heroInfo", "constraintInfo",
+                "flowInfo", "timelineInfo", "gapPlanInfo"];
+  const scan = () => {
+    let t = "";
+    nodes.forEach(id => { t += " " + allText(at(id)) + " " + infoOf(at(id)); });
+    btns.forEach(id => { t += " " + infoOf(at(id)); });
+    const m = /[A-Za-z]+/.exec(t);
+    return m ? m[0] : null;
+  };
+  clearAll();
+  setVal("target", "4000");
+  setVal("targetDate", inDays(150));
+  sandbox.calculate();
+  let bad = scan();
+  if (bad) return "אנגלית במצב יעד: " + bad;
+  clearAll();
+  setVal("submissions", "60000");
+  setVal("online_invite", "500");
+  setVal("target", "3000");
+  sandbox.calculate();
+  bad = scan();
+  return bad ? "אנגלית במצב זרימה: " + bad : null;
+});
+
+check("הסרגל הדביק מקבל את המספר ואת שמו", () => {
+  clearAll();
+  setVal("submissions", "60000");
+  sandbox.calculate();
+  const counts = {}; stageKeys.forEach(k => { counts[k] = null; });
+  counts.submissions = 60000;
+  const flow = sandbox.Engine.constrainedCombine(counts, null);
+  if (num(registry.stickyValue.textContent) !== flow.hires) return "הסרגל לא עודכן";
+  return registry.stickyLabel.textContent.includes("מגויסים")
+    ? null : "הסרגל אינו אומר מה המספר";
+});
+
+check("כל שלב שאפשר להזין בו מחזיר תשובה", () => {
+  const bad = [];
+  withData.forEach(k => {
+    clearAll();
+    setVal(k, "20000");
+    sandbox.calculate();
+    if (!shown("results") || !shown("flowCard")) { bad.push(k + ": אין תוצאה"); return; }
+    if (!/[0-9]/.test(registry.heroValue.textContent)) bad.push(k + ": אין מספר");
+    if (!flowRows().length) bad.push(k + ": משפך ריק");
+    if (flowRows().some(r => !hasInfo(r, 15))) bad.push(k + ": שורה בלי מקור");
+  });
+  return bad.length ? bad.join(" | ") : null;
 });
 
 check("איפוס מנקה הכל", () => {
