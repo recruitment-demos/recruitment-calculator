@@ -171,14 +171,90 @@ check("מצב תכנון מיעד נפתח כשהוזן רק יעד", () => {
   return shown("constraintCard") ? null : "המחשבון עם האילוצים מוסתר";
 });
 
-check("במצב יעד מוצגת תשובה אחת בלבד", () => {
+check("במצב יעד יש תשובה אחת, ולצידה אותן טבלאות זמן", () => {
+  // תשובה אחת לשאלת הכמות (המשפך), ואותן טבלאות זמן כמו במצב זרימה -
+  // בקשה מפורשת. מה שאסור שיחזור הוא כרטיס נוסף שעונה על אותה שאלה
+  // במספר אחר.
   clearAll();
   setVal("target", "4000");
   sandbox.calculate();
   const open = ["heroCard", "constraintCard", "flowCard", "gapCardPlan",
                 "whenCard", "matrixCard", "timelineCard"].filter(shown);
-  return JSON.stringify(open) === JSON.stringify(["heroCard", "constraintCard"])
-    ? null : "הוצגו כרטיסים נוספים: " + open.join(", ");
+  return JSON.stringify(open) === JSON.stringify(
+    ["heroCard", "constraintCard", "whenCard", "matrixCard", "timelineCard"])
+    ? null : "כרטיסים לא צפויים: " + open.join(", ");
+});
+
+check("הטבלאות במצב יעד תואמות את המשפך שמעליהן", () => {
+  clearAll();
+  setVal("target", "4000");
+  sandbox.calculate();
+  const plan = sandbox.Engine.constrainedPlan(4000, null);
+  const counts = {}; stageKeys.forEach(k => { counts[k] = null; });
+  counts.submissions = plan.submissions;
+  const m = sandbox.Engine.constrainedMatrix(counts, null);
+  const byKey = {};
+  m.rows.forEach(r => { byKey[r.key] = r.count; });
+  const off = plan.rows.filter(r => byKey[r.key] !== undefined &&
+                                    Math.abs(byKey[r.key] - r.total) > 2);
+  if (off.length) return "הטבלה והמשפך נפרדו ב«" + off[0].label + "»";
+  // והשורות אכן צוירו
+  const rows = registry.matrixBody.children;
+  if (rows.length !== 1 + m.rows.length) return "מספר שורות לא צפוי";
+  const tl = registry.whenBody.children.filter(c => c.classList.contains("tl"))[0];
+  return tl && tl.children.filter(c => c.classList.contains("tlrow")).length
+    === m.rows.length ? null : "פריסת הזמנים לא צוירה";
+});
+
+check("הטבלאות במצב יעד מתכיילות לחלון הימים שנותרו", () => {
+  clearAll();
+  setVal("target", "4000");
+  setVal("targetDate", inDays(27));
+  sandbox.calculate();
+  const plan = sandbox.Engine.constrainedPlan(4000, 27);
+  const counts = {}; stageKeys.forEach(k => { counts[k] = null; });
+  counts.submissions = plan.submissions;
+  const m = sandbox.Engine.constrainedMatrix(counts, 27);
+  const shownNums = registry.matrixBody.children
+    .filter((r, i) => i > 0).map(r => num(allText(r.children[m.buckets.length + 1])));
+  const expected = m.rows.map(r => r.count);
+  if (JSON.stringify(shownNums) !== JSON.stringify(expected))
+    return "הטבלה אינה מתכיילת לחלון";
+  // וחלונות שמאוחרים מהתאריך מסומנים
+  const late = registry.matrixBody.children[0].children
+    .filter(c => c.classList.contains("late"));
+  return late.length > 0 ? null : "חלונות מאוחרים אינם מסומנים";
+});
+
+check("תאריך שאינו משנה את הכמות אומר זאת במפורש", () => {
+  // התקלה שדווחה: יעד 200 עם ובלי תאריך החזיר בדיוק 3,642 הגשות,
+  // ולא היתה שום אמירה על כך.
+  clearAll();
+  setVal("target", "200");
+  setVal("targetDate", inDays(27));
+  sandbox.calculate();
+  const withDate = num(registry.heroValue.textContent);
+  const bare = sandbox.Engine.constrainedPlan(200, null).submissions;
+  const txt = allText(registry.gapBody);
+  if (withDate === bare) {
+    return txt.includes("זהה לזו שבשנה שלמה") && txt.includes("הקצב")
+      ? null : "לא נאמר למה הכמות לא השתנתה";
+  }
+  return txt.includes("גדולה מזו של אותו יעד בשנה שלמה")
+    ? null : "לא נאמר שהחלון הגדיל את הדרישה";
+});
+
+check("חלון קצר מספיק כן משנה את הכמות", () => {
+  clearAll();
+  setVal("target", "200");
+  sandbox.calculate();
+  const annual = num(registry.heroValue.textContent);
+  setVal("targetDate", inDays(10));
+  sandbox.calculate();
+  const short = num(registry.heroValue.textContent);
+  if (short <= annual) return "חלון של 10 ימים לא הגדיל את הדרישה";
+  return allText(registry.gapBody).includes("גדולה מזו של אותו יעד בשנה שלמה")
+    ? null : "לא הוסבר למה";
 });
 
 check("ההגשות הדרושות ל-4,000 הן כ-82 אלף", () => {

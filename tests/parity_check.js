@@ -90,6 +90,8 @@ for (const sc of scenarios) {
     results.push(Engine.constrainedCombine(sc.counts, sc.days));
   } else if (sc.op === "constrained_gap") {
     results.push(Engine.constrainedGap(sc.counts, sc.target, sc.days));
+  } else if (sc.op === "constrained_plan_matrix") {
+    results.push(Engine.constrainedPlanMatrix(sc.target, sc.days));
   } else if (sc.op === "constrained_timeline") {
     results.push(Engine.constrainedTimeline(sc.counts, sc.days));
   } else if (sc.op === "constrained_matrix") {

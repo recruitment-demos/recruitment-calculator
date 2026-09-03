@@ -206,6 +206,8 @@ def build_scenarios(eng):
     for t in (0, 1, 700, 1418, 1419, 3294, 4000, 9999):
         for d in (None, -1, 0, 1, 30, 122, 182, 365, 730):
             scenarios.append({"op": "constrained_plan", "target": t, "days": d})
+            scenarios.append({"op": "constrained_plan_matrix", "target": t,
+                              "days": d})
             scenarios.append({"op": "constrained_gap", "counts": {}, "target": t,
                               "days": d})
 
@@ -288,6 +290,8 @@ def python_result(eng, sc):
         return eng.constrained_combine(sc["counts"], sc.get("days"))
     if op == "constrained_gap":
         return eng.constrained_gap(sc["counts"], sc["target"], sc.get("days"))
+    if op == "constrained_plan_matrix":
+        return eng.constrained_plan_matrix(sc["target"], sc.get("days"))
     if op == "constrained_timeline":
         return eng.constrained_timeline(sc["counts"], sc.get("days"))
     if op == "constrained_matrix":

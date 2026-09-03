@@ -1641,6 +1641,78 @@ class Engine:
             "hires": proj["hires"],
         }
 
+    def constrained_plan_matrix(self, target_hires, days=None):
+        """אותה טבלה, אבל על הכמויות של התכנון עצמו.
+
+        במצב יעד אי אפשר לבנות את הטבלאות מהזנת כמות ההגשות שהתכנון
+        החזיר: העיגול בשני הכיוונים אינו זהה, ואז המשפך אומר 2,544
+        והטבלה שמתחתיו 2,543 - על אותו שלב, באותו עמוד. כאן הכמויות
+        נלקחות מהתכנון עצמו, ולכן הן זהות לחלוטין.
+        """
+        plan = self.constrained_plan(target_hires, days)
+        if plan is None:
+            return None
+        span, _ = self._flow_span(days)
+        uniform = self._uniform_shares(span)
+        first = plan["rows"][0]["key"]
+
+        def shares_for(key, new_count, known_count):
+            total = new_count + known_count
+            if not total:
+                return None
+            buckets = self._measured_buckets(first, key)
+            by_key = {x["key"]: x["share"] for x in buckets} if buckets else {}
+            if not buckets and not known_count:
+                return None
+            out = []
+            for i, b in enumerate(self.buckets):
+                acc = known_count * (uniform[i] or 0.0)
+                acc += new_count * (by_key.get(b["key"]) or 0.0)
+                out.append({"key": b["key"], "label": b["label"],
+                            "share": acc / total})
+            return out
+
+        rows = []
+        order = 0
+        for r in plan["rows"][1:]:
+            order += 1
+            shares = shares_for(r["key"], r["new"], r["known"])
+            if shares is None:
+                continue
+            rows.append({
+                "key": r["key"], "label": r["label"], "count": r["total"],
+                "days_median": self._measured_days(first, r["key"]),
+                "is_hire": bool(r.get("is_hire")), "is_aside": False,
+                "known": r["known"],
+                "cells": self.spread(r["total"], shares),
+                "order": order,
+            })
+        for a in plan["aside"]:
+            order += 1
+            shares = shares_for(a["key"], a["total"], 0)
+            if shares is None:
+                continue
+            rows.append({
+                "key": a["key"], "label": a["label"], "count": a["total"],
+                "days_median": self._measured_days(first, a["key"]),
+                "is_hire": False, "is_aside": True, "known": 0,
+                "cells": self.spread(a["total"], shares),
+                "order": order,
+            })
+
+        rows.sort(key=lambda x: ((x["days_median"] if x["days_median"] is not None
+                                  else 0.0), x["order"]))
+        for r in rows:
+            del r["order"]
+        return {
+            "buckets": [{"key": b["key"], "label": b["label"],
+                         "min_days": b["min_days"], "max_days": b["max_days"]}
+                        for b in self.buckets],
+            "rows": rows,
+            "span_days": span, "annual": days is None,
+            "hires": target_hires,
+        }
+
     def constrained_timeline(self, counts, days=None):
         """מתי יתגייסו: הגיוסים הצפויים מפוזרים על חלונות הזמן.
 

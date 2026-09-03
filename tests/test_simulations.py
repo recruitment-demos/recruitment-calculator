@@ -244,6 +244,111 @@ class TestSimulations(unittest.TestCase):
                                              where)
 
     # ------------------------------------------------------------------
+    # תאריך היעד: מה הוא משנה, ומתי
+    # ------------------------------------------------------------------
+
+    def test_the_window_changes_the_answer_wherever_the_ceiling_binds(self):
+        """התקלה שדווחה: יעד 200 עם ובלי תאריך החזיר בדיוק אותו מספר.
+
+        הנתיב הקבוע מספק בחלון D רק 1,418×D/365 גיוסים. כשהמספר הזה
+        קטן מחלקו היחסי ביעד, הוא הופך למגבלה - והדרישה מהמשפך גדלה.
+        הגבול לכל יעד הוא D = יעד × 43.048% × 365 / 1,418, כלומר
+        כ-22 יום ליעד של 200 וכ-443 יום ליעד של 4,000.
+        """
+        share = self.af["known"]["share_of_hires"]
+        per_year = self.af["known"]["hires_per_year"]
+        checked = 0
+        for target in (50, 100, 200, 400, 1000, 2000, 4000, 9999):
+            annual = self.eng.constrained_plan(target, None)["submissions"]
+            boundary = target * share * 365 / per_year
+            for days in (1, 5, 10, 15, 20, 22, 25, 27, 40, 60, 90, 120,
+                         182, 240, 300, 365, 500, 730):
+                plan = self.eng.constrained_plan(target, days)
+                where = f"יעד {target} בחלון {days} (גבול {boundary:.0f})"
+                # «בלי תאריך» הוא שנה שלמה, ולכן חלון של 365 יום זהה לו
+                # מעצם הגדרתו ואינו יכול להיות גדול ממנו.
+                if days < min(boundary, 365) - 1:
+                    self.assertGreater(plan["submissions"], annual, where)
+                elif days > 365:
+                    # חלון ארוך משנה: הנתיב הקבוע מספק בו יותר, ולכן
+                    # הדרישה מהמשפך קטנה
+                    self.assertLessEqual(plan["submissions"], annual, where)
+                elif days > boundary + 1 or days == 365:
+                    self.assertEqual(plan["submissions"], annual, where)
+                checked += 1
+        self.assertGreater(checked, 140)
+
+    def test_a_shorter_window_always_needs_at_least_as_much(self):
+        """מונוטוניות בזמן: קיצור החלון לעולם אינו מקטין את הדרישה."""
+        for target in (50, 200, 400, 1000, 4000, 9999):
+            last = None
+            for days in sorted([1, 5, 10, 22, 27, 60, 120, 182, 365, 730],
+                               reverse=True):
+                subs = self.eng.constrained_plan(target, days)["submissions"]
+                if last is not None:
+                    self.assertGreaterEqual(subs, last,
+                                            f"יעד {target} בחלון {days}")
+                last = subs
+
+    def test_the_pace_always_changes_with_the_window(self):
+        """גם כשהכמות זהה, הקצב חייב להשתנות - וזה מה שהתאריך קובע."""
+        for target in (50, 200, 4000):
+            paces = []
+            for days in (10, 27, 60, 120, 365):
+                plan = self.eng.constrained_plan(target, days)
+                paces.append(plan["rows"][0]["per_day"])
+            self.assertEqual(paces, sorted(paces, reverse=True), str(target))
+            self.assertEqual(len(set(paces)), len(paces), str(target))
+
+    def test_the_tables_follow_the_plan_in_every_window(self):
+        """הטבלאות במצב יעד חייבות להתכייל לחלון, בדיוק כמו המשפך."""
+        keys = self.keys
+        for target in (200, 400, 4000):
+            for days in (None, 10, 27, 120, 365):
+                plan = self.eng.constrained_plan(target, days)
+                counts = {k: None for k in keys}
+                counts["submissions"] = plan["submissions"]
+                m = self.eng.constrained_plan_matrix(target, days)
+                self.assertIsNotNone(m, f"{target}/{days}")
+                by_key = {r["key"]: r["count"] for r in m["rows"]}
+                # הטבלה במצב יעד חייבת להיות **זהה** למשפך, לא קרובה:
+                # שני מספרים שונים על אותו שלב באותו עמוד נראים כמו באג
+                for row in plan["rows"]:
+                    if row["key"] not in by_key:
+                        continue
+                    self.assertEqual(
+                        by_key[row["key"]], row["total"],
+                        f"יעד {target} בחלון {days}, שלב {row['key']}")
+                for row in plan["aside"]:
+                    self.assertEqual(by_key[row["key"]], row["total"],
+                                     f"יעד {target} בחלון {days}, {row['key']}")
+                for row in m["rows"]:
+                    self.assertEqual(sum(c["count"] for c in row["cells"]),
+                                     row["count"], f"{target}/{days}/{row['key']}")
+                tl = self.eng.constrained_timeline(counts, days)
+                self.assertLessEqual(abs(tl["total"] - target), 2,
+                                     f"{target}/{days}")
+
+    def test_the_two_modes_agree_on_every_number(self):
+        """הזנת יעד והזנת הכמות שהתכנון מחזיר חייבות לתת אותו עמוד."""
+        keys = self.keys
+        for target in (100, 200, 400, 1000, 4000):
+            for days in (None, 10, 27, 120, 365):
+                plan = self.eng.constrained_plan(target, days)
+                counts = {k: None for k in keys}
+                counts["submissions"] = plan["submissions"]
+                flow = self.eng.constrained_combine(counts, days)
+                where = f"יעד {target} בחלון {days}"
+                self.assertEqual(len(flow["rows"]), len(plan["rows"]), where)
+                for a, b in zip(plan["rows"], flow["rows"]):
+                    self.assertEqual(a["key"], b["key"], where)
+                    self.assertLessEqual(abs(a["total"] - b["total"]), 2,
+                                         f"{where}, שלב {a['key']}")
+                self.assertLessEqual(
+                    abs(plan["known"]["hires"] - flow["known"]["hires"]), 2,
+                    where)
+
+    # ------------------------------------------------------------------
     # חפיפה לתרשים
     # ------------------------------------------------------------------
 

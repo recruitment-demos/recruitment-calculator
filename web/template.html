@@ -1726,6 +1726,70 @@ const Engine = (() => {
     };
   };
 
+  const constrainedPlanMatrix = (target, days) => {
+    const plan = constrainedPlan(target, days);
+    if (plan === null) return null;
+    const sp = flowSpan(days);
+    const uniform = uniformShares(sp.span);
+    const first = plan.rows[0].key;
+
+    const sharesFor = (key, newCount, knownCount) => {
+      const total = newCount + knownCount;
+      if (!total) return null;
+      const buckets = measuredBuckets(first, key);
+      const byKey = {};
+      if (buckets) buckets.forEach(x => { byKey[x.key] = x.share; });
+      if (!buckets && !knownCount) return null;
+      return DATA.time_buckets.map((b, i) => {
+        let acc = knownCount * (uniform[i] === null ? 0.0 : uniform[i]);
+        const v = byKey[b.key];
+        acc += newCount * (v === null || v === undefined ? 0.0 : v);
+        return { key: b.key, label: b.label, share: acc / total };
+      });
+    };
+
+    const rows = [];
+    let order = 0;
+    plan.rows.slice(1).forEach(r => {
+      order += 1;
+      const shares = sharesFor(r.key, r.new, r.known);
+      if (shares === null) return;
+      rows.push({
+        key: r.key, label: r.label, count: r.total,
+        days_median: measuredDays(first, r.key),
+        is_hire: !!r.is_hire, is_aside: false, known: r.known,
+        cells: spread(r.total, shares), order: order
+      });
+    });
+    plan.aside.forEach(a => {
+      order += 1;
+      const shares = sharesFor(a.key, a.total, 0);
+      if (shares === null) return;
+      rows.push({
+        key: a.key, label: a.label, count: a.total,
+        days_median: measuredDays(first, a.key),
+        is_hire: false, is_aside: true, known: 0,
+        cells: spread(a.total, shares), order: order
+      });
+    });
+
+    rows.sort((a, b) => {
+      const da = a.days_median === null ? 0.0 : a.days_median;
+      const db = b.days_median === null ? 0.0 : b.days_median;
+      return da - db || a.order - b.order;
+    });
+    rows.forEach(r => { delete r.order; });
+    return {
+      buckets: DATA.time_buckets.map(b => ({
+        key: b.key, label: b.label,
+        min_days: b.min_days, max_days: b.max_days
+      })),
+      rows: rows,
+      span_days: sp.span, annual: days === null || days === undefined,
+      hires: target
+    };
+  };
+
   const constrainedTimeline = (counts, days) => {
     const proj = constrainedCombine(counts, days);
     if (proj === null) return null;
@@ -1808,6 +1872,7 @@ const Engine = (() => {
            constrainedEntry, constrainedCombine, constrainedGap,
            knownShare, blendedRate, flowFunnel,
            constrainedTimeline, constrainedMatrix,
+           constrainedPlanMatrix,
            curveShare, hiresByDay, combinedByDay,
            crossCheck, requiredForTarget, requiredFunnel, requiredPlan,
            effectiveRate, observedCandidates, observedPerDay, capacity,
@@ -2753,6 +2818,40 @@ function calculate() {
          cp.growth.toFixed(2) + "."]);
       renderConstrained(target, shownDate, days);
       cards.push("constraintCard");
+
+      /* אותן טבלאות ואותה פריסת זמנים כמו במצב זרימה, בדיוק באותו
+         עיצוב. הן נבנות מהכמות שהתכנון דורש בשלב הראשון - וזה עובד
+         מפני ששני הכיוונים הם היפוך מדויק זה של זה, ולכן הכמויות
+         בטבלאות זהות לאלה שבמשפך שמעליהן. */
+      const planCounts = {};
+      DATA.stages.forEach(st => { planCounts[st.key] = null; });
+      planCounts[cp.rows[0].key] = cp.submissions;
+      const pm = Engine.constrainedPlanMatrix(target, days);
+      if (renderWhen(pm, shownDate)) cards.push("whenCard");
+      if (renderMatrix(pm, shownDate, days)) cards.push("matrixCard");
+      if (renderTimeline(planCounts, days, shownDate)) cards.push("timelineCard");
+
+      /* חלון זמן שאינו משנה את הכמות חייב לומר זאת. בלי זה המשתמש
+         מזין תאריך, מקבל בדיוק אותו מספר, ואין לו דרך לדעת למה. */
+      if (days !== null) {
+        const ceiling = cp.known.per_year * cp.span_days / 365;
+        const proportional = target * (DATA.annual_flow.known.share_of_hires);
+        if (ceiling <= proportional) {
+          notes.push({ kind: "flat", text:
+            "בחלון של " + nf(cp.span_days) + " ימים הנתיב הקבוע יכול לספק " +
+            nf(cp.known.hires) + " גיוסים בלבד, ולכן דרישת ההגשות גדולה " +
+            "מזו של אותו יעד בשנה שלמה (" +
+            nf(Engine.constrainedPlan(target, null).submissions) + ")." });
+        } else {
+          const limit = Math.floor(proportional * 365 / cp.known.per_year);
+          notes.push({ kind: "flat", text:
+            "כמות ההגשות ליעד הזה זהה לזו שבשנה שלמה, ומה שהתאריך משנה " +
+            "הוא הקצב: " + fmtPace(cp.rows[0].per_day) + " במקום " +
+            fmtPace(Engine.constrainedPlan(target, null).rows[0].per_day) +
+            ". הכמות תשתנה רק בחלון קצר מ-" + nf(limit) + " ימים, שבו " +
+            "הנתיב הקבוע כבר לא יספיק לחלקו ביעד." });
+        }
+      }
     } else {
       renderHero("יעד גיוס", target, "", "יעד גיוס",
         "אין מספיק נתונים כדי לגזור את כמות ההגשות הדרושה.");
