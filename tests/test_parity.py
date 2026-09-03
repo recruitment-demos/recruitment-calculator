@@ -45,6 +45,8 @@ def build_scenarios(eng):
         scenarios.append({"op": "covered_share", "stage": k})
         scenarios.append({"op": "observed_candidates", "stage": k})
         scenarios.append({"op": "observed_per_day", "stage": k})
+        scenarios.append({"op": "known_share", "stage": k})
+        scenarios.append({"op": "blended_rate", "stage": k})
         for d in DAYS + [None]:
             scenarios.append({"op": "capacity", "stage": k, "days": d})
         for c in COUNTS:
@@ -273,6 +275,10 @@ def python_result(eng, sc):
         return eng.spread(sc["total"], sc["buckets"])
     if op == "constrained_plan":
         return eng.constrained_plan(sc["target"], sc.get("days"))
+    if op == "known_share":
+        return eng.known_share(sc["stage"])
+    if op == "blended_rate":
+        return eng.blended_rate(sc["stage"])
     if op == "constrained_entry":
         return eng.constrained_entry(sc["stage"], sc["count"], sc.get("days"))
     if op == "constrained_combine":

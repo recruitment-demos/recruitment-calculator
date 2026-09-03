@@ -1136,16 +1136,65 @@ class Engine:
                 return f["days"]["median"]
         return None
 
+    def known_share(self, key):
+        """איזה חלק מהנפח בשלב הזה הוא האוכלוסייה המוכרת, לפי התרשים.
+
+        בבדיקת קבצים עברו ב-2025 30,574 מועמדים, מהם 1,418 מוכרת -
+        כלומר 4.64%. זהו התמהיל הטבעי של השלב.
+        """
+        packed = self._flow_rows()
+        if packed is None:
+            return None
+        af, rows, idx = packed
+        if key not in idx:
+            return None
+        row = rows[idx[key]]
+        if not row["volume"]:
+            return 0.0
+        return round_to(row["known"] / row["volume"], 6)
+
+    def blended_rate(self, key):
+        """שיעור ההמרה המשוקלל מהשלב ועד הגיוס, כולל האוכלוסייה המוכרת.
+
+        זה המספר שעונה על «יש לי 300 בבדיקת קבצים, כמה יתגייסו»:
+        3,294 גיוסים מתוך 30,574 שעברו בשלב, כלומר 10.77%, ומכאן
+        כ-32 גיוסים. האוכלוסייה המוכרת אינה מספר קבוע שנדבק לכל
+        תשובה - היא חלק מהתמהיל, ולכן היא מגדילה את השיעור הזה.
+        """
+        packed = self._flow_rows()
+        if packed is None:
+            return None
+        af, rows, idx = packed
+        if key not in idx:
+            return None
+        row = rows[idx[key]]
+        if not row["volume"]:
+            return None
+        acc = 1.0
+        for r in af["chain"][idx[key]:]:
+            acc *= r["rate_to_next"]
+        return round_to((row["new"] * acc + row["known"]) / row["volume"], 6)
+
     def constrained_entry(self, key, count, days=None):
         """מיפוי כמות שהוזנה בשלב כלשהו אל שרשרת התזרים.
 
         שלושה מקרים, ובכולם נאמר במפורש דרך מה נעשה המיפוי:
-          chain    - השלב יושב על השרשרת. מנכים ממנו את האוכלוסייה
-                     המוכרת אם היא עוברת שם, כי היא אינה נגזרת מהמשפך.
+          chain    - השלב יושב על השרשרת.
           aside    - תחנת צד (מרכז הערכה). היא נתלית על המארח שלה לפי
                      חלקה בו, שגם הוא מהתרשים.
           measured - שלב שאינו בתרשים כלל (זימון למבחן מקוון). הגשר אל
                      השלב הבא בשרשרת נמדד מהקבצים, ונאמר שכך נעשה.
+
+        **פיצול הכמות בין שני הנתיבים הוא יחסי, עם תקרה.** הכמות
+        מתפצלת לפי התמהיל הטבעי של השלב (`known_share`), ולא על ידי
+        ניכוי המספר השנתי הקבוע. הניכוי הקבוע נתן ל-300 בדיקות קבצים
+        1,418 גיוסים - כל האוכלוסייה השנתית, על 300 מועמדים - וזו
+        היתה תקלה שדווחה. יחסית מתקבלים 32, שהם 300 כפול 10.77%.
+
+        התקרה: הנתיב המוכר אינו יכול לחרוג מהיקפו בחלון הנתון. כמות
+        גדולה מהנפח הטבעי מקבלת את התקרה, וכל מה שמעליה נופל על
+        האוכלוסייה החדשה - וזה מה ששומר על ההיפוך המדויק מול
+        constrained_plan.
         """
         packed = self._flow_rows()
         if packed is None or count is None:
@@ -1155,57 +1204,53 @@ class Engine:
         if span is None:
             return None
 
-        if key in idx:
-            row = rows[idx[key]]
-            known_here = known_span if row["known_passes"] else 0.0
-            new = count - known_here
-            return {
-                "key": key, "label": row["label"], "count": count,
-                "chain_key": key, "chain_label": row["label"],
-                "known_here": round_half_up(known_here),
-                "new": new if new > 0 else 0.0,
-                # הכמות המוזנת היא נפח לאורך החלון, ולכן היא כוללת גם
-                # את האוכלוסייה המוכרת שעוברת באותו שלב. כמות שקטנה
-                # ממנה אינה מותירה דבר לאוכלוסייה החדשה, וזו הודעה
-                # למשתמש ולא תוצאה שקטה.
-                "below_known": new <= 0 and known_here > 0,
-                "via": "chain", "via_rate": None, "via_label": None,
-            }
+        via = via_rate = via_label = chain_key = landed = label_txt = None
 
-        for a in af["aside"]:
-            if a["key"] == key:
+        if key in idx:
+            via, chain_key, landed = "chain", key, float(count)
+            label_txt = rows[idx[key]]["label"]
+        else:
+            for a in af["aside"]:
+                if a["key"] != key:
+                    continue
                 share = a["share_of_host"]
                 if not share:
                     return None
                 host = rows[idx[a["after"]]]
-                return {
-                    "key": key, "label": a["label"], "count": count,
-                    "chain_key": host["key"], "chain_label": host["label"],
-                    "known_here": 0,
-                    "new": count / share,
-                    "below_known": False,
-                    "via": "aside", "via_rate": round_to(share, 6),
-                    "via_label": host["label"],
-                }
-
-        if not self.has_rate(key):
-            return None
-        for f in self.forward(key):
-            if f["key"] in idx:
-                reach = f["reach"]["mid"]
-                if not reach:
+                via, via_rate, via_label = "aside", round_to(share, 6), host["label"]
+                chain_key, landed, label_txt = host["key"], count / share, a["label"]
+                break
+            if chain_key is None:
+                if not self.has_rate(key):
                     return None
-                target = rows[idx[f["key"]]]
-                return {
-                    "key": key, "label": self.label(key), "count": count,
-                    "chain_key": target["key"], "chain_label": target["label"],
-                    "known_here": 0,
-                    "new": count * reach,
-                    "below_known": False,
-                    "via": "measured", "via_rate": round_to(reach, 6),
-                    "via_label": target["label"],
-                }
-        return None
+                for f in self.forward(key):
+                    if f["key"] not in idx:
+                        continue
+                    reach = f["reach"]["mid"]
+                    if not reach:
+                        return None
+                    target = rows[idx[f["key"]]]
+                    via, via_rate = "measured", round_to(reach, 6)
+                    via_label, chain_key = target["label"], target["key"]
+                    landed, label_txt = count * reach, self.label(key)
+                    break
+                if chain_key is None:
+                    return None
+
+        share_known = self.known_share(chain_key) or 0.0
+        claim = landed * share_known
+        known_here = min(claim, known_span)
+        return {
+            "key": key, "label": label_txt, "count": count,
+            "chain_key": chain_key,
+            "chain_label": rows[idx[chain_key]]["label"],
+            "landed": round_to(landed, 4),
+            "known_share": share_known,
+            "known_claim": claim,
+            "known_here": round_half_up(known_here),
+            "new": max(0.0, landed - known_here),
+            "via": via, "via_rate": via_rate, "via_label": via_label,
+        }
 
     def constrained_combine(self, counts, days=None):
         """כמה יתגייסו מהכמויות שהוזנו, לפי תזרים הליך הגיוס.
@@ -1238,16 +1283,36 @@ class Engine:
         chain = af["chain"]
         n_chain = len(chain)
         new_at = [0.0] * len(rows)
+        known_at = [0.0] * len(rows)
         sources = [[] for _ in rows]
+
+        # התקרה על הנתיב המוכר נאכפת פעם אחת על כל מה שהוזן, ולא שלב
+        # אחר שלב: זו אוכלוסייה אחת, ואילו נספרה בכל שלב בנפרד היא
+        # היתה מוכפלת. כשהתביעות יחד חורגות מההיקף בחלון, כולן
+        # מוקטנות באותו יחס.
+        claim = sum(e["known_claim"] for e in entries)
+        factor = 1.0
+        if claim > known_span and claim:
+            factor = known_span / claim
+        for e in entries:
+            e["known_here"] = round_half_up(e["known_claim"] * factor)
+            e["new"] = max(0.0, e["landed"] - e["known_claim"] * factor)
 
         for e in entries:
             i = idx[e["chain_key"]]
             v = e["new"]
+            k = e["known_claim"] * factor
             new_at[i] += v
+            if rows[i]["known_passes"]:
+                known_at[i] += k
             sources[i].append({"entry": e, "new": v, "days_median": 0.0})
             for j in range(i, n_chain):
                 v = v * chain[j]["rate_to_next"]
                 new_at[j + 1] += v
+                # הנתיב המוכר אינו עובר מיון: הוא ממשיך כמות שהוא
+                # בכל שלב שהתרשים מסמן שהוא עובר בו.
+                if rows[j + 1]["known_passes"]:
+                    known_at[j + 1] += k
                 sources[j + 1].append({
                     "entry": e, "new": v,
                     "days_median": self._measured_days(e["key"], rows[j + 1]["key"]),
@@ -1285,7 +1350,7 @@ class Engine:
         for i in range(start, len(rows)):
             row = rows[i]
             new_i = round_half_up(new_at[i])
-            known_i = round_half_up(known_span) if row["known_passes"] else 0
+            known_i = round_half_up(known_at[i]) if row["known_passes"] else 0
             total = new_i + known_i
             out.append({
                 "key": row["key"], "label": row["label"],
@@ -1367,42 +1432,45 @@ class Engine:
         }
 
     def constrained_gap(self, counts, target_hires, days=None):
-        """כמה עוד צריך: היעד פחות מה שכבר בדרך, לפי אותו תזרים.
+        """כמה עוד צריך בכל שלב כדי להגיע ליעד.
 
-        מה שכבר בדרך כולל את האוכלוסייה המוכרת גם כשלא הוזן שום שלב -
-        היא מתגייסת בלי תלות במשפך. כל תוספת נופלת על האוכלוסייה
-        החדשה בלבד, ולכן הדרישה בכל שלב היא הפער חלקי מכפלת שיעורי
-        המעבר מאותו שלב ועד הגיוס.
+        השורה בכל שלב היא **הנפח שהתכנון דורש שם, פחות מה שכבר עובר
+        שם**. כך «מה שכבר יש ועוד ההשלמה» שווה בדיוק לדרישה המלאה
+        בכל שלב, ולא רק בשלב שהוזן.
+
+        החישוב הקודם תרגם את פער הגיוסים דרך שיעורי המעבר, ומאז
+        שהפיצול בין הנתיבים הפך ליחסי הוא חרג: 30,000 הגשות ועוד
+        ההשלמה נתנו 103,450, כמות שמניבה 4,687 גיוסים ולא 4,000.
         """
-        packed = self._flow_rows()
-        if packed is None or target_hires is None:
+        plan = self.constrained_plan(target_hires, days)
+        if plan is None:
             return None
-        af, rows, idx = packed
+        af, rows, idx = self._flow_rows()
         span, known_span = self._flow_span(days)
-        if span is None:
-            return None
 
         proj = self.constrained_combine(counts, days)
-        have = proj["hires"] if proj else round_half_up(known_span)
+        have = proj["hires"] if proj else 0
         gap = target_hires - have
 
-        to_hire = {}
-        p = 1.0
-        for r in reversed(af["chain"]):
-            p = p * r["rate_to_next"]
-            to_hire[r["key"]] = p
+        flowing = {}
+        if proj:
+            for r in proj["rows"]:
+                flowing[r["key"]] = r["total"]
+        needed = {r["key"]: r["total"] for r in plan["rows"]}
 
         out = []
         for r in af["chain"]:
-            share = to_hire[r["key"]]
-            required = (round_half_up(gap / share)
-                        if gap > 0 and share else (0 if gap <= 0 else None))
+            total = needed.get(r["key"], 0)
+            already = flowing.get(r["key"], 0)
+            extra = total - already
+            if gap <= 0 or extra < 0:
+                extra = 0
             out.append({
                 "key": r["key"], "label": r["label"],
-                "rate": round_to(share, 6),
-                "required": required,
-                "per_day": (None if required is None
-                            else round_to(required / span, 3)),
+                "needed_total": total, "have": already,
+                "required": extra,
+                "rate": self.blended_rate(r["key"]),
+                "per_day": round_to(extra / span, 3),
             })
 
         return {
@@ -1410,9 +1478,10 @@ class Engine:
             "days": days, "span_days": span, "annual": days is None,
             "year": af["year"],
             "known": {"label": af["known"]["label"],
-                      "hires": round_half_up(known_span),
+                      "hires": plan["known"]["hires"],
                       "per_year": af["known"]["hires_per_year"]},
             "projected": proj,
+            "plan": plan,
             "rows": out,
         }
 

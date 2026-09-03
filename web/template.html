@@ -180,6 +180,10 @@
      בכלל תלוי בכמות ההגשות.                                          */
   .fbar.split { display: flex; background: none; }
   .fseg { height: 100%; width: 0; transition: width .8s cubic-bezier(.2,.7,.3,1); }
+  /* פס שאינו אפס נשאר גלוי גם כשהוא זעיר ביחס לשורה הגדולה, אחרת
+     השורה נראית ריקה והמשפך «נהיה קווים בלבד». */
+  .fseg.on { min-width: 3px; }
+  .fbar.on { min-width: 3px; }
   .fseg.newpop { background: linear-gradient(90deg, var(--brand), var(--brand-2)); }
   .fseg.knownpop { background: linear-gradient(90deg, #a8730f, #e0a83a); }
   .fstage.hire .fseg.newpop { background: linear-gradient(90deg, #0a7a52, #24b581); }
@@ -1270,6 +1274,28 @@ const Engine = (() => {
     return f ? f.days.median : null;
   };
 
+  /* איזה חלק מהנפח בשלב הזה הוא האוכלוסייה המוכרת, לפי התרשים. */
+  const knownShare = (k) => {
+    const packed = flowRows();
+    if (packed === null) return null;
+    if (!Object.prototype.hasOwnProperty.call(packed.idx, k)) return null;
+    const row = packed.rows[packed.idx[k]];
+    if (!row.volume) return 0.0;
+    return roundTo(row.known / row.volume, 6);
+  };
+
+  /* שיעור ההמרה המשוקלל מהשלב ועד הגיוס, כולל האוכלוסייה המוכרת. */
+  const blendedRate = (k) => {
+    const packed = flowRows();
+    if (packed === null) return null;
+    if (!Object.prototype.hasOwnProperty.call(packed.idx, k)) return null;
+    const row = packed.rows[packed.idx[k]];
+    if (!row.volume) return null;
+    let acc = 1.0;
+    packed.af.chain.slice(packed.idx[k]).forEach(r => { acc *= r.rate_to_next; });
+    return roundTo((row.new * acc + row.known) / row.volume, 6);
+  };
+
   const constrainedEntry = (key, count, days) => {
     const packed = flowRows();
     if (packed === null || count === null || count === undefined) return null;
@@ -1277,49 +1303,53 @@ const Engine = (() => {
     const sp = flowSpan(days);
     if (sp === null) return null;
 
+    let via = null, viaRate = null, viaLabel = null;
+    let chainKey = null, landed = null, labelTxt = null;
+
     if (Object.prototype.hasOwnProperty.call(idx, key)) {
-      const row = rows[idx[key]];
-      const knownHere = row.known_passes ? sp.known : 0.0;
-      const nw = count - knownHere;
-      return {
-        key: key, label: row.label, count: count,
-        chain_key: key, chain_label: row.label,
-        known_here: roundHalfUp(knownHere),
-        new: nw > 0 ? nw : 0.0,
-        below_known: nw <= 0 && knownHere > 0,
-        via: "chain", via_rate: null, via_label: null
-      };
+      via = "chain"; chainKey = key; landed = count;
+      labelTxt = rows[idx[key]].label;
+    } else {
+      for (let i = 0; i < af.aside.length; i++) {
+        const a = af.aside[i];
+        if (a.key !== key) continue;
+        const share = a.share_of_host;
+        if (!share) return null;
+        const host = rows[idx[a.after]];
+        via = "aside"; viaRate = roundTo(share, 6); viaLabel = host.label;
+        chainKey = host.key; landed = count / share; labelTxt = a.label;
+        break;
+      }
+      if (chainKey === null) {
+        if (!hasRate(key)) return null;
+        const fw = forward(key);
+        for (let i = 0; i < fw.length; i++) {
+          if (!Object.prototype.hasOwnProperty.call(idx, fw[i].key)) continue;
+          const reach = fw[i].reach.mid;
+          if (!reach) return null;
+          const target = rows[idx[fw[i].key]];
+          via = "measured"; viaRate = roundTo(reach, 6);
+          viaLabel = target.label; chainKey = target.key;
+          landed = count * reach; labelTxt = label(key);
+          break;
+        }
+        if (chainKey === null) return null;
+      }
     }
 
-    for (let i = 0; i < af.aside.length; i++) {
-      const a = af.aside[i];
-      if (a.key !== key) continue;
-      const share = a.share_of_host;
-      if (!share) return null;
-      const host = rows[idx[a.after]];
-      return {
-        key: key, label: a.label, count: count,
-        chain_key: host.key, chain_label: host.label,
-        known_here: 0, new: count / share, below_known: false,
-        via: "aside", via_rate: roundTo(share, 6), via_label: host.label
-      };
-    }
-
-    if (!hasRate(key)) return null;
-    const fw = forward(key);
-    for (let i = 0; i < fw.length; i++) {
-      if (!Object.prototype.hasOwnProperty.call(idx, fw[i].key)) continue;
-      const reach = fw[i].reach.mid;
-      if (!reach) return null;
-      const target = rows[idx[fw[i].key]];
-      return {
-        key: key, label: label(key), count: count,
-        chain_key: target.key, chain_label: target.label,
-        known_here: 0, new: count * reach, below_known: false,
-        via: "measured", via_rate: roundTo(reach, 6), via_label: target.label
-      };
-    }
-    return null;
+    const shareKnown = knownShare(chainKey) || 0.0;
+    const claim = landed * shareKnown;
+    const knownHere = Math.min(claim, sp.known);
+    return {
+      key: key, label: labelTxt, count: count,
+      chain_key: chainKey, chain_label: rows[idx[chainKey]].label,
+      landed: roundTo(landed, 4),
+      known_share: shareKnown,
+      known_claim: claim,
+      known_here: roundHalfUp(knownHere),
+      new: Math.max(0.0, landed - knownHere),
+      via: via, via_rate: viaRate, via_label: viaLabel
+    };
   };
 
   const constrainedCombine = (counts, days) => {
@@ -1342,16 +1372,30 @@ const Engine = (() => {
     const chain = af.chain;
     const nChain = chain.length;
     const newAt = rows.map(() => 0.0);
+    const knownAt = rows.map(() => 0.0);
     const sources = rows.map(() => []);
+
+    // התקרה על הנתיב המוכר נאכפת פעם אחת על כל מה שהוזן. ראו engine.py.
+    let claim = 0;
+    entries.forEach(e => { claim += e.known_claim; });
+    let factor = 1.0;
+    if (claim > knownSpan && claim) factor = knownSpan / claim;
+    entries.forEach(e => {
+      e.known_here = roundHalfUp(e.known_claim * factor);
+      e.new = Math.max(0.0, e.landed - e.known_claim * factor);
+    });
 
     entries.forEach(e => {
       const i = idx[e.chain_key];
       let v = e.new;
+      const k = e.known_claim * factor;
       newAt[i] += v;
+      if (rows[i].known_passes) knownAt[i] += k;
       sources[i].push({ entry: e, new: v, days_median: 0.0 });
       for (let j = i; j < nChain; j++) {
         v = v * chain[j].rate_to_next;
         newAt[j + 1] += v;
+        if (rows[j + 1].known_passes) knownAt[j + 1] += k;
         sources[j + 1].push({
           entry: e, new: v,
           days_median: measuredDays(e.key, rows[j + 1].key)
@@ -1390,7 +1434,7 @@ const Engine = (() => {
     for (let i = start; i < rows.length; i++) {
       const row = rows[i];
       const newI = roundHalfUp(newAt[i]);
-      const knownI = row.known_passes ? roundHalfUp(knownSpan) : 0;
+      const knownI = row.known_passes ? roundHalfUp(knownAt[i]) : 0;
       const total = newI + knownI;
       out.push({
         key: row.key, label: row.label,
@@ -1476,26 +1520,32 @@ const Engine = (() => {
   };
 
   const constrainedGap = (counts, target, days) => {
+    const plan = constrainedPlan(target, days);
+    if (plan === null) return null;
     const packed = flowRows();
-    if (packed === null || target === null || target === undefined) return null;
     const af = packed.af;
     const sp = flowSpan(days);
-    if (sp === null) return null;
 
     const proj = constrainedCombine(counts, days);
-    const have = proj ? proj.hires : roundHalfUp(sp.known);
+    const have = proj ? proj.hires : 0;
     const gap = target - have;
-    const toHire = ratesToHire(af);
+
+    const flowing = {};
+    if (proj) proj.rows.forEach(r => { flowing[r.key] = r.total; });
+    const needed = {};
+    plan.rows.forEach(r => { needed[r.key] = r.total; });
 
     const out = af.chain.map(r => {
-      const share = toHire[r.key];
-      const required = gap > 0
-        ? (share ? roundHalfUp(gap / share) : null)
-        : 0;
+      const total = needed[r.key] === undefined ? 0 : needed[r.key];
+      const already = flowing[r.key] === undefined ? 0 : flowing[r.key];
+      let extra = total - already;
+      if (gap <= 0 || extra < 0) extra = 0;
       return {
-        key: r.key, label: r.label, rate: roundTo(share, 6),
-        required: required,
-        per_day: required === null ? null : roundTo(required / sp.span, 3)
+        key: r.key, label: r.label,
+        needed_total: total, have: already,
+        required: extra,
+        rate: blendedRate(r.key),
+        per_day: roundTo(extra / sp.span, 3)
       };
     });
 
@@ -1504,9 +1554,9 @@ const Engine = (() => {
       days: days === undefined ? null : days,
       span_days: sp.span, annual: days === null || days === undefined,
       year: af.year,
-      known: { label: af.known.label, hires: roundHalfUp(sp.known),
+      known: { label: af.known.label, hires: plan.known.hires,
                per_year: af.known.hires_per_year },
-      projected: proj, rows: out
+      projected: proj, plan: plan, rows: out
     };
   };
 
@@ -1674,6 +1724,7 @@ const Engine = (() => {
            spread, combinedMatrix, managerPlan, throughputPlan,
            annualFlow, constrainedPlan,
            constrainedEntry, constrainedCombine, constrainedGap,
+           knownShare, blendedRate,
            constrainedTimeline, constrainedMatrix,
            curveShare, hiresByDay, combinedByDay,
            crossCheck, requiredForTarget, requiredFunnel, requiredPlan,
@@ -1887,12 +1938,15 @@ function chainRow(body, o, i) {
     track.append(bar);
     const wNew = ((o.split.new / (o.max || 1)) * 100).toFixed(2);
     const wKnown = ((o.split.known / (o.max || 1)) * 100).toFixed(2);
+    if (o.split.new > 0) segNew.classList.add("on");
+    if (o.split.known > 0) segKnown.classList.add("on");
     later(() => {
       segNew.style.width = wNew + "%";
       segKnown.style.width = wKnown + "%";
     }, 70 + i * 60);
   } else {
     const bar = el("div", "fbar");
+    if (o.value > 0) bar.classList.add("on");
     track.append(bar);
     later(() => { bar.style.width = width + "%"; }, 70 + i * 60);
   }
@@ -2139,18 +2193,25 @@ function renderFlow(counts, targetDate, days) {
     : "נותרו " + fmtSpan(plan.span_days) + ", עד " + fmtDay(targetDate);
   const entryNames = plan.entries.map(e => "«" + e.label + "»").join(" ו-");
 
+  const first = plan.entries[0];
+  const blended = Engine.blendedRate(first.chain_key);
+
   renderLanes("flowLanes",
     plan.known,
-    "קבוע. " + nf(plan.known.per_year) + " גיוסים בשנה שאינם עוברים בהליך " +
-      "המיון כלל. הם אינם נגזרים מהמספר שהוזן ואינם מושפעים ממנו" +
-      (plan.annual ? "." : ", ובחלון של " + nf(plan.span_days) + " ימים הם " +
-        nf(plan.known.hires) + "."),
+    "החלק מהכמות שהוזנה ששייך לאוכלוסייה המוכרת, לפי התמהיל של השלב: " +
+      pct(first.known_share) + " מהנפח ב«" + first.chain_label + "» הם " +
+      "מוכרים, והם מתגייסים ביחס 1:1. הנתיב הזה אינו יכול לחרוג מ-" +
+      nf(plan.known.per_year) + " גיוסים בשנה" +
+      (plan.annual ? "." : ", כלומר " + nf(plan.known.hires) + " בחלון של " +
+        nf(plan.span_days) + " ימים."),
     plan.new,
-    "מה שנגזר מהמספר שהוזן ב" + entryNames + ", לפי שיעורי המעבר של תזרים " +
+    "כל השאר. הם עוברים את הליך המיון, לפי שיעורי המעבר של תזרים " +
       plan.year + ".",
     "סך מגויסים", plan.hires,
     nf(plan.new.hires) + " מהמשפך  +  " + nf(plan.known.hires) +
-      " מהנתיב המוכר = " + nf(plan.hires) + " גיוסים ב" + spanText + ".");
+      " מהנתיב המוכר = " + nf(plan.hires) + " גיוסים ב" + spanText + "." +
+      (blended ? " שיעור ההמרה המשוקלל מ«" + first.chain_label + "» ועד " +
+        "גיוס הוא " + pct(blended) + "." : ""));
 
   renderChain("flowBody", plan, {
     sources: true, startDate: plan.annual ? todayDay() : todayDay()
@@ -2159,14 +2220,20 @@ function renderFlow(counts, targetDate, days) {
   const info = [
     "כמה יתגייסו מהכמות שהוזנה ב" + entryNames + ", ב" + spanText + ": " +
       nf(plan.hires) + " גיוסים.",
-    "המספר מורכב משני נתיבים. " + nf(plan.new.hires) + " נגזרים מהמשפך " +
-      "לפי יחסי תזרים " + plan.year + ", ועוד " + nf(plan.known.hires) +
-      " מגיעים מ«" + plan.known.label + "» - נתיב קבוע שאינו עובר בהליך " +
-      "המיון ואינו תלוי בכמות שבמשפך. בלי הנתיב הזה המספר היה קטן בהרבה.",
-    "הכמות שמוזנת בכל שלב היא נפח לאורך החלון" +
-      (plan.annual ? " - וברירת המחדל היא שנה שלמה" : "") + ", ולא מלאי " +
-      "רגעי. לכן היא כוללת גם את האוכלוסייה המוכרת בשלבים שהיא עוברת " +
-      "בהם, והמנוע מנכה אותה לפני שהוא גוזר קדימה.",
+    blended
+      ? "החישוב הוא הכמות כפול שיעור ההמרה המשוקלל של השלב: " +
+        nf(first.count) + " כפול " + pct(blended) + ". השיעור הזה כבר " +
+        "מגלם בתוכו את האוכלוסייה המוכרת - היא חלק מהתמהיל של השלב, " +
+        "ולא מספר קבוע שנדבק לכל תשובה."
+      : "",
+    "הפיצול בין שני הנתיבים הוא יחסי: " + pct(first.known_share) +
+      " מהנפח ב«" + first.chain_label + "» הם האוכלוסייה המוכרת, שמתגייסת " +
+      "ביחס 1:1, והשאר עוברים את הליך המיון. לכן " + nf(plan.new.hires) +
+      " מהגיוסים באים מהמשפך ו-" + nf(plan.known.hires) + " מהנתיב המוכר.",
+    "יש תקרה אחת: הנתיב המוכר אינו יכול לחרוג מ-" +
+      nf(plan.known.per_year) + " גיוסים בשנה. כמות גדולה מהנפח השנתי " +
+      "הטבעי מקבלת את התקרה, וכל מה שמעליה נופל על האוכלוסייה החדשה - " +
+      "וזה מה ששומר על ההיפוך המדויק מול הכיוון השני.",
     "הכיוון ההפוך עומד על אותה אריתמטיקה: יעד של " + nf(plan.hires) +
       " גיוסים יחזיר בדיוק את הכמות שהוזנה.",
     "הכמויות באות מהתזרים. הזמנים שמתחת לכל כמות נמדדו בקבצים, על " +
@@ -2198,10 +2265,7 @@ function renderGapPlan(counts, target, targetDate, days) {
       " · עודף: " + nf(-plan.gap);
     setInfo("gapPlanInfo", "כמה עוד צריך",
       ["מה שכבר בדרך צפוי להניב " + nf(plan.have) + " גיוסים " + spanText +
-       ", והיעד הוא " + nf(target) + ". היעד מושג בלי להכניס אף מועמד חדש.",
-       "מתוך " + nf(plan.have) + " הגיוסים, " + nf(plan.known.hires) +
-       " מגיעים מ«" + plan.known.label + "» - נתיב קבוע שרץ במקביל ואינו " +
-       "תלוי במשפך."]);
+       ", והיעד הוא " + nf(target) + ". היעד מושג בלי להכניס אף מועמד חדש."]);
     body.append(el("div", "msg good",
       "אין צורך בתוספת. " + nf(plan.have) + " צפויים מול יעד של " + nf(target) + "."));
     return true;
@@ -2213,29 +2277,29 @@ function renderGapPlan(counts, target, targetDate, days) {
 
   setInfo("gapPlanInfo", "כמה עוד צריך",
     ["מה שכבר בדרך צפוי להניב " + nf(plan.have) + " גיוסים " + spanText +
-     " (מתוכם " + nf(plan.known.hires) + " מ«" + plan.known.label +
-     "», נתיב קבוע שרץ במקביל). היעד הוא " + nf(target) + ", ולכן חסרים " +
-     nf(plan.gap) + ".",
-     "כל שורה אומרת כמה מועמדים חדשים באותו שלב יסגרו את הפער הזה - לא " +
-     "את כל היעד. השורות אינן מצטברות זו לזו: אלו תשובות חלופיות.",
-     "כל התוספת נופלת על האוכלוסייה החדשה, מפני שהנתיב המוכר קבוע ואינו " +
-     "ניתן להגדלה. לכן הדרישה בכל שלב היא הפער חלקי מכפלת שיעורי המעבר " +
-     "מאותו שלב ועד הגיוס.",
+     ", והיעד הוא " + nf(target) + " - ולכן חסרים " + nf(plan.gap) + ".",
+     "כל שורה אומרת כמה עוד צריך שיעברו באותו שלב: הנפח שהתכנון דורש " +
+     "שם, פחות מה שכבר עובר שם. מה שכבר יש ועוד ההשלמה שווה בדיוק " +
+     "לדרישה המלאה בכל שלב.",
+     "השורות אינן מצטברות זו לזו - אלו אותם אנשים בשלבים שונים של " +
+     "אותו משפך.",
      plan.annual ? "" : "מתחת לכל כמות כתוב הקצב הנדרש בתוך " +
        nf(plan.span_days) + " הימים שנותרו."]);
 
-  const max = Math.max.apply(null, plan.rows.map(r => r.required || 0).concat([1]));
+  const max = Math.max.apply(null, plan.rows.map(r => r.needed_total || 0).concat([1]));
   plan.rows.forEach((r, i) => {
     chainRow(body, {
       label: r.label,
-      chip: pct(r.rate) + " מגיעים לגיוס",
+      chip: r.have ? "יש " + nf(r.have) + " מתוך " + nf(r.needed_total) : null,
       value: r.required, max: max,
+      split: { new: r.required, known: 0 },
       small: plan.annual ? null : fmtPace(r.per_day),
-      info: nf(r.required) + " מועמדים חדשים ב«" + r.label + "» יניבו את " +
-        nf(plan.gap) + " הגיוסים החסרים: " + pct(r.rate) + " מהם מגיעים " +
-        "לגיוס לפי שיעורי המעבר של תזרים " + plan.year + "." +
-        (plan.annual ? "" : " בחלון של " + nf(plan.span_days) + " ימים זהו " +
-          fmtPace(r.per_day) + ".")
+      info: "כדי לגייס " + nf(plan.target) + " צריך ש-" + nf(r.needed_total) +
+        " יעברו ב«" + r.label + "». כבר עוברים שם " + nf(r.have) + ", ולכן " +
+        "חסרים " + nf(r.required) + ". שיעור ההמרה המשוקלל מהשלב הזה ועד " +
+        "גיוס הוא " + pct(r.rate) + "." +
+        (plan.annual ? "" : " בחלון של " + nf(plan.span_days) + " ימים " +
+          "התוספת היא " + fmtPace(r.per_day) + ".")
     }, i);
   });
   return true;
@@ -2573,13 +2637,6 @@ function calculate() {
   if (renderTimeline(counts, days, shownDate)) cards.push("timelineCard");
 
   flow.entries.forEach(e => {
-    if (e.below_known) {
-      notes.push({ kind: "warn", text:
-        "הכמות שהוזנה ב«" + e.label + "» (" + nf(e.count) + ") קטנה מהנפח " +
-        "של «" + flow.known.label + "» באותו חלון (" + nf(e.known_here) +
-        "). המספרים הם נפח לאורך החלון, לא מלאי רגעי, ולכן לא נותר ממנה " +
-        "דבר לאוכלוסייה החדשה." });
-    }
     if (e.via === "measured") {
       notes.push({ kind: "warn", text:
         "«" + e.label + "» אינו מופיע בתזרים הליך הגיוס. המעבר ממנו ל«" +
@@ -2652,9 +2709,13 @@ function buildAbout() {
     "ההגשות. לכן כל תוספת ליעד נופלת כולה על הנתיב השני.",
     "הנתיב המוכר מתחלק אחיד על פני השנה. חלון קצר מקבל ממנו פחות, ולכן " +
     "דרישת ההגשות בחלון קצר גדולה יותר מחלק יחסי של הדרישה השנתית.",
-    "הכמות שמוזנת בכל שלב היא נפח לאורך החלון ולא מלאי רגעי, ולכן היא " +
-    "כוללת גם את האוכלוסייה המוכרת בשלבים שהיא עוברת בהם. המנוע מנכה " +
-    "אותה לפני שהוא גוזר קדימה, וזה מה שהופך את שני הכיוונים לזהים.",
+    "כמות שמוזנת בשלב מתפצלת בין שני הנתיבים לפי התמהיל הטבעי של אותו " +
+    "שלב, ולא על ידי ניכוי המספר השנתי הקבוע. מהנפח בבדיקת קבצים " +
+    "4.6% הם האוכלוסייה המוכרת, ולכן 300 בדיקות קבצים מניבות כ-32 " +
+    "גיוסים - הכמות כפול שיעור ההמרה המשוקלל של השלב, 10.8%.",
+    "יש תקרה אחת: הנתיב המוכר אינו יכול לחרוג מהיקפו בחלון. כמות " +
+    "גדולה מהנפח הטבעי מקבלת את התקרה, וכל מה שמעליה נופל על " +
+    "האוכלוסייה החדשה. זה מה שהופך את שני הכיוונים לזהים.",
     "הזמנים אינם באים מהתזרים - הוא נושא יחסים בלבד. הם נמדדים מקובצי " +
     "המקור: לכל זוג שלבים נמדד ישירות כמה ימים לקח למי שעבר את המסלול " +
     "בפועל. כל זמן הוא חציון: מחצית מגיעים מוקדם יותר ומחציתם מאוחר יותר.",
@@ -2695,8 +2756,9 @@ function buildAbout() {
      "ממלאים שלב - ומקבלים כמה יתגייסו ממנו. אפשר להזין כמה שלבים.",
      "ממלאים את שניהם - ומקבלים כמה עוד צריך מעבר למה שכבר בדרך.",
      "«תאריך היעד» משנה כמויות ולא רק תאריכים: הוא קובע את אורך החלון, " +
-     "ולפיו נחתך גם חלקו של הנתיב הקבוע. בלי תאריך החלון הוא שנה שלמה.",
-     "הכמות שמוזנת היא נפח לאורך החלון, לא מלאי רגעי."]);
+     "ולפיו נחתכת גם התקרה של הנתיב הקבוע. בלי תאריך החלון הוא שנה שלמה.",
+     "כמות שמוזנת בשלב מוכפלת בשיעור ההמרה המשוקלל שלו - זה שמגלם " +
+     "בתוכו גם את האוכלוסייה המוכרת."]);
 }
 
 buildInputs();

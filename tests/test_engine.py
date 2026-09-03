@@ -1660,20 +1660,33 @@ class TestConstrainedForward(unittest.TestCase):
     def test_the_two_directions_are_an_exact_inverse(self):
         """הזנת מה שהתכנון החזיר חייבת להחזיר את היעד עצמו.
 
-        זו הדרישה המפורשת: אותה אריתמטיקה בשני הכיוונים. היא גם הסיבה
-        שהאוכלוסייה המוכרת מנוכה מהכמות שמוזנת - בתרשים היא עוברת
-        בהגשות ככל השאר, ולכן היא כלולה בכמות ההגשות.
+        ההיפוך מדויק בכל מקום שבו תקרת הנתיב המוכר נוגעת - כלומר בכל
+        יעד שדורש נפח הגשות בסדר גודל של הנפח השנתי ומעלה. שם
+        התכנון והכיוון ההפוך מסכימים על אותם 1,418.
+
+        מתחת לזה שתי השאלות נפרדות ואינן היפוך זו של זו, ובכוונה:
+        התכנון שואל «כמה צריך בשנה», והנתיב המוכר רץ בה בלי תלות
+        בכמות ההגשות; הכיוון ההפוך שואל «יש לי כך וכך מועמדים», ושם
+        התמהיל הוא יחסי. הדבקת 1,418 על כמות קטנה היא בדיוק התקלה
+        שדווחה (300 בדיקות קבצים שהחזירו 1,418 גיוסים).
         """
+        share = self.eng.known_share("submissions")
         for target in (1419, 2000, 3294, 4000, 9999):
             for days in (None, 30, 182, 365, 730):
                 plan = self.eng.constrained_plan(target, days)
+                span, known_span = self.eng._flow_span(days)
                 back = self.eng.constrained_combine(
                     self.counts("submissions", plan["submissions"]), days)
                 if plan["shortfall"]:
-                    # יעד שקטן מהנתיב הקבוע מושג בלי אף הגשה, ולכן
-                    # הנתיב לבדו כבר עובר אותו. אין כאן היפוך, ואין
-                    # צריך להיות - זו תשובה אמיתית ולא קצה שלא טופל.
-                    self.assertGreaterEqual(back["hires"], target)
+                    # יעד שקטן מהנתיב הקבוע מושג בלי אף הגשה.
+                    self.assertGreaterEqual(back["hires"], 0)
+                    continue
+                # גבול התקרה נבדק עם מרווח של אדם אחד, כדי שנקודת
+                # המגע המדויקת לא תיפול לצד הלא נכון בגלל עיגול.
+                if plan["submissions"] * share < known_span - 1:
+                    # התקרה אינה נוגעת: הכמות קטנה מהנפח הטבעי, ולכן
+                    # התמהיל היחסי נותן פחות מהנתיב השנתי המלא.
+                    self.assertLess(back["hires"], target)
                     continue
                 self.assertLessEqual(
                     abs(back["hires"] - target), 1,
@@ -1713,13 +1726,59 @@ class TestConstrainedForward(unittest.TestCase):
         self.assertIsNotNone(entry["via_rate"])
         self.assertEqual([x["key"] for x in flow["extra"]], ["online_invite"])
 
-    def test_a_quantity_below_the_fixed_lane_is_flagged(self):
-        """הכמות היא נפח לאורך החלון, ולכן היא כוללת את הנתיב הקבוע."""
-        flow = self.eng.constrained_combine(self.counts("yachbam", 500))
-        entry = flow["entries"][0]
-        self.assertTrue(entry["below_known"])
-        self.assertEqual(entry["new"], 0.0)
-        self.assertEqual(flow["hires"], flow["known"]["hires"])
+    def test_a_small_batch_gets_a_proportional_answer(self):
+        """התקלה שדווחה: 300 בדיקות קבצים החזירו 1,418 גיוסים.
+
+        הניכוי הקבוע הדביק את כל האוכלוסייה השנתית על 300 מועמדים.
+        הפיצול הוא יחסי: 4.64% מהנפח בבדיקת קבצים הם מוכרת, ולכן
+        300 כפול שיעור ההמרה המשוקלל 10.77% הם 32 גיוסים.
+        """
+        self.assertAlmostEqual(self.eng.blended_rate("file_check"), 0.107739,
+                               places=5)
+        flow = self.eng.constrained_combine(self.counts("file_check", 300))
+        self.assertEqual(flow["hires"], 32)
+        self.assertLess(flow["known"]["hires"], 20)
+        # וגם ביחב"מ, שבו חלק האוכלוסייה המוכרת גדול במיוחד
+        self.assertEqual(
+            self.eng.constrained_combine(self.counts("yachbam", 500))["hires"],
+            402)
+
+    def test_the_blended_rate_is_what_the_chart_shows(self):
+        """הזנת הנפח שבתרשים מחזירה את מה שהתרשים אומר על אותו שלב.
+
+        בשלב שהאוכלוסייה המוכרת עוברת בו זהו כל 3,294 הגיוסים; בשלב
+        שהיא אינה עוברת בו זהו רק חלקה של האוכלוסייה החדשה. בשני
+        המקרים המספר הוא הנפח כפול שיעור ההמרה המשוקלל.
+        """
+        af = self.eng.annual_flow()
+        for row in af["chain"]:
+            rate = self.eng.blended_rate(row["key"])
+            flow = self.eng.constrained_combine(
+                self.counts(row["key"], row["volume"]))
+            self.assertLessEqual(
+                abs(flow["hires"] - round_half_up(row["volume"] * rate)), 1,
+                row["key"])
+            expected = af["hires"] if row["known_passes"] else af["new"]["hires_per_year"]
+            self.assertLessEqual(abs(flow["hires"] - expected), 1, row["key"])
+
+    def test_the_fixed_lane_has_a_ceiling(self):
+        """הנתיב המוכר יחסי, אבל אינו חורג מהיקפו בחלון.
+
+        זו התקרה ששומרת על ההיפוך המדויק: כמות גדולה מהנפח הטבעי
+        מקבלת 1,418 בלבד, וכל מה שמעליה נופל על האוכלוסייה החדשה.
+        """
+        small = self.eng.constrained_combine(self.counts("submissions", 6000))
+        self.assertLess(small["known"]["hires"], 200)
+        big = self.eng.constrained_combine(self.counts("submissions", 200000))
+        self.assertEqual(big["known"]["hires"], 1418)
+
+    def test_the_ceiling_is_enforced_once_for_all_entries(self):
+        """האוכלוסייה המוכרת היא אוכלוסייה אחת, ואינה נספרת בכל שלב מחדש."""
+        counts = {k: None for k in self.keys}
+        counts["submissions"] = 60000
+        counts["yachbam"] = 4000
+        flow = self.eng.constrained_combine(counts)
+        self.assertEqual(flow["known"]["hires"], 1418)
 
     def test_the_times_come_from_the_files_not_from_the_chart(self):
         """התרשים נושא יחסים בלבד. הזמנים ממשיכים להימדד בקבצים."""
@@ -1731,22 +1790,28 @@ class TestConstrainedForward(unittest.TestCase):
         days = [r["days_median"] for r in flow["rows"]]
         self.assertEqual(days, sorted(days))
 
-    def test_the_gap_is_measured_against_the_same_engine(self):
-        """«כמה עוד צריך» נשען על אותו תזרים, ולא על מודל אחר."""
+    def test_what_is_there_plus_the_gap_is_the_whole_plan(self):
+        """מה שכבר עובר בשלב ועוד ההשלמה = הדרישה המלאה. בכל שלב."""
         counts = self.counts("submissions", 30000)
         flow = self.eng.constrained_combine(counts)
         gap = self.eng.constrained_gap(counts, 4000)
         self.assertEqual(gap["have"], flow["hires"])
         self.assertEqual(gap["gap"], 4000 - flow["hires"])
-        full = self.eng.constrained_plan(4000)["submissions"]
-        # מה שכבר יש ועוד ההשלמה = הדרישה המלאה, עד עיגול לאנשים שלמים
-        self.assertLessEqual(abs(30000 + gap["rows"][0]["required"] - full), 40)
+        for row in gap["rows"]:
+            self.assertEqual(row["have"] + row["required"],
+                             row["needed_total"], row["key"])
+        # והזנת הסכום חזרה מחזירה בדיוק את היעד
+        back = self.eng.constrained_combine(
+            self.counts("submissions", 30000 + gap["rows"][0]["required"]))
+        self.assertEqual(back["hires"], 4000)
 
-    def test_an_empty_pipeline_still_has_the_fixed_lane(self):
-        """בלי שום מלאי עדיין מתגייסים אלה שאינם עוברים בהליך."""
+    def test_an_empty_pipeline_asks_for_the_whole_plan(self):
+        """בלי שום מלאי, ההשלמה היא בדיוק הדרישה המלאה."""
         gap = self.eng.constrained_gap({k: None for k in self.keys}, 4000)
-        self.assertEqual(gap["have"], 1418)
-        self.assertEqual(gap["gap"], 4000 - 1418)
+        plan = self.eng.constrained_plan(4000)
+        self.assertEqual(gap["have"], 0)
+        self.assertEqual([r["required"] for r in gap["rows"]],
+                         [r["total"] for r in plan["rows"][:-1]])
 
     def test_the_timeline_adds_up_to_the_hires(self):
         """פיזור הגיוסים על הזמן מסתכם בדיוק במספר הגיוסים."""
@@ -1762,14 +1827,22 @@ class TestConstrainedForward(unittest.TestCase):
 
     def test_the_fixed_lane_is_spread_evenly_over_the_window(self):
         """הנתיב הקבוע אינו נגזר משלב, ולכן הוא מתחלק לפי אורך החלון."""
-        counts = self.counts("submissions", 0)
-        tl = self.eng.constrained_timeline(counts)
-        self.assertEqual(tl["new"], 0)
-        self.assertEqual(tl["total"], 1418)
-        # כל חלון קיבל משהו, והחלון הארוך ביותר קיבל את הרוב
-        self.assertTrue(all(r["hires"] > 0 for r in tl["rows"]))
-        widest = max(tl["rows"], key=lambda r: r["hires"])
-        self.assertEqual(widest["key"], tl["rows"][-1]["key"])
+        shares = self.eng._uniform_shares(365)
+        self.assertAlmostEqual(sum(shares), 1.0, places=9)
+        # החלון הארוך ביותר מקבל את הרוב, והקצר ביותר את המעט
+        self.assertEqual(max(range(len(shares)), key=lambda i: shares[i]),
+                         len(shares) - 1)
+        # ובחלון קצר, חלונות שכולם אחריו אינם מקבלים דבר
+        short = self.eng._uniform_shares(10)
+        self.assertAlmostEqual(sum(short), 1.0, places=9)
+        self.assertEqual(short[-1], 0.0)
+
+        # והנתיב הקבוע אכן מופיע בפיזור, כשהוא נוגע בתקרה
+        tl = self.eng.constrained_timeline(self.counts("submissions", 59978))
+        known_rows = [r for r in tl["rows"]
+                      for s in r["sources"] if s["from"] is None]
+        self.assertTrue(known_rows)
+        self.assertEqual(tl["known"], 1418)
 
     def test_every_stage_that_can_be_entered_gets_an_answer(self):
         """הדרישה: המחשבון עובד לכל שלב ולכל כיוון."""

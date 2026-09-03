@@ -124,6 +124,7 @@ const inDays = n => {
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") +
          "-" + String(d.getDate()).padStart(2, "0");
 };
+const pctOf = x => (x * 100).toFixed(1) + "%";
 const flowRows = () => registry.flowBody.children;
 const constraintRows = () => registry.constraintBody.children;
 
@@ -457,13 +458,34 @@ check("שלב שאינו בתזרים נקשר אליו ונאמר שכך נעש
   return warned ? null : "לא הוזהר שהשלב אינו בתזרים";
 });
 
-check("כמות שקטנה מהנתיב המוכר מפיקה אזהרה", () => {
+check("נפח קטן מקבל תשובה יחסית ולא את כל האוכלוסייה השנתית", () => {
+  // התקלה שדווחה: 300 בדיקות קבצים החזירו 1,418 גיוסים - כל
+  // האוכלוסייה השנתית הודבקה על 300 מועמדים.
+  clearAll();
+  setVal("file_check", "300");
+  sandbox.calculate();
+  const v = num(registry.heroValue.textContent);
+  if (v !== 32) return "התקבלו " + v + " גיוסים במקום 32";
+  const counts = {}; stageKeys.forEach(k => { counts[k] = null; });
+  counts.file_check = 300;
+  const flow = sandbox.Engine.constrainedCombine(counts, null);
+  if (flow.known.hires >= 20) return "הנתיב המוכר לא היה יחסי: " + flow.known.hires;
+  if (Math.round(300 * sandbox.Engine.blendedRate("file_check")) !== v)
+    return "המספר אינו הכמות כפול שיעור ההמרה המשוקלל";
   clearAll();
   setVal("yachbam", "500");
   sandbox.calculate();
-  return registry.gapBody.children.some(
-    c => c.classList.contains("warn") && c.textContent.includes("נפח לאורך החלון"))
-    ? null : "לא הוזהר שהכמות קטנה מהנתיב המוכר";
+  const y = num(registry.heroValue.textContent);
+  return y === 402 ? null : "500 ביחב\"מ החזירו " + y + " במקום 402";
+});
+
+check("שיעור ההמרה המשוקלל מוזכר בהסבר", () => {
+  clearAll();
+  setVal("file_check", "300");
+  sandbox.calculate();
+  const t = infoOf(registry.flowLanes) + " " + infoOf(registry.flowInfo);
+  const rate = pctOf(sandbox.Engine.blendedRate("file_check"));
+  return t.includes(rate) ? null : "השיעור המשוקלל " + rate + " אינו מוזכר";
 });
 
 check("תאריך יעד בזרימה קדימה מקטין את המספר הגדול", () => {
@@ -677,7 +699,7 @@ check("כמה כבר בדרך נאמר במפורש", () => {
     ? null : "לא נאמר כמה כבר בדרך וכמה חסר: " + sub;
 });
 
-check("הפער נמדד מול אותו מנוע ולא מול מודל אחר", () => {
+check("מה שכבר יש ועוד ההשלמה = הדרישה המלאה", () => {
   clearAll();
   setVal("submissions", "30000");
   setVal("target", "4000");
@@ -687,12 +709,13 @@ check("הפער נמדד מול אותו מנוע ולא מול מודל אחר"
   const flow = sandbox.Engine.constrainedCombine(counts, null);
   const gap = sandbox.Engine.constrainedGap(counts, 4000, null);
   if (gap.have !== flow.hires) return "«כבר בדרך» אינו המספר שבכרטיס הזרימה";
-  // 30,000 הגשות + ההשלמה בהגשות = הדרישה המלאה, עד עיגול
-  const full = sandbox.Engine.constrainedPlan(4000, null).submissions;
-  // עיגול הגיוסים לאנשים שלמים משאיר סטייה זעירה, ולא יותר מזה
-  const together = 30000 + gap.rows[0].required;
-  return Math.abs(together - full) <= 40
-    ? null : "ההשלמה אינה משלימה לדרישה המלאה: " + together + " מול " + full;
+  const off = gap.rows.filter(r => r.have + r.required !== r.needed_total);
+  if (off.length) return "השורה של «" + off[0].label + "» אינה מסתכמת";
+  // והזנת הסכום חזרה מחזירה בדיוק את היעד
+  const back = {}; stageKeys.forEach(k => { back[k] = null; });
+  back.submissions = 30000 + gap.rows[0].required;
+  return sandbox.Engine.constrainedCombine(back, null).hires === 4000
+    ? null : "הסכום אינו מחזיר את היעד";
 });
 
 check("יעד שכבר הושג אינו מבקש תוספת", () => {
