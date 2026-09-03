@@ -78,6 +78,8 @@ for (const sc of scenarios) {
     results.push(Engine.spread(sc.total, sc.buckets));
   } else if (sc.op === "constrained_plan") {
     results.push(Engine.constrainedPlan(sc.target, sc.days));
+  } else if (sc.op === "flow_funnel") {
+    results.push(Engine.flowFunnel());
   } else if (sc.op === "known_share") {
     results.push(Engine.knownShare(sc.stage));
   } else if (sc.op === "blended_rate") {

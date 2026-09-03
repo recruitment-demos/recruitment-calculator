@@ -772,10 +772,11 @@ check("אין מלל באנגלית בשום מקום בתצוגה", () => {
   const nodes = ["heroCap", "heroNote", "constraintBody", "constraintLanes",
                  "flowBody", "flowLanes", "whenBody", "matrixBody",
                  "timelineBody", "gapBody", "gapPlanBody", "gapPlanSub",
+                 "chartAllBody", "chartNewBody", "chartAllHead", "chartNewHead",
                  "infoTitle", "infoText"];
   const btns = ["aboutBtn", "inputInfo", "heroInfo", "constraintInfo",
                 "flowInfo", "whenInfo", "matrixInfo", "timelineInfo",
-                "gapPlanInfo"];
+                "gapPlanInfo", "chartInfo"];
   const scan = () => {
     let t = "";
     nodes.forEach(id => { t += " " + allText(at(id)) + " " + infoOf(at(id)); });
@@ -822,6 +823,71 @@ check("כל שלב שאפשר להזין בו מחזיר תשובה", () => {
     if (flowRows().some(r => !hasInfo(r, 15))) bad.push(k + ": שורה בלי מקור");
   });
   return bad.length ? bad.join(" | ") : null;
+});
+
+check("יעד קטן מקבל נתיב מוכר יחסי ולא 1,418", () => {
+  // התקלה שדווחה: יעד 400 החזיר 1,418 בכרטיס הכחול.
+  clearAll();
+  setVal("target", "400");
+  sandbox.calculate();
+  const plan = sandbox.Engine.constrainedPlan(400, null);
+  if (plan.known.hires !== 172) return "הנתיב המוכר הוא " + plan.known.hires;
+  if (plan.new.hires !== 228) return "האוכלוסייה החדשה היא " + plan.new.hires;
+  const v = num(registry.heroValue.textContent);
+  if (v === 1418) return "הכרטיס הראשי עדיין מציג 1,418";
+  if (v !== plan.submissions) return "הכרטיס אינו תואם את המנוע: " + v;
+  // והחלק היחסי הוא 43%, בדיוק כמו בתרשים
+  const lane = num(registry.constraintLanes.children[0].children[1].textContent);
+  return lane === 172 ? null : "התיבה מציגה " + lane;
+});
+
+check("אין התייחסות לזמן כשלא הוזן תאריך", () => {
+  clearAll();
+  setVal("target", "4000");
+  sandbox.calculate();
+  if (registry.heroNote.textContent !== "")
+    return "נשארה שורת זמן: " + registry.heroNote.textContent;
+  clearAll();
+  setVal("submissions", "60000");
+  sandbox.calculate();
+  if (registry.heroNote.textContent !== "")
+    return "נשארה שורת זמן בזרימה: " + registry.heroNote.textContent;
+  // ועם תאריך היא כן חוזרת
+  setVal("targetDate", inDays(90));
+  sandbox.calculate();
+  return registry.heroNote.textContent.includes("נותרו")
+    ? null : "עם תאריך לא הוצג כמה זמן נשאר";
+});
+
+check("משפך הליך הגיוס מוצג בשתי עמודות", () => {
+  const f = sandbox.Engine.flowFunnel();
+  const a = registry.chartAllBody.children;
+  const b = registry.chartNewBody.children;
+  const expected = f.rows.length + f.aside.length;
+  if (a.length !== expected) return "עמודה ראשונה: " + a.length + " שורות";
+  if (b.length !== expected) return "עמודה שנייה: " + b.length + " שורות";
+  if (!registry.chartAllHead.textContent.includes("כולל"))
+    return "אין כותרת לעמודה הראשונה";
+  if (!registry.chartNewHead.textContent.includes("בלי"))
+    return "אין כותרת לעמודה השנייה";
+  // הכמויות הן התרשים עצמו
+  const nums = a.filter(r => !r.classList.contains("aside")).map(r => num(fval(r)));
+  if (JSON.stringify(nums) !== JSON.stringify(f.rows.map(r => r.all.count)))
+    return "העמודה הראשונה אינה תואמת את התרשים";
+  const nums2 = b.filter(r => !r.classList.contains("aside")).map(r => num(fval(r)));
+  if (JSON.stringify(nums2) !== JSON.stringify(f.rows.map(r => r.new.count)))
+    return "העמודה השנייה אינה תואמת את התרשים";
+  const missing = a.concat(b).filter(r => !hasInfo(r, 20));
+  return missing.length ? missing.length + " שורות בלי מקור" : null;
+});
+
+check("המשפך שבתחתית אינו משתנה עם מה שמוזן", () => {
+  const before = allText(registry.chartAllBody);
+  clearAll();
+  setVal("target", "9999");
+  sandbox.calculate();
+  return allText(registry.chartAllBody) === before
+    ? null : "המשפך ההיסטורי השתנה עם הקלט";
 });
 
 check("איפוס מנקה הכל", () => {

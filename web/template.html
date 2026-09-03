@@ -378,6 +378,21 @@
   }
   .sheet p:last-child { margin-bottom: 0; }
 
+  /* ---------- שני משפכים זה לצד זה ---------- */
+  .twofunnels { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; }
+  .halffunnel { min-width: 0; }
+  .colhead {
+    font-size: 12.5px; font-weight: 700; color: var(--brand);
+    background: var(--brand-soft); border-radius: 8px;
+    padding: 6px 11px; margin-bottom: 10px; text-align: center;
+  }
+  .halffunnel:last-child .colhead { color: var(--muted); background: #f2f5f9; }
+  .halffunnel .fstage { grid-template-columns: 1fr 62px; }
+  .halffunnel .fhead { grid-column: 1 / -1; }
+  @media (max-width: 680px) {
+    .twofunnels { grid-template-columns: 1fr; gap: 18px; }
+  }
+
   /* ---------- שורת מאזן קצרה ---------- */
   .tally {
     font-size: 13px; font-weight: 600; color: var(--brand);
@@ -499,6 +514,23 @@
     <div class="card reveal" id="gapCard">
       <div class="titlerow"><h2>שים לב</h2></div>
       <div id="gapBody"></div>
+    </div>
+  </div>
+
+  <div class="card" id="chartCard">
+    <div class="titlerow">
+      <h2>משפך הליך הגיוס</h2>
+      <button class="info" id="chartInfo" type="button">ⓘ</button>
+    </div>
+    <div class="twofunnels">
+      <div class="halffunnel">
+        <div class="colhead" id="chartAllHead"></div>
+        <div class="funnel" id="chartAllBody"></div>
+      </div>
+      <div class="halffunnel">
+        <div class="colhead" id="chartNewHead"></div>
+        <div class="funnel" id="chartNewBody"></div>
+      </div>
     </div>
   </div>
 
@@ -1166,10 +1198,12 @@ const Engine = (() => {
     const span = days === null ? year : days;
     if (span === null || span <= 0) return null;
 
-    const knownHires = af.known.hires_per_year * span / year;
-    let newHires = target - knownHires;
-    const shortfall = newHires < 0;
-    if (shortfall) newHires = 0.0;
+    // האוכלוסייה המוכרת יחסית ליעד, עם תקרה. ההסבר המלא ב-engine.py.
+    const ceiling = af.known.hires_per_year * span / year;
+    const proportional = Math.max(0.0, target) * af.known.share_of_hires;
+    const knownHires = Math.min(ceiling, proportional);
+    const newHires = Math.max(0.0, target - knownHires);
+    const shortfall = false;
 
     const chain = af.chain;
     const volumes = {};
@@ -1519,6 +1553,54 @@ const Engine = (() => {
     return acc;
   };
 
+  /* ------------------------------------------------------------------ *
+   *  משפך הליך הגיוס השנתי, בשתי עמודות: עם האוכלוסייה המוכרת ובלעדיה   *
+   *  חייב להישאר זהה ל-recruit_calc/engine.py.                          *
+   * ------------------------------------------------------------------ */
+  const flowFunnel = () => {
+    const af = annualFlow();
+    if (af === null) return null;
+    const rows = af.chain.concat([af.hire_row]);
+    const firstAll = rows[0].volume, firstNew = rows[0].new;
+
+    const col = (count, prevCount, firstCount) => ({
+      count: count,
+      from_prev: prevCount ? roundTo(count / prevCount, 6) : null,
+      from_first: firstCount ? roundTo(count / firstCount, 6) : null
+    });
+
+    const out = [];
+    let prev = null;
+    rows.forEach((r, i) => {
+      out.push({
+        key: r.key, label: r.label,
+        is_hire: i === rows.length - 1,
+        known: r.known_passes ? r.known : 0,
+        known_passes: r.known_passes,
+        all: col(r.volume, prev ? prev.volume : null, firstAll),
+        new: col(r.new, prev ? prev.new : null, firstNew)
+      });
+      prev = r;
+    });
+
+    const byKey = {};
+    rows.forEach(r => { byKey[r.key] = r; });
+    const aside = af.aside.map(a => ({
+      key: a.key, label: a.label, after: a.after,
+      share_of_host: a.share_of_host,
+      all: col(a.volume, byKey[a.after].volume, firstAll),
+      new: col(roundHalfUp(byKey[a.after].new * a.share_of_host),
+               byKey[a.after].new, firstNew)
+    }));
+
+    return {
+      year: af.year, source: af.source,
+      known_label: af.known.label, new_label: af.new.label,
+      known_per_year: af.known.hires_per_year,
+      rows: out, aside: aside
+    };
+  };
+
   const constrainedGap = (counts, target, days) => {
     const plan = constrainedPlan(target, days);
     if (plan === null) return null;
@@ -1724,7 +1806,7 @@ const Engine = (() => {
            spread, combinedMatrix, managerPlan, throughputPlan,
            annualFlow, constrainedPlan,
            constrainedEntry, constrainedCombine, constrainedGap,
-           knownShare, blendedRate,
+           knownShare, blendedRate, flowFunnel,
            constrainedTimeline, constrainedMatrix,
            curveShare, hiresByDay, combinedByDay,
            crossCheck, requiredForTarget, requiredFunnel, requiredPlan,
@@ -2126,17 +2208,20 @@ function renderConstrained(target, targetDate, days) {
 
   renderLanes("constraintLanes",
     plan.known,
-    "קבוע. " + nf(plan.known.per_year) + " גיוסים בשנה שאינם עוברים בהליך " +
-      "המיון כלל, ולכן אינם דורשים הגשות. " +
-      (plan.annual ? "אין דרך להגדיל אותם."
-        : "הם מתחלקים אחיד על פני השנה, ולכן ב-" + nf(plan.span_days) +
-          " ימים הם תורמים " + nf(plan.known.hires) + " בלבד - וזו הסיבה " +
-          "שחלון קצר מגדיל את דרישת ההגשות."),
+    "חלקה היחסי של האוכלוסייה המוכרת ביעד: " +
+      pct(plan.known.hires / plan.target) + " מ-" + nf(plan.target) +
+      " הגיוסים, לפי חלקה בתרשים. היא מגיעה ביחס 1:1, אינה עוברת בהליך " +
+      "המיון ולכן אינה דורשת הגשות. " +
+      (plan.annual
+        ? "יש לה תקרה: " + nf(plan.known.per_year) + " גיוסים בשנה, ומעליה " +
+          "כל התוספת נופלת על האוכלוסייה החדשה."
+        : "התקרה שלה נחתכת לפי אורך החלון - ב-" + nf(plan.span_days) +
+          " ימים היא " + nf(Math.round(plan.known.per_year *
+            plan.span_days / 365)) + " בלבד, וזו הסיבה שחלון קצר מגדיל " +
+          "את דרישת ההגשות."),
     plan.new,
-    plan.shortfall
-      ? "היעד קטן מהנתיב המוכר, ולכן אינו דורש אף הגשה."
-      : "כל השאר. אלה הגיוסים היחידים שנגזרים מכמות ההגשות, בשיעור " +
-        pct(plan.new.hire_rate) + " מהגשה לגיוס.",
+    "כל השאר. אלה הגיוסים היחידים שנגזרים מכמות ההגשות, בשיעור " +
+      pct(plan.new.hire_rate) + " מהגשה לגיוס.",
     "הגשות דרושות", plan.submissions,
     "כדי לגייס " + nf(plan.target) + " ב" + spanText + " צריך " +
       nf(plan.submissions) + " הגשות. זו התשובה הראשית של המחשבון." +
@@ -2163,14 +2248,18 @@ function renderConstrained(target, targetDate, days) {
     info.push("מתחת לכל כמות כתוב הקצב הנדרש: כמה מועמדים צריך להכניס " +
       "לאותו שלב ליום, ובשלבים הדקים - לשבוע או לחודש.");
   }
-  if (plan.shortfall) {
-    info.push("היעד שהוזן קטן מהנתיב המוכר, ולכן הוא מושג בלי אף הגשה חדשה.");
+  info.push("שיעורי המעבר בשרשרת חושבו על האוכלוסייה החדשה בלבד, מפני " +
+    "שהאוכלוסייה המוכרת אינה עוברת סינון.");
+  if (plan.known.hires < plan.target * 0.43) {
+    info.push("מעל " + nf(Math.round(plan.known.per_year / 0.43048)) +
+      " גיוסים בשנה, האוכלוסייה המוכרת מגיעה לתקרה שלה - " +
+      nf(plan.known.hires) + " - וכל התוספת מעליה נופלת על האוכלוסייה " +
+      "החדשה. לכן הגיוסים גדלים פי " + plan.target_growth.toFixed(2) +
+      " אך ההגשות פי " + plan.growth.toFixed(2) + ".");
   } else {
-    info.push("שיעורי המעבר בשרשרת חושבו על האוכלוסייה החדשה בלבד, מפני " +
-      "שהאוכלוסייה המוכרת אינה עוברת סינון.");
-    info.push("הגיוסים גדלים פי " + plan.target_growth.toFixed(2) +
-      " אך ההגשות פי " + plan.growth.toFixed(2) + " - מפני שהנתיב המוכר " +
-      "אינו גדל וכל התוספת נופלת על הנתיב היחיד שכן גדל.");
+    info.push("האוכלוסייה המוכרת מהווה " + pct(plan.known.hires / plan.target) +
+      " מהיעד, בדיוק כחלקה בתרשים. היא אינה מספר קבוע שנדבק ליעד - " +
+      "יעד קטן יותר מקבל ממנה פחות.");
   }
   info.push("הכיוון ההפוך עומד על אותה אריתמטיקה: הזנת " +
     nf(plan.submissions) + " ב«הגשות» תחזיר את אותם " + nf(plan.target) +
@@ -2498,6 +2587,86 @@ function renderTimeline(counts, days, targetDate) {
   return true;
 }
 
+/* ------------------------------------------------------------------ *
+ *  משפך הליך הגיוס השנתי, בשתי עמודות זו לצד זו                       *
+ *  זהו התרשים עצמו ולא תחזית, ולכן הוא אינו תלוי במה שהוזן. שמאל -    *
+ *  כל הנפח כולל האוכלוסייה המוכרת; ימין - האוכלוסייה החדשה בלבד,      *
+ *  כלומר מי שבאמת עובר את הליך המיון.                                 *
+ * ------------------------------------------------------------------ */
+function renderChart() {
+  const f = Engine.flowFunnel();
+  if (!f) return;
+
+  $("chartAllHead").textContent = "כולל " + f.known_label;
+  $("chartNewHead").textContent = "בלי " + f.known_label;
+
+  const draw = (bodyId, pick, withKnown) => {
+    const body = $(bodyId);
+    body.innerHTML = "";
+    const all = f.rows.map(r => pick(r).count)
+      .concat(f.aside.map(a => pick(a).count));
+    const max = Math.max.apply(null, all.concat([1]));
+    const asideAfter = {};
+    f.aside.forEach(a => {
+      if (!asideAfter[a.after]) asideAfter[a.after] = [];
+      asideAfter[a.after].push(a);
+    });
+
+    let i = 0;
+    f.rows.forEach((r, idx) => {
+      const c = pick(r);
+      const prev = idx > 0 ? pick(f.rows[idx - 1]) : null;
+      const why = "בשנת " + f.year + " עברו כאן " + nf(c.count) +
+        (withKnown && r.known
+          ? ", מהם " + nf(r.known) + " " + f.known_label + " ו-" +
+            nf(c.count - r.known) + " " + f.new_label + "."
+          : (withKnown ? " - " + f.known_label + " אינה עוברת בשלב הזה." :
+             " " + f.new_label + ", כלומר מי שעובר את הליך המיון.")) +
+        (c.from_prev ? " מהשלב הקודם מגיעים לכאן " + pct(c.from_prev) + "." : "") +
+        (c.from_first && idx > 0
+          ? " מכלל ההגשות זהו " + pct(c.from_first) + "." : "");
+      chainRow(body, {
+        label: r.label, cls: r.is_hire ? "hire" : (idx === 0 ? "source" : ""),
+        chip: c.from_prev ? pct(c.from_prev) : null,
+        value: c.count, max: max,
+        small: c.from_first && idx > 0 ? pct(c.from_first) + " מההגשות" : null,
+        info: why, infoTitle: r.label
+      }, i++);
+
+      (asideAfter[r.key] || []).forEach(a => {
+        const ac = pick(a);
+        chainRow(body, {
+          label: "↳ " + a.label, cls: "aside", infoTitle: a.label,
+          chip: pct(a.share_of_host),
+          value: ac.count, max: max,
+          small: ac.from_first ? pct(ac.from_first) + " מההגשות" : null,
+          info: "תחנת צד, לא בשרשרת. בתרשים " + f.year + " עברו בה " +
+            nf(ac.count) + ", שהם " + pct(a.share_of_host) + " מ«" +
+            Engine.label(a.after) + "». היא אינה תחנת חובה בדרך לגיוס."
+        }, i++);
+      });
+    });
+  };
+
+  draw("chartAllBody", r => r.all, true);
+  draw("chartNewBody", r => r.new, false);
+
+  const hire = f.rows[f.rows.length - 1];
+  setInfo("chartInfo", "משפך הליך הגיוס",
+    ["זהו תרשים תזרים הליך הגיוס " + f.year + " שהתקבל, ולא תחזית: הוא " +
+     "אינו משתנה עם מה שמוזן למעלה. כל היחסים שבמחשבון נגזרים ממנו.",
+     "שני המשפכים הם אותה שנה בשתי קריאות. משמאל כל הנפח, כולל «" +
+     f.known_label + "»; מימין רק «" + f.new_label + "», כלומר מי שבאמת " +
+     "עובר את הליך המיון.",
+     "ההבדל ביניהם הוא מה שהופך את החישוב לנכון: «" + f.known_label +
+     "» מגיעה ביחס 1:1 ואינה עוברת מיון, ולכן היא " +
+     pct(hire.known / hire.all.count) + " מהגיוסים אך רק " +
+     pct(f.rows[0].known / f.rows[0].all.count) + " מההגשות. " +
+     "בשלבי המיון עצמם - יום מיון מקוון ויום מיון - היא אינה מופיעה כלל.",
+     "לצד כל כמות כתוב איזה חלק היא מהשלב הקודם, ומתחתיה איזה חלק היא " +
+     "מכלל ההגשות."]);
+}
+
 /* --- הערות ובדיקות --- */
 function renderNotes(messages) {
   const body = $("gapBody");
@@ -2568,7 +2737,7 @@ function calculate() {
       renderHero(
         "הגשות דרושות ל-" + nf(target) + " גיוסים",
         cp.submissions,
-        cp.annual ? "בשנה שלמה"
+        cp.annual ? ""
           : "נותרו " + fmtSpan(cp.span_days) + " · עד " + fmtDay(shownDate) +
             " · " + fmtPace(cp.rows[0].per_day),
         "מאיפה בא המספר הזה",
@@ -2621,7 +2790,7 @@ function calculate() {
        nf(flow.known.hires) + " מהגיוסים מגיעים מ«" + flow.known.label +
        "» ומתחלקים אחיד על פני החלון, ולכן כולם בתוכו."]);
   } else {
-    renderHero("מגויסים צפויים", flow.hires, "בשנה שלמה",
+    renderHero("מגויסים צפויים", flow.hires, "",
       "מאיפה בא המספר הזה",
       [nf(flow.new.hires) + " נגזרים מהמשפך  +  " + nf(flow.known.hires) +
        " מ«" + flow.known.label + "» = " + nf(flow.hires) + " גיוסים.",
@@ -2763,9 +2932,10 @@ function buildAbout() {
 
 buildInputs();
 buildAbout();
+renderChart();
 watchHero();
 ["heroInfo", "constraintInfo", "flowInfo", "gapPlanInfo", "whenInfo",
- "matrixInfo", "timelineInfo", "inputInfo"].forEach(attachInfo);
+ "matrixInfo", "timelineInfo", "inputInfo", "chartInfo"].forEach(attachInfo);
 $("infoClose").addEventListener("click", closeInfo);
 $("infoModal").addEventListener("click", ev => {
   if (ev && ev.target === $("infoModal")) closeInfo();

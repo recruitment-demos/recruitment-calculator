@@ -987,13 +987,19 @@ class Engine:
         if span is None or span <= 0:
             return None
 
-        known_hires = af["known"]["hires_per_year"] * span / year
-        new_hires = target_hires - known_hires
-        # יעד שקטן מהנתיב המוכר מושג בלי אף הגשה. זו תשובה אמיתית,
-        # לא שגיאה, והיא מוצגת ככזו.
-        shortfall = new_hires < 0
-        if shortfall:
-            new_hires = 0.0
+        # **האוכלוסייה המוכרת יחסית ליעד, עם תקרה.** היא מהווה 43%
+        # מהגיוסים בתרשים, ולכן יעד של 400 מקבל ממנה כ-172 ולא 1,418.
+        # הדבקת המספר השנתי כרצפה קשיחה היתה מחזירה 1,418 גיוסים ליעד
+        # של 400 - וזו היתה תקלה שדווחה. התקרה נשארת: מעל 3,294 גיוסים
+        # החלק היחסי חורג מההיקף השנתי, ואז כל התוספת נופלת על
+        # האוכלוסייה החדשה.
+        ceiling = af["known"]["hires_per_year"] * span / year
+        proportional = max(0.0, target_hires) * af["known"]["share_of_hires"]
+        known_hires = min(ceiling, proportional)
+        new_hires = max(0.0, target_hires - known_hires)
+        # יעד שקטן מהנתיב הקבוע אינו קיים עוד: החלק היחסי לעולם אינו
+        # גדול מהיעד עצמו. השדה נשמר כדי שהמבנה לא ישתנה.
+        shortfall = False
 
         chain = af["chain"]
         volumes = {af["hire_row"]["key"]: new_hires}
@@ -1429,6 +1435,60 @@ class Engine:
             "aside": aside,
             "extra": extra,
             "overlap_warning": len(entries) > 1,
+        }
+
+    def flow_funnel(self):
+        """משפך הליך הגיוס השנתי, בשתי עמודות: עם האוכלוסייה המוכרת ובלעדיה.
+
+        זהו התרשים עצמו, לא תחזית, ולכן הוא אינו תלוי במה שהוזן. שתי
+        העמודות זו לצד זו מראות מה חלקה של האוכלוסייה המוכרת בכל שלב:
+        היא אינה עוברת ביום מיון כלל, ולכן העמודה הימנית והשמאלית שם
+        זהות, ובגיוס עצמו היא 43% מהנפח.
+        """
+        af = self.annual_flow()
+        if af is None:
+            return None
+        rows = list(af["chain"]) + [af["hire_row"]]
+        first_all = rows[0]["volume"]
+        first_new = rows[0]["new"]
+
+        def col(count, prev_count, first_count):
+            return {
+                "count": count,
+                "from_prev": (round_to(count / prev_count, 6)
+                              if prev_count else None),
+                "from_first": (round_to(count / first_count, 6)
+                               if first_count else None),
+            }
+
+        out = []
+        prev = None
+        for i, r in enumerate(rows):
+            out.append({
+                "key": r["key"], "label": r["label"],
+                "is_hire": i == len(rows) - 1,
+                "known": r["known"] if r["known_passes"] else 0,
+                "known_passes": r["known_passes"],
+                "all": col(r["volume"], prev["volume"] if prev else None, first_all),
+                "new": col(r["new"], prev["new"] if prev else None, first_new),
+            })
+            prev = r
+
+        by_key = {r["key"]: r for r in rows}
+        aside = [{
+            "key": a["key"], "label": a["label"], "after": a["after"],
+            "share_of_host": a["share_of_host"],
+            "all": col(a["volume"], by_key[a["after"]]["volume"], first_all),
+            "new": col(round_half_up(by_key[a["after"]]["new"] * a["share_of_host"]),
+                       by_key[a["after"]]["new"], first_new),
+        } for a in af["aside"]]
+
+        return {
+            "year": af["year"], "source": af["source"],
+            "known_label": af["known"]["label"],
+            "new_label": af["new"]["label"],
+            "known_per_year": af["known"]["hires_per_year"],
+            "rows": out, "aside": aside,
         }
 
     def constrained_gap(self, counts, target_hires, days=None):

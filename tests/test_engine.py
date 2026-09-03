@@ -1530,13 +1530,23 @@ class TestConstrainedPlan(unittest.TestCase):
         for p in (year, short):
             self.assertGreater(p["growth"], p["target_growth"])
 
-    def test_a_target_under_the_known_lane_needs_no_submissions_at_all(self):
-        plan = self.eng.constrained_plan(700)
-        self.assertTrue(plan["shortfall"])
-        self.assertEqual(plan["new"]["hires"], 0)
-        self.assertEqual(plan["rows"][0]["new"], 0)
-        # הנתיב המוכר לבדו נותר, ולכן יש עדיין נפח בתחנות המנהליות
-        self.assertEqual(plan["rows"][0]["total"], plan["known"]["hires"])
+    def test_a_small_target_gets_a_proportional_known_lane(self):
+        """התקלה שדווחה: יעד 400 החזיר 1,418 גיוסים.
+
+        הנתיב המוכר היה רצפה קשיחה, ולכן כל יעד שקטן ממנו קיבל אותו
+        במלואו. עכשיו הוא חלק יחסי מהיעד - 43%, בדיוק כחלקו בתרשים -
+        ולעולם אינו גדול מהיעד עצמו.
+        """
+        share = self.af["known"]["share_of_hires"]
+        for target in (100, 400, 700, 1418, 2000):
+            plan = self.eng.constrained_plan(target)
+            self.assertLessEqual(plan["known"]["hires"], target, str(target))
+            self.assertLessEqual(
+                abs(plan["known"]["hires"] - target * share), 0.5, str(target))
+            self.assertEqual(plan["known"]["hires"] + plan["new"]["hires"],
+                             target, str(target))
+            self.assertGreater(plan["rows"][0]["new"], 0, str(target))
+        self.assertEqual(self.eng.constrained_plan(400)["submissions"], 7283)
 
     def test_every_row_splits_into_the_two_lanes_and_they_add_up(self):
         plan = self.eng.constrained_plan(4000)
@@ -1660,34 +1670,15 @@ class TestConstrainedForward(unittest.TestCase):
     def test_the_two_directions_are_an_exact_inverse(self):
         """הזנת מה שהתכנון החזיר חייבת להחזיר את היעד עצמו.
 
-        ההיפוך מדויק בכל מקום שבו תקרת הנתיב המוכר נוגעת - כלומר בכל
-        יעד שדורש נפח הגשות בסדר גודל של הנפח השנתי ומעלה. שם
-        התכנון והכיוון ההפוך מסכימים על אותם 1,418.
-
-        מתחת לזה שתי השאלות נפרדות ואינן היפוך זו של זו, ובכוונה:
-        התכנון שואל «כמה צריך בשנה», והנתיב המוכר רץ בה בלי תלות
-        בכמות ההגשות; הכיוון ההפוך שואל «יש לי כך וכך מועמדים», ושם
-        התמהיל הוא יחסי. הדבקת 1,418 על כמות קטנה היא בדיוק התקלה
-        שדווחה (300 בדיקות קבצים שהחזירו 1,418 גיוסים).
+        מאז שהאוכלוסייה המוכרת יחסית בשני הכיוונים - ולא רצפה קשיחה
+        בכיוון אחד ותמהיל יחסי בשני - ההיפוך מדויק בכל יעד ובכל
+        חלון זמן, ולא רק היכן שהתקרה נוגעת.
         """
-        share = self.eng.known_share("submissions")
-        for target in (1419, 2000, 3294, 4000, 9999):
-            for days in (None, 30, 182, 365, 730):
+        for target in (100, 400, 1419, 2000, 3294, 4000, 9999):
+            for days in (None, 27, 30, 182, 365, 730):
                 plan = self.eng.constrained_plan(target, days)
-                span, known_span = self.eng._flow_span(days)
                 back = self.eng.constrained_combine(
                     self.counts("submissions", plan["submissions"]), days)
-                if plan["shortfall"]:
-                    # יעד שקטן מהנתיב הקבוע מושג בלי אף הגשה.
-                    self.assertGreaterEqual(back["hires"], 0)
-                    continue
-                # גבול התקרה נבדק עם מרווח של אדם אחד, כדי שנקודת
-                # המגע המדויקת לא תיפול לצד הלא נכון בגלל עיגול.
-                if plan["submissions"] * share < known_span - 1:
-                    # התקרה אינה נוגעת: הכמות קטנה מהנפח הטבעי, ולכן
-                    # התמהיל היחסי נותן פחות מהנתיב השנתי המלא.
-                    self.assertLess(back["hires"], target)
-                    continue
                 self.assertLessEqual(
                     abs(back["hires"] - target), 1,
                     f"יעד {target} בחלון {days}: חזר {back['hires']}")

@@ -68,6 +68,7 @@ def build_scenarios(eng):
                                   "target": t, "days": d})
 
     scenarios.append({"op": "lead_time_anomalies"})
+    scenarios.append({"op": "flow_funnel"})
 
     for t in TARGETS:
         scenarios.append({"op": "required_funnel", "target": t})
@@ -275,6 +276,8 @@ def python_result(eng, sc):
         return eng.spread(sc["total"], sc["buckets"])
     if op == "constrained_plan":
         return eng.constrained_plan(sc["target"], sc.get("days"))
+    if op == "flow_funnel":
+        return eng.flow_funnel()
     if op == "known_share":
         return eng.known_share(sc["stage"])
     if op == "blended_rate":
