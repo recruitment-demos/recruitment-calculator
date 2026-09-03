@@ -175,6 +175,76 @@ class TestSimulations(unittest.TestCase):
                 self.assertGreaterEqual(hires, last, f"{key}={count}")
                 last = hires
 
+    def test_the_headline_number_equals_the_hire_row(self):
+        """הכרטיס הראשי חייב להיות שווה לשורת הגיוס שבמשפך.
+
+        התקלה שדווחה: הכרטיס אמר 106 והתיבה שמתחתיו 2,020 - סך
+        הגיוסים העתידי מתוך אותן 60,000 הגשות, שאינו מה שנשאל.
+        """
+        for key in ("submissions", "file_check", "yachbam"):
+            for count in (300, 5000, 60000):
+                for days in (None, 10, 26, 90, 365):
+                    flow = self.eng.constrained_combine(
+                        self.counts(key, count), days)
+                    hire = flow["rows"][-1]
+                    where = f"{key}={count} בחלון {days}"
+                    if days is None:
+                        self.assertEqual(flow["hires"], hire["total"], where)
+                        self.assertIsNone(hire["total_in_time"], where)
+                    else:
+                        self.assertEqual(flow["hires_in_time"],
+                                         hire["total_in_time"], where)
+                        self.assertEqual(
+                            flow["known_in_time"] + flow["new_in_time"],
+                            flow["hires_in_time"], where)
+
+    def test_a_window_never_shows_more_than_the_eventual_total(self):
+        """מה שנכנס בחלון לעולם אינו גדול ממה שיקרה בסופו של דבר."""
+        for key in ("submissions", "file_check", "online_day", "yachbam"):
+            for count in (300, 5000, 60000):
+                for days in (1, 10, 26, 60, 120, 365):
+                    flow = self.eng.constrained_combine(
+                        self.counts(key, count), days)
+                    for row in flow["rows"]:
+                        where = f"{key}={count}/{days}/{row['key']}"
+                        self.assertLessEqual(row["total_in_time"],
+                                             row["total"], where)
+                        self.assertGreaterEqual(row["total_in_time"], 0, where)
+                    # האוכלוסייה החדשה יורדת משלב לשלב גם בתוך החלון.
+                    # הסך הכול אינו חייב לרדת: הנתיב המוכר אינו עובר
+                    # בשלבי המיון ומצטרף מחדש ביחב"מ, ולכן בחלון קצר
+                    # מאוד «יום מיון» יכול להיות 0 ו«יחב"מ» 4.
+                    seq = [r["new_in_time"] for r in flow["rows"]]
+                    self.assertEqual(seq, sorted(seq, reverse=True),
+                                     f"{key}={count}/{days}")
+
+    def test_a_longer_window_lets_more_in(self):
+        """מונוטוניות בזמן: חלון ארוך יותר מכניס לפחות אותו דבר."""
+        for key in ("submissions", "file_check", "yachbam"):
+            last = -1
+            for days in (1, 5, 10, 26, 60, 120, 240, 365):
+                flow = self.eng.constrained_combine(
+                    self.counts(key, 60000), days)
+                self.assertGreaterEqual(flow["hires_in_time"], last,
+                                        f"{key} בחלון {days}")
+                last = flow["hires_in_time"]
+
+    def test_reach_share_is_a_share(self):
+        """שיעור ההגעה בתוך חלון הוא בין 0 ל-1 ואינו יורד עם הזמן."""
+        keys = self.eng.stage_keys(True) + [self.eng.hire_key]
+        for a in self.eng.stage_keys(True):
+            for b in keys:
+                last = -1.0
+                for days in (0, 1, 7, 14, 26, 30, 60, 90, 180, 365, 1000):
+                    sh = self.eng.reach_share(a, b, days)
+                    if sh is None:
+                        continue
+                    self.assertGreaterEqual(sh, 0.0, f"{a}->{b}/{days}")
+                    self.assertLessEqual(sh, 1.0, f"{a}->{b}/{days}")
+                    self.assertGreaterEqual(sh, last - 1e-9, f"{a}->{b}/{days}")
+                    last = sh
+                self.assertEqual(self.eng.reach_share(a, b, None), 1.0)
+
     # ------------------------------------------------------------------
     # שני הכיוונים יחד
     # ------------------------------------------------------------------

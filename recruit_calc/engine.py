@@ -1181,6 +1181,45 @@ class Engine:
             acc *= r["rate_to_next"]
         return round_to((row["new"] * acc + row["known"]) / row["volume"], 6)
 
+    def reach_share(self, from_key, to_key, days):
+        """איזה חלק מההגעות ל«to» מתוך «from» קורה בתוך מספר ימים נתון.
+
+        לשלב הגיוס יש עקומה שנמדדה יום ביום, והיא המדויקת ביותר -
+        ולכן היא בשימוש שם. לשאר הזוגות יש התפלגות על חלונות זמן,
+        והצבירה בתוך החלון שנחתך היא ליניארית.
+
+        לחלון האחרון («מעל 3 חודשים») אין קצה עליון, ולכן הוא נצבר
+        ליניארית עד סוף השנה. זו הערכה, והיא משפיעה רק על חלונות
+        ארוכים מ-3 חודשים.
+        """
+        if days is None:
+            return 1.0
+        if days < 0:
+            return 0.0
+        if from_key == to_key:
+            return 1.0
+        if to_key == self.hire_key:
+            share = self.curve_share(from_key, days)
+            return 1.0 if share is None else share
+        buckets = self._measured_buckets(from_key, to_key)
+        if not buckets:
+            return None
+        acc = 0.0
+        for b in buckets:
+            share = b.get("share") or 0.0
+            lo = b["min_days"]
+            hi = b["max_days"]
+            if days < lo:
+                continue
+            if hi is None:
+                span = max(1, 365 - lo + 1)
+                acc += share * min(1.0, (days - lo + 1) / span)
+            elif days >= hi:
+                acc += share
+            else:
+                acc += share * (days - lo + 1) / (hi - lo + 1)
+        return round_to(min(1.0, acc), 6)
+
     def constrained_entry(self, key, count, days=None):
         """מיפוי כמות שהוזנה בשלב כלשהו אל שרשרת התזרים.
 
@@ -1358,12 +1397,25 @@ class Engine:
             new_i = round_half_up(new_at[i])
             known_i = round_half_up(known_at[i]) if row["known_passes"] else 0
             total = new_i + known_i
+            # מה מתוך השורה מספיק להיכנס בתוך החלון. הנתיב הקבוע
+            # מתחלק אחיד על פני החלון ולכן כולו בפנים; האוכלוסייה
+            # החדשה נמדדת לפי הזמן שלוקח להגיע לשלב הזה.
+            in_new = None
+            if days is not None and days >= 0:
+                acc = 0.0
+                for src in sources[i]:
+                    share = self.reach_share(src["entry"]["key"], row["key"], days)
+                    acc += src["new"] * (0.0 if share is None else share)
+                in_new = round_half_up(acc)
             out.append({
                 "key": row["key"], "label": row["label"],
                 "is_hire": i == len(rows) - 1,
                 "is_source": any(s["entry"]["key"] == row["key"]
                                  for s in sources[i]),
                 "total": total, "new": new_i, "known": known_i,
+                "new_in_time": in_new,
+                "known_in_time": known_i,
+                "total_in_time": None if in_new is None else in_new + known_i,
                 "known_passes": row["known_passes"],
                 "rate_to_next": row["rate_to_next"],
                 "to_next": row["to_next"],
@@ -1382,9 +1434,21 @@ class Engine:
                 continue
             total = (next(e["count"] for e in entries if e["key"] == a["key"])
                      if is_src else round_half_up(new_at[i] * a["share_of_host"]))
+            in_total = None
+            if days is not None and days >= 0:
+                if is_src:
+                    in_total = total
+                else:
+                    acc = 0.0
+                    for src in sources[i]:
+                        share = self.reach_share(src["entry"]["key"],
+                                                 a["key"], days)
+                        acc += src["new"] * (0.0 if share is None else share)
+                    in_total = round_half_up(acc * a["share_of_host"])
             aside.append({
                 "key": a["key"], "label": a["label"], "after": a["after"],
-                "total": total, "share_of_host": a["share_of_host"],
+                "total": total, "total_in_time": in_total,
+                "share_of_host": a["share_of_host"],
                 "per_day": round_to(total / span, 3),
                 "days_median": 0.0 if is_src else weighted_days(sources[i]),
                 "sources": source_list(sources[i]),
@@ -1429,6 +1493,9 @@ class Engine:
             },
             "hires": hire["total"],
             "hires_in_time": in_time,
+            "known_in_time": hire["known"],
+            "new_in_time": (None if in_time is None
+                            else in_time - hire["known"]),
             "entries": entries,
             "start_key": rows[start]["key"],
             "rows": out,

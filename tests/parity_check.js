@@ -80,6 +80,8 @@ for (const sc of scenarios) {
     results.push(Engine.constrainedPlan(sc.target, sc.days));
   } else if (sc.op === "flow_funnel") {
     results.push(Engine.flowFunnel());
+  } else if (sc.op === "reach_share") {
+    results.push(Engine.reachShare(sc.from, sc.to, sc.days));
   } else if (sc.op === "known_share") {
     results.push(Engine.knownShare(sc.stage));
   } else if (sc.op === "blended_rate") {

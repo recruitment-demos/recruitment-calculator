@@ -125,6 +125,8 @@ const inDays = n => {
          "-" + String(d.getDate()).padStart(2, "0");
 };
 const pctOf = x => (x * 100).toFixed(1) + "%";
+// במצב יעד הכרטיס הכחול מציג את היעד, וכמות ההגשות יושבת בשורה שמתחתיו
+const heroSubs = () => num(registry.heroNote.textContent.split("·")[0]);
 const flowRows = () => registry.flowBody.children;
 const constraintRows = () => registry.constraintBody.children;
 
@@ -164,10 +166,12 @@ check("מצב תכנון מיעד נפתח כשהוזן רק יעד", () => {
   sandbox.calculate();
   if (!shown("results")) return "אזור התוצאות מוסתר";
   const cp = sandbox.Engine.constrainedPlan(400, null);
-  if (num(registry.heroValue.textContent) !== cp.submissions)
-    return "ההגשות הדרושות לא הוצגו: " + registry.heroValue.textContent;
-  if (!registry.heroCap.textContent.includes("400")) return "היעד לא נזכר";
-  if (!registry.heroCap.textContent.includes("הגשות")) return "כותרת שגויה";
+  // הכרטיס הכחול הוא היעד עצמו, וההגשות מתחתיו
+  if (num(registry.heroValue.textContent) !== 400)
+    return "הכרטיס אינו מציג את היעד: " + registry.heroValue.textContent;
+  if (heroSubs() !== cp.submissions)
+    return "ההגשות הדרושות לא הוצגו: " + registry.heroNote.textContent;
+  if (!registry.heroCap.textContent.includes("יעד")) return "כותרת שגויה";
   return shown("constraintCard") ? null : "המחשבון עם האילוצים מוסתר";
 });
 
@@ -233,7 +237,7 @@ check("תאריך שאינו משנה את הכמות אומר זאת במפור
   setVal("target", "200");
   setVal("targetDate", inDays(27));
   sandbox.calculate();
-  const withDate = num(registry.heroValue.textContent);
+  const withDate = heroSubs();
   const bare = sandbox.Engine.constrainedPlan(200, null).submissions;
   const txt = allText(registry.gapBody);
   if (withDate === bare) {
@@ -248,10 +252,10 @@ check("חלון קצר מספיק כן משנה את הכמות", () => {
   clearAll();
   setVal("target", "200");
   sandbox.calculate();
-  const annual = num(registry.heroValue.textContent);
+  const annual = heroSubs();
   setVal("targetDate", inDays(10));
   sandbox.calculate();
-  const short = num(registry.heroValue.textContent);
+  const short = heroSubs();
   if (short <= annual) return "חלון של 10 ימים לא הגדיל את הדרישה";
   return allText(registry.gapBody).includes("גדולה מזו של אותו יעד בשנה שלמה")
     ? null : "לא הוסבר למה";
@@ -261,7 +265,9 @@ check("ההגשות הדרושות ל-4,000 הן כ-82 אלף", () => {
   clearAll();
   setVal("target", "4000");
   sandbox.calculate();
-  const v = num(registry.heroValue.textContent);
+  if (num(registry.heroValue.textContent) !== 4000)
+    return "הכרטיס אינו מציג את היעד";
+  const v = heroSubs();
   if (v !== sandbox.Engine.constrainedPlan(4000, null).submissions)
     return "המספר אינו של מודל האילוצים: " + v;
   if (v < 70000 || v > 95000) return "כמות ההגשות אינה סבירה: " + v;
@@ -355,10 +361,10 @@ check("תאריך יעד משנה את הכמות ולא רק את התאריך"
   clearAll();
   setVal("target", "4000");
   sandbox.calculate();
-  const annual = num(registry.heroValue.textContent);
+  const annual = heroSubs();
   setVal("targetDate", inDays(180));
   sandbox.calculate();
-  const half = num(registry.heroValue.textContent);
+  const half = heroSubs();
   if (half === annual) return "התאריך לא שינה את הכמות";
   if (half !== sandbox.Engine.constrainedPlan(4000, 180).submissions)
     return "הכמות אינה תואמת את המנוע";
@@ -373,7 +379,8 @@ check("תאריך יעד מציג כמה זמן נשאר", () => {
   sandbox.calculate();
   const t = registry.heroNote.textContent;
   if (!t.includes("נותרו")) return "לא נאמר כמה זמן נשאר: " + t;
-  return /\d{4}/.test(t) ? null : "אין תאריך בכותרת: " + t;
+  return /\d{4}/.test(registry.heroCap.textContent)
+    ? null : "אין תאריך בכותרת: " + registry.heroCap.textContent;
 });
 
 check("תאריך יעד מציג קצב נדרש לכל שלב", () => {
@@ -414,8 +421,7 @@ check("תאריך שעבר מפיק אזהרה ואינו משנה את החיש
   setVal("target", "4000");
   setVal("targetDate", "2020-01-01");
   sandbox.calculate();
-  if (num(registry.heroValue.textContent) !==
-      sandbox.Engine.constrainedPlan(4000, null).submissions)
+  if (heroSubs() !== sandbox.Engine.constrainedPlan(4000, null).submissions)
     return "תאריך שעבר שינה את החישוב";
   return registry.gapBody.children.some(
     c => c.classList.contains("warn") && c.textContent.includes("כבר עבר"))
@@ -909,19 +915,21 @@ check("יעד קטן מקבל נתיב מוכר יחסי ולא 1,418", () => {
   const plan = sandbox.Engine.constrainedPlan(400, null);
   if (plan.known.hires !== 172) return "הנתיב המוכר הוא " + plan.known.hires;
   if (plan.new.hires !== 228) return "האוכלוסייה החדשה היא " + plan.new.hires;
-  const v = num(registry.heroValue.textContent);
+  const v = heroSubs();
   if (v === 1418) return "הכרטיס הראשי עדיין מציג 1,418";
   if (v !== plan.submissions) return "הכרטיס אינו תואם את המנוע: " + v;
   // והחלק היחסי הוא 43%, בדיוק כמו בתרשים
   const lane = num(registry.constraintLanes.children[0].children[1].textContent);
-  return lane === 172 ? null : "התיבה מציגה " + lane;
+  if (lane !== 172) return "התיבה מציגה " + lane;
+  return num(registry.heroValue.textContent) === 400
+    ? null : "הכרטיס הכחול אינו היעד";
 });
 
 check("אין התייחסות לזמן כשלא הוזן תאריך", () => {
   clearAll();
   setVal("target", "4000");
   sandbox.calculate();
-  if (registry.heroNote.textContent !== "")
+  if (registry.heroNote.textContent.indexOf("נותרו") !== -1)
     return "נשארה שורת זמן: " + registry.heroNote.textContent;
   clearAll();
   setVal("submissions", "60000");
@@ -964,6 +972,98 @@ check("המשפך שבתחתית אינו משתנה עם מה שמוזן", () =
   sandbox.calculate();
   return allText(registry.chartAllBody) === before
     ? null : "המשפך ההיסטורי השתנה עם הקלט";
+});
+
+check("הכרטיס הכחול שווה לשורת הגיוס שבמשפך - בשני המצבים", () => {
+  // התקלה שדווחה: הכרטיס הראשי אמר 106 והתיבה שמתחתיו 2,020.
+  const hireOf = bodyId => {
+    const rows = registry[bodyId].children.filter(r => r.classList.contains("hire"));
+    return rows.length ? num(fval(rows[0])) : null;
+  };
+  clearAll();
+  setVal("submissions", "60000");
+  setVal("targetDate", inDays(26));
+  sandbox.calculate();
+  const hero = num(registry.heroValue.textContent);
+  if (hireOf("flowBody") !== hero)
+    return "זרימה עם תאריך: הכרטיס " + hero + " מול המשפך " + hireOf("flowBody");
+  const lane = num(registry.flowLanes.children[2].children[1].textContent);
+  if (lane !== hero) return "תיבת סך המגויסים היא " + lane + " ולא " + hero;
+  const known = num(registry.flowLanes.children[0].children[1].textContent);
+  const fresh = num(registry.flowLanes.children[1].children[1].textContent);
+  if (known + fresh !== hero) return "שני הנתיבים אינם מסתכמים בכרטיס הראשי";
+
+  clearAll();
+  setVal("submissions", "60000");
+  sandbox.calculate();
+  if (hireOf("flowBody") !== num(registry.heroValue.textContent))
+    return "זרימה בלי תאריך: הכרטיס אינו שווה למשפך";
+
+  clearAll();
+  setVal("target", "200");
+  setVal("targetDate", inDays(26));
+  sandbox.calculate();
+  if (num(registry.heroValue.textContent) !== 200)
+    return "מצב יעד: הכרטיס אינו מציג את היעד";
+  if (hireOf("constraintBody") !== 200)
+    return "מצב יעד: שורת הגיוס אינה היעד";
+  return null;
+});
+
+check("עם תאריך, המשפך מציג רק את מה שנכנס בחלון", () => {
+  clearAll();
+  setVal("submissions", "60000");
+  setVal("targetDate", inDays(26));
+  sandbox.calculate();
+  const counts = {}; stageKeys.forEach(k => { counts[k] = null; });
+  counts.submissions = 60000;
+  const flow = sandbox.Engine.constrainedCombine(counts, 26);
+  const rows = registry.flowBody.children.filter(r => !r.classList.contains("aside"));
+  const nums = rows.map(r => num(fval(r)));
+  const expected = flow.rows.map(r => r.total_in_time);
+  if (JSON.stringify(nums) !== JSON.stringify(expected))
+    return "המשפך אינו מוגבל לחלון: " + nums;
+  // וכל שורה קטנה מהסך הכול העתידי, חוץ מנקודת הכניסה
+  const bare = sandbox.Engine.constrainedCombine(counts, null);
+  if (!(flow.rows[flow.rows.length - 1].total_in_time <
+        bare.rows[bare.rows.length - 1].total))
+    return "שורת הגיוס לא הצטמצמה";
+  return infoOf(rows[1]).includes("מאוחרים מהתאריך")
+    ? null : "לא נאמר שהשאר מאוחרים מהתאריך";
+});
+
+check("בלי תאריך המשפך מציג את הסך הכול", () => {
+  clearAll();
+  setVal("submissions", "60000");
+  sandbox.calculate();
+  const counts = {}; stageKeys.forEach(k => { counts[k] = null; });
+  counts.submissions = 60000;
+  const flow = sandbox.Engine.constrainedCombine(counts, null);
+  const nums = registry.flowBody.children
+    .filter(r => !r.classList.contains("aside")).map(r => num(fval(r)));
+  return JSON.stringify(nums) === JSON.stringify(flow.rows.map(r => r.total))
+    ? null : "המשפך אינו מציג את הסך הכול";
+});
+
+check("במצב יעד המשפך גוזר לאחור בתוך החלון", () => {
+  clearAll();
+  setVal("target", "200");
+  setVal("targetDate", inDays(26));
+  sandbox.calculate();
+  const plan = sandbox.Engine.constrainedPlan(200, 26);
+  const nums = registry.constraintBody.children
+    .filter(r => !r.classList.contains("aside")).map(r => num(fval(r)));
+  if (JSON.stringify(nums) !== JSON.stringify(plan.rows.map(r => r.total)))
+    return "המשפך אינו תואם את התכנון";
+  // כל שורה נגזרת מזו שמתחתיה לפי אחוז המעבר
+  for (let i = 0; i < plan.rows.length - 1; i++) {
+    const r = plan.rows[i];
+    if (!r.rate_to_next) continue;
+    const nextNew = plan.rows[i + 1].new;
+    if (Math.abs(r.new * r.rate_to_next - nextNew) > 1.5)
+      return "השרשרת אינה עקבית ב«" + r.label + "»";
+  }
+  return heroSubs() === plan.submissions ? null : "ההגשות אינן של החלון";
 });
 
 check("איפוס מנקה הכל", () => {

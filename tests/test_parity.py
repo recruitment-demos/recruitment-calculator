@@ -55,6 +55,9 @@ def build_scenarios(eng):
         scenarios.append({"op": "forward", "stage": k})
         for d in DAYS:
             scenarios.append({"op": "curve_share", "stage": k, "days": d})
+            for t in keys + [hire]:
+                scenarios.append({"op": "reach_share", "from": k, "to": t,
+                                  "days": d})
         for c in COUNTS:
             scenarios.append({"op": "project_cohort", "stage": k, "count": c})
             scenarios.append({"op": "timeline", "stage": k, "count": c})
@@ -280,6 +283,8 @@ def python_result(eng, sc):
         return eng.constrained_plan(sc["target"], sc.get("days"))
     if op == "flow_funnel":
         return eng.flow_funnel()
+    if op == "reach_share":
+        return eng.reach_share(sc["from"], sc["to"], sc["days"])
     if op == "known_share":
         return eng.known_share(sc["stage"])
     if op == "blended_rate":

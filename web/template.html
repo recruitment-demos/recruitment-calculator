@@ -1330,6 +1330,35 @@ const Engine = (() => {
     return roundTo((row.new * acc + row.known) / row.volume, 6);
   };
 
+  /* איזה חלק מההגעות ל«to» מתוך «from» קורה בתוך מספר ימים נתון.
+     חייב להישאר זהה ל-recruit_calc/engine.py. */
+  const reachShare = (fromKey, toKey, days) => {
+    if (days === null || days === undefined) return 1.0;
+    if (days < 0) return 0.0;
+    if (fromKey === toKey) return 1.0;
+    if (toKey === HIRE) {
+      const sh = curveShare(fromKey, days);
+      return sh === null || sh === undefined ? 1.0 : sh;
+    }
+    const buckets = measuredBuckets(fromKey, toKey);
+    if (!buckets) return null;
+    let acc = 0.0;
+    buckets.forEach(b => {
+      const share = b.share || 0.0;
+      const lo = b.min_days, hi = b.max_days;
+      if (days < lo) return;
+      if (hi === null || hi === undefined) {
+        const span = Math.max(1, 365 - lo + 1);
+        acc += share * Math.min(1.0, (days - lo + 1) / span);
+      } else if (days >= hi) {
+        acc += share;
+      } else {
+        acc += share * (days - lo + 1) / (hi - lo + 1);
+      }
+    });
+    return roundTo(Math.min(1.0, acc), 6);
+  };
+
   const constrainedEntry = (key, count, days) => {
     const packed = flowRows();
     if (packed === null || count === null || count === undefined) return null;
@@ -1470,11 +1499,24 @@ const Engine = (() => {
       const newI = roundHalfUp(newAt[i]);
       const knownI = row.known_passes ? roundHalfUp(knownAt[i]) : 0;
       const total = newI + knownI;
+      // מה מתוך השורה מספיק להיכנס בתוך החלון. ראו engine.py.
+      let inNew = null;
+      if (days !== null && days !== undefined && days >= 0) {
+        let acc = 0.0;
+        sources[i].forEach(src => {
+          const sh = reachShare(src.entry.key, row.key, days);
+          acc += src.new * (sh === null || sh === undefined ? 0.0 : sh);
+        });
+        inNew = roundHalfUp(acc);
+      }
       out.push({
         key: row.key, label: row.label,
         is_hire: i === rows.length - 1,
         is_source: sources[i].some(s => s.entry.key === row.key),
         total: total, new: newI, known: knownI,
+        new_in_time: inNew,
+        known_in_time: knownI,
+        total_in_time: inNew === null ? null : inNew + knownI,
         known_passes: row.known_passes,
         rate_to_next: row.rate_to_next, to_next: row.to_next,
         per_day: roundTo(total / span, 3),
@@ -1493,9 +1535,23 @@ const Engine = (() => {
       const total = isSrc
         ? entries.filter(e => e.key === a.key)[0].count
         : roundHalfUp(newAt[i] * a.share_of_host);
+      let inTotal = null;
+      if (days !== null && days !== undefined && days >= 0) {
+        if (isSrc) {
+          inTotal = total;
+        } else {
+          let acc = 0.0;
+          sources[i].forEach(src => {
+            const sh = reachShare(src.entry.key, a.key, days);
+            acc += src.new * (sh === null || sh === undefined ? 0.0 : sh);
+          });
+          inTotal = roundHalfUp(acc * a.share_of_host);
+        }
+      }
       aside.push({
         key: a.key, label: a.label, after: a.after,
-        total: total, share_of_host: a.share_of_host,
+        total: total, total_in_time: inTotal,
+        share_of_host: a.share_of_host,
         per_day: roundTo(total / span, 3),
         days_median: isSrc ? 0.0 : weightedDays(sources[i]),
         sources: sourceList(sources[i]),
@@ -1536,6 +1592,8 @@ const Engine = (() => {
       },
       hires: hire.total,
       hires_in_time: inTime,
+      known_in_time: hire.known,
+      new_in_time: inTime === null ? null : inTime - hire.known,
       entries: entries,
       start_key: rows[start].key,
       rows: out, aside: aside, extra: extra,
@@ -1870,7 +1928,7 @@ const Engine = (() => {
            spread, combinedMatrix, managerPlan, throughputPlan,
            annualFlow, constrainedPlan,
            constrainedEntry, constrainedCombine, constrainedGap,
-           knownShare, blendedRate, flowFunnel,
+           knownShare, blendedRate, flowFunnel, reachShare,
            constrainedTimeline, constrainedMatrix,
            constrainedPlanMatrix,
            curveShare, hiresByDay, combinedByDay,
@@ -2155,8 +2213,13 @@ function renderChain(bodyId, plan, opts) {
   const startDate = opts.startDate || null;
   const denom = opts.denom || plan.rows[0].total;
 
-  const all = plan.rows.map(r => r.total)
-    .concat(plan.aside.map(a => a.total))
+  // כשמוצג רק מה שנכנס בחלון, גם הפסים וגם הכמויות באים משם
+  const inTime = !!opts.inTime;
+  const shownVal = r => (inTime && r.total_in_time !== null &&
+                         r.total_in_time !== undefined)
+    ? r.total_in_time : r.total;
+  const all = plan.rows.map(shownVal)
+    .concat(plan.aside.map(shownVal))
     .concat((plan.extra || []).map(x => x.total));
   const max = Math.max.apply(null, all.concat([1]));
 
@@ -2236,11 +2299,21 @@ function renderChain(bodyId, plan, opts) {
              "ועד כאן, נמדד בקבצים על מי שעבר את המסלול בפועל.";
     }
 
+    if (inTime) {
+      why += " עד " + fmtDay(shiftDays(todayDay(), plan.span_days)) +
+             " יגיעו לכאן " + nf(shownVal(r)) + " מתוך " + nf(r.total) +
+             " שיגיעו בסופו של דבר - השאר מאוחרים מהתאריך.";
+    }
     chainRow(body, {
       label: r.label, cls: r.is_hire ? "hire" : (r.is_source ? "source" : ""),
       chip: chip, chipCls: chipCls,
-      value: r.total, max: max, split: { new: r.new, known: r.known },
-      small: rowFoot(r.per_day, r.days_median, dated, startDate),
+      value: shownVal(r), max: max,
+      split: inTime
+        ? { new: (r.new_in_time === null ? r.new : r.new_in_time),
+            known: r.known_in_time === null ? r.known : r.known_in_time }
+        : { new: r.new, known: r.known },
+      small: rowFoot(inTime ? shownVal(r) / plan.span_days : r.per_day,
+                     r.days_median, dated, startDate),
       info: why
     }, i++);
 
@@ -2248,8 +2321,9 @@ function renderChain(bodyId, plan, opts) {
       chainRow(body, {
         label: "↳ " + a.label, cls: "aside", infoTitle: a.label,
         chip: pct(a.share_of_host) + " מ«" + Engine.label(a.after) + "»",
-        value: a.total, max: max,
-        small: rowFoot(a.per_day, a.days_median, dated, startDate),
+        value: shownVal(a), max: max,
+        small: rowFoot(inTime ? shownVal(a) / plan.span_days : a.per_day,
+                       a.days_median, dated, startDate),
         info: "תחנת צד, לא בשרשרת. בתזרים " + plan.year + " היא מקבלת " +
           pct(a.share_of_host) + " מ«" + Engine.label(a.after) + "», וכמעט " +
           "כל מי שמגיע אליה ממשיך הלאה. היא אינה משתתפת בחישוב ואינה " +
@@ -2350,25 +2424,45 @@ function renderFlow(counts, targetDate, days) {
   const first = plan.entries[0];
   const blended = Engine.blendedRate(first.chain_key);
 
+  /* כשהוזן תאריך יעד, הכרטיס הזה מציג אך ורק את מה שמספיק להיכנס
+     בתוך החלון - בדיוק המספר שבכרטיס הכחול. הצגת סך הגיוסים העתידי
+     לצד מספר אחר בכרטיס הראשי היא מה שנראה כמו שני מחשבונים. */
+  const timed = !plan.annual && plan.hires_in_time !== null &&
+                plan.hires_in_time !== undefined;
+  const laneKnown = timed
+    ? { label: plan.known.label, ratio: plan.known.ratio,
+        per_year: plan.known.per_year, hires: plan.known_in_time }
+    : plan.known;
+  const laneNew = timed
+    ? { label: plan.new.label, ratio: plan.new.ratio,
+        hire_rate: plan.new.hire_rate, hires: plan.new_in_time }
+    : plan.new;
+  const laneTotal = timed ? plan.hires_in_time : plan.hires;
+
   renderLanes("flowLanes",
-    plan.known,
+    laneKnown,
     "החלק מהכמות שהוזנה ששייך לאוכלוסייה המוכרת, לפי התמהיל של השלב: " +
       pct(first.known_share) + " מהנפח ב«" + first.chain_label + "» הם " +
       "מוכרים, והם מתגייסים ביחס 1:1. הנתיב הזה אינו יכול לחרוג מ-" +
       nf(plan.known.per_year) + " גיוסים בשנה" +
       (plan.annual ? "." : ", כלומר " + nf(plan.known.hires) + " בחלון של " +
-        nf(plan.span_days) + " ימים."),
-    plan.new,
+        nf(plan.span_days) + " ימים. הוא מתחלק אחיד על פני החלון, ולכן " +
+        "כולו נכנס בתוכו."),
+    laneNew,
     "כל השאר. הם עוברים את הליך המיון, לפי שיעורי המעבר של תזרים " +
-      plan.year + ".",
-    "סך מגויסים", plan.hires,
-    nf(plan.new.hires) + " מהמשפך  +  " + nf(plan.known.hires) +
-      " מהנתיב המוכר = " + nf(plan.hires) + " גיוסים ב" + spanText + "." +
-      (blended ? " שיעור ההמרה המשוקלל מ«" + first.chain_label + "» ועד " +
-        "גיוס הוא " + pct(blended) + "." : ""));
+      plan.year + "." +
+      (timed ? " מוצג כאן רק מי שמספיק להתגייס תוך " + nf(plan.span_days) +
+        " ימים: " + nf(plan.new_in_time) + " מתוך " + nf(plan.new.hires) +
+        " שיתגייסו בסופו של דבר." : ""),
+    timed ? "מגויסים עד התאריך" : "סך מגויסים", laneTotal,
+    nf(laneNew.hires) + " מהמשפך  +  " + nf(laneKnown.hires) +
+      " מהנתיב המוכר = " + nf(laneTotal) + " גיוסים ב" + spanText + "." +
+      (timed ? " זהו בדיוק המספר שבכרטיס שלמעלה, ולא סך הגיוסים העתידי." : "") +
+      (blended && !timed ? " שיעור ההמרה המשוקלל מ«" + first.chain_label +
+        "» ועד גיוס הוא " + pct(blended) + "." : ""));
 
   renderChain("flowBody", plan, {
-    sources: true, startDate: plan.annual ? todayDay() : todayDay()
+    sources: true, startDate: todayDay(), inTime: timed
   });
 
   const info = [
@@ -2799,16 +2893,25 @@ function calculate() {
   if (!entered.length) {
     const cp = Engine.constrainedPlan(target, days);
     if (cp) {
+      /* המספר הראשי הוא היעד עצמו, וכמות ההגשות הדרושה יושבת מתחתיו.
+         כך הכרטיס הכחול שווה תמיד לשורת הגיוס שבתחתית המשפך - בשני
+         המצבים - ואי אפשר לקרוא אותו כשני מספרים שונים. */
       renderHero(
-        "הגשות דרושות ל-" + nf(target) + " גיוסים",
-        cp.submissions,
-        cp.annual ? ""
-          : "נותרו " + fmtSpan(cp.span_days) + " · עד " + fmtDay(shownDate) +
-            " · " + fmtPace(cp.rows[0].per_day),
+        cp.annual ? "יעד גיוס" : "מגויסים עד " + fmtDay(shownDate),
+        target,
+        nf(cp.submissions) + " הגשות דרושות" +
+          (cp.annual ? ""
+            : " · נותרו " + fmtSpan(cp.span_days) + " · " +
+              fmtPace(cp.rows[0].per_day)),
         "מאיפה בא המספר הזה",
-        ["כדי לגייס " + nf(target) + " צריך " + nf(cp.submissions) + " הגשות" +
-         (cp.annual ? " בשנה." : " בתוך " + nf(cp.span_days) + " הימים " +
-           "שנותרו, כלומר " + fmtPace(cp.rows[0].per_day) + "."),
+        ["היעד הוא " + nf(target) + " גיוסים" +
+         (cp.annual ? " בשנה" : " עד " + fmtDay(shownDate)) + ", וכדי " +
+         "להגיע אליו צריך " + nf(cp.submissions) + " הגשות" +
+         (cp.annual ? "." : " בתוך " + nf(cp.span_days) + " הימים שנותרו, " +
+           "כלומר " + fmtPace(cp.rows[0].per_day) + "."),
+         "כל שורה במשפך אומרת כמה מועמדים צריכים לעבור באותו שלב בתוך " +
+         "החלון כדי שהיעד יתקיים, וכל שורה נגזרת מזו שמתחתיה לפי אחוזי " +
+         "המעבר של התזרים - עד לשורת הגיוס, שהיא היעד עצמו.",
          nf(cp.known.hires) + " מהגיוסים מגיעים מ«" + cp.known.label +
          "» ואינם עוברים בהליך המיון כלל, ולכן אינם דורשים הגשות. רק " +
          nf(cp.new.hires) + " הגיוסים של «" + cp.new.label + "» נגזרים " +
@@ -2880,7 +2983,7 @@ function calculate() {
   if (flow.hires_in_time !== null && flow.hires_in_time !== undefined) {
     renderHero("מגויסים עד " + fmtDay(shownDate), shown,
       "נותרו " + fmtSpan(flow.span_days) + " · " + nf(flow.hires) +
-        " בסך הכול בחלון הזה",
+        " בסך הכול, גם אחרי התאריך",
       "מאיפה בא המספר הזה",
       [nf(shown) + " מתוך " + nf(flow.hires) + " שיתגייסו בחלון הזה " +
        "יספיקו להתגייס עד " + fmtDay(shownDate) + ".",
