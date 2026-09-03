@@ -1790,6 +1790,41 @@ class TestConstrainedForward(unittest.TestCase):
         self.assertIsNone(
             self.eng.constrained_combine(counts, None)["hires_in_time"])
 
+    def test_the_matrix_always_adds_up_to_the_row_total(self):
+        """סכום החלונות בשורה שווה בדיוק לסך הכול. אחרת נראה כמו טעות."""
+        for key, n in (("submissions", 60000), ("file_check", 20000),
+                       ("online_invite", 8000), ("yachbam", 6000)):
+            for days in (None, 60, 122, 365):
+                m = self.eng.constrained_matrix(self.counts(key, n), days)
+                if m is None:
+                    continue
+                for row in m["rows"]:
+                    self.assertEqual(sum(c["count"] for c in row["cells"]),
+                                     row["count"], f"{key}/{days}/{row['key']}")
+
+    def test_the_matrix_and_the_funnel_agree(self):
+        """הטבלה והמשפך הם אותם מספרים. הם לא יתפצלו בשקט."""
+        counts = self.counts("file_check", 20000)
+        flow = self.eng.constrained_combine(counts)
+        m = self.eng.constrained_matrix(counts)
+        by_key = {r["key"]: r["count"] for r in m["rows"]}
+        for row in flow["rows"]:
+            if row["is_source"] or row["key"] not in by_key:
+                continue
+            self.assertEqual(by_key[row["key"]], row["total"], row["key"])
+
+    def test_the_entered_stage_has_no_arrival_row(self):
+        """מי שכבר נמצא בשלב אינו «מגיע» לשם, ואין לו זמן הגעה."""
+        m = self.eng.constrained_matrix(self.counts("submissions", 60000))
+        self.assertNotIn("submissions", [r["key"] for r in m["rows"]])
+        self.assertIn("hire", [r["key"] for r in m["rows"]])
+
+    def test_the_matrix_is_ordered_by_time(self):
+        """השורות מסודרות לפי מתי מגיעים, ולא לפי סדר השלבים בקוד."""
+        m = self.eng.constrained_matrix(self.counts("submissions", 60000))
+        days = [r["days_median"] for r in m["rows"]]
+        self.assertEqual(days, sorted(days))
+
     def test_the_required_pace_is_the_quantity_over_the_window(self):
         """הקצב הנדרש: כמה מועמדים ביום בכל שלב."""
         plan = self.eng.constrained_plan(4000, 200)

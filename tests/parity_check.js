@@ -86,6 +86,8 @@ for (const sc of scenarios) {
     results.push(Engine.constrainedGap(sc.counts, sc.target, sc.days));
   } else if (sc.op === "constrained_timeline") {
     results.push(Engine.constrainedTimeline(sc.counts, sc.days));
+  } else if (sc.op === "constrained_matrix") {
+    results.push(Engine.constrainedMatrix(sc.counts, sc.days));
   } else if (sc.op === "throughput_plan") {
     results.push(Engine.throughputPlan(sc.target, sc.days));
   } else if (sc.op === "manager_plan") {

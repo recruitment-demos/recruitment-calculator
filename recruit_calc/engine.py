@@ -1316,6 +1316,7 @@ class Engine:
                 "total": total, "share_of_host": a["share_of_host"],
                 "per_day": round_to(total / span, 3),
                 "days_median": 0.0 if is_src else weighted_days(sources[i]),
+                "sources": source_list(sources[i]),
                 "is_source": is_src,
                 # תחנת צד שהוזנה יושבת לפני השורה הראשונה שמוצגת, ולכן
                 # היא מצוירת בראש ולא אחרי המארח שלה - שאינו מוצג.
@@ -1415,6 +1416,102 @@ class Engine:
             "rows": out,
         }
 
+    def _uniform_shares(self, span):
+        """חלוקה אחידה של הנתיב הקבוע על פני חלונות הזמן.
+
+        הוא אינו נגזר משום שלב ואינו עובר מיון, ולכן הוא מתחלק לפי
+        אורך כל חלון. חלון שכולו אחרי סוף התקופה אינו מקבל דבר,
+        והשאר מנורמלים לסכום אחד.
+        """
+        widths = []
+        for b in self.buckets:
+            lo = b["min_days"]
+            hi = span if b["max_days"] is None else min(b["max_days"], span)
+            widths.append(max(0.0, hi - lo) if lo < span else 0.0)
+        total = sum(widths)
+        return [(w / total if total else None) for w in widths]
+
+    def _measured_buckets(self, from_key, to_key):
+        """התפלגות הזמנים שנמדדה בקבצים בין שני שלבים."""
+        if from_key is None or from_key == to_key or not self.has_rate(from_key):
+            return None
+        for f in self.forward(from_key):
+            if f["key"] == to_key:
+                return f.get("buckets")
+        return None
+
+    def constrained_matrix(self, counts, days=None):
+        """טבלה אחת: כמה יגיעו לכל שלב, ומתי, על אותה רשת חלונות זמן.
+
+        הכמויות באות מהתזרים ופריסת הזמן מהמדידה. השיעורים של כל
+        המקורות מעורבבים במשקל הכמות שכל אחד תורם, והפיזור נעשה על
+        הסכום הרץ - ולכן **סכום התאים בשורה שווה בדיוק לסך הכול**.
+        טבלה שאינה מסתכמת נראית כמו טעות.
+
+        השלב שהוזן אינו מקבל שורה: מי שכבר שם אינו "מגיע" לשם.
+        """
+        proj = self.constrained_combine(counts, days)
+        if proj is None:
+            return None
+        span, known_span = self._flow_span(days)
+        uniform = self._uniform_shares(span)
+
+        def blended(sources, known, key):
+            parts = []
+            weight = 0.0
+            for s in sources or []:
+                if s["from"] == key or not s["count"]:
+                    continue
+                b = self._measured_buckets(s["from"], key)
+                if not b:
+                    continue
+                parts.append((s["count"], {x["key"]: x["share"] for x in b}))
+                weight += s["count"]
+            total = weight + known
+            if not total:
+                return None
+            out = []
+            for i, b in enumerate(self.buckets):
+                acc = known * (uniform[i] or 0.0)
+                for w, shares in parts:
+                    acc += w * (shares.get(b["key"]) or 0.0)
+                out.append({"key": b["key"], "label": b["label"],
+                            "share": acc / total})
+            return out
+
+        rows = []
+        order = 0
+        for r in list(proj["rows"]) + list(proj["aside"]):
+            order += 1
+            if r.get("is_source"):
+                continue
+            known = r.get("known") or 0
+            shares = blended(r.get("sources"), known, r["key"])
+            if shares is None:
+                continue
+            rows.append({
+                "key": r["key"], "label": r["label"], "count": r["total"],
+                "days_median": r["days_median"],
+                "is_hire": bool(r.get("is_hire")),
+                "is_aside": "share_of_host" in r,
+                "known": known,
+                "cells": self.spread(r["total"], shares),
+                "order": order,
+            })
+
+        rows.sort(key=lambda x: ((x["days_median"] if x["days_median"] is not None
+                                  else 0.0), x["order"]))
+        for r in rows:
+            del r["order"]
+        return {
+            "buckets": [{"key": b["key"], "label": b["label"],
+                         "min_days": b["min_days"], "max_days": b["max_days"]}
+                        for b in self.buckets],
+            "rows": rows,
+            "span_days": span, "annual": days is None,
+            "hires": proj["hires"],
+        }
+
     def constrained_timeline(self, counts, days=None):
         """מתי יתגייסו: הגיוסים הצפויים מפוזרים על חלונות הזמן.
 
@@ -1451,17 +1548,10 @@ class Engine:
                     "share": part["share"],
                 })
 
-        # הנתיב המוכר: אחיד על פני החלון. חלון זמן שכולו אחרי סוף
-        # התקופה אינו מקבל דבר, והשאר מנורמלים לסכום אחד.
-        widths = []
-        for b in self.buckets:
-            lo = b["min_days"]
-            hi = span if b["max_days"] is None else min(b["max_days"], span)
-            widths.append(max(0.0, hi - lo) if lo < span else 0.0)
-        total_width = sum(widths)
+        # הנתיב המוכר: אחיד על פני החלון, לפי אותו עוזר שמשמש את הטבלה.
+        uniform = self._uniform_shares(span)
         known_buckets = [{
-            "key": b["key"], "label": b["label"],
-            "share": (widths[i] / total_width) if total_width else None,
+            "key": b["key"], "label": b["label"], "share": uniform[i],
         } for i, b in enumerate(self.buckets)]
         known_parts = self.spread(proj["known"]["hires"], known_buckets)
         for i, part in enumerate(known_parts):

@@ -111,10 +111,12 @@ const infoOf = node => {
 const at = id => registry[id] || { children: [], attributes: {}, textContent: "" };
 const hasInfo = (row, min) => infoOf(row).trim().length > (min || 10);
 const fval = row => {
-  // הטקסט של התא עצמו בלבד. מתחתיו יושב small עם הזמן או הקצב, ואסור
-  // שהספרות שלו ייספרו כחלק מהכמות.
+  // הכמות יושבת ב-span משלה, ולצידו small עם הזמן או הקצב. אסור
+  // שהספרות של ה-small ייספרו כחלק מהכמות.
   const v = (row.children || []).filter(c => c.classList.contains("fval"))[0];
-  return v ? v.textContent : "";
+  if (!v) return "";
+  const n = (v.children || []).filter(c => c.classList.contains("n"))[0];
+  return n ? n.textContent : v.textContent;
 };
 const inDays = n => {
   const d = new Date();
@@ -173,7 +175,7 @@ check("במצב יעד מוצגת תשובה אחת בלבד", () => {
   setVal("target", "4000");
   sandbox.calculate();
   const open = ["heroCard", "constraintCard", "flowCard", "gapCardPlan",
-                "timelineCard"].filter(shown);
+                "whenCard", "matrixCard", "timelineCard"].filter(shown);
   return JSON.stringify(open) === JSON.stringify(["heroCard", "constraintCard"])
     ? null : "הוצגו כרטיסים נוספים: " + open.join(", ");
 });
@@ -483,6 +485,133 @@ check("תאריך יעד בזרימה קדימה מקטין את המספר הג
   return registry.heroCap.textContent.includes("עד ") ? null : "אין תאריך בכותרת";
 });
 
+check("הרכיבים הוויזואליים חוזרים בכל מצב", () => {
+  // התקלה שדווחה: כרטיסי הזמנים נעלמו, ונשאר משפך בלי פריסת זמן.
+  clearAll();
+  setVal("submissions", "60000");
+  sandbox.calculate();
+  const missing = ["flowCard", "whenCard", "matrixCard", "timelineCard"]
+    .filter(id => !shown(id));
+  if (missing.length) return "כרטיסים חסרים: " + missing.join(", ");
+  // וגם כשמוזן תאריך יעד
+  setVal("targetDate", inDays(27));
+  sandbox.calculate();
+  const missing2 = ["flowCard", "whenCard", "matrixCard", "timelineCard"]
+    .filter(id => !shown(id));
+  return missing2.length ? "עם תאריך יעד חסרים: " + missing2.join(", ") : null;
+});
+
+check("המשפך הוויזואלי מופיע גם עם תאריך יעד קצר", () => {
+  // 4,000 ב-27 יום: המספר הראשי גדול, והמשפך חייב להופיע מתחתיו
+  clearAll();
+  setVal("target", "4000");
+  setVal("targetDate", inDays(27));
+  sandbox.calculate();
+  if (!shown("constraintCard")) return "כרטיס המשפך מוסתר";
+  const plan = sandbox.Engine.constrainedPlan(4000, 27);
+  const rows = constraintRows();
+  if (rows.length !== plan.rows.length + plan.aside.length)
+    return "מספר שורות שגוי: " + rows.length;
+  if (registry.constraintLanes.children.length !== 3) return "אין שלוש תיבות";
+  // פס דו-צבעי בכל שורה בשרשרת
+  const noBar = rows.filter(r => !r.classList.contains("aside")).filter(r => {
+    const track = r.children.filter(c => c.classList.contains("ftrack"))[0];
+    const bar = track && track.children[0];
+    return !bar || !bar.classList.contains("split") || bar.children.length !== 2;
+  });
+  return noBar.length ? noBar.length + " שורות בלי פס דו-צבעי" : null;
+});
+
+check("הכמות והשורה הקטנה שמתחתיה הן שני אלמנטים", () => {
+  // בדפדפן, אנימציית הספירה כותבת ל-textContent ומוחקת כל צאצא. אם
+  // הזמן או הקצב יושבים באותו תא הם נמחקים תוך פחות משנייה.
+  clearAll();
+  setVal("target", "4000");
+  setVal("targetDate", inDays(120));
+  sandbox.calculate();
+  const bad = constraintRows().filter(r => {
+    const v = r.children.filter(c => c.classList.contains("fval"))[0];
+    if (v.textContent) return true;           // המספר חייב לשבת ב-span
+    const n = (v.children || []).filter(c => c.classList.contains("n"))[0];
+    const sm = (v.children || []).filter(c => c.tagName === "small")[0];
+    return !n || !sm;
+  });
+  return bad.length ? bad.length + " תאים שבהם הכמות והזמן באותו אלמנט" : null;
+});
+
+check("מתי יגיעו לכל שלב מציג שלב, כמות וימים", () => {
+  clearAll();
+  setVal("submissions", "60000");
+  sandbox.calculate();
+  const counts = {}; stageKeys.forEach(k => { counts[k] = null; });
+  counts.submissions = 60000;
+  const m = sandbox.Engine.constrainedMatrix(counts, null);
+  const rows = registry.whenBody.children
+    .filter(c => c.classList.contains("tl"))[0].children
+    .filter(c => c.classList.contains("tlrow"));
+  if (rows.length !== m.rows.length) return "מספר שורות שגוי: " + rows.length;
+  const txt = allText(rows[0]);
+  if (!txt.includes("מועמדים")) return "אין כמות בשורת הזמן";
+  if (!/[0-9]/.test(txt)) return "אין ימים בשורת הזמן";
+  // נקודה על ציר הזמן לכל שורה
+  const noDot = rows.filter(r => {
+    const track = r.children.filter(c => c.classList.contains("tltrack"))[0];
+    return !track || track.children.length !== 2;
+  });
+  if (noDot.length) return noDot.length + " שורות בלי נקודה על הציר";
+  const missing = rows.filter(r => !hasInfo(r, 20));
+  return missing.length ? missing.length + " שורות בלי מקור" : null;
+});
+
+check("הטבלה האחת מסתכמת בדיוק", () => {
+  clearAll();
+  setVal("submissions", "60000");
+  sandbox.calculate();
+  const counts = {}; stageKeys.forEach(k => { counts[k] = null; });
+  counts.submissions = 60000;
+  const m = sandbox.Engine.constrainedMatrix(counts, null);
+  const off = m.rows.filter(r => {
+    let sum = 0;
+    r.cells.forEach(c => { sum += c.count; });
+    return sum !== r.count;
+  });
+  if (off.length) return off.length + " שורות שסכום החלונות בהן אינו הסך הכול";
+  const rows = registry.matrixBody.children;
+  // שורת כותרת אחת, ואז שורה אחת לכל שלב. שורות המלל אינן חוזרות.
+  if (rows.length !== 1 + m.rows.length) return "מספר שורות לא צפוי: " + rows.length;
+  const cols = m.buckets.length + 3;
+  const bad = rows.filter((r, i) => i > 0 && r.children.length !== cols);
+  if (bad.length) return bad.length + " שורות עם מספר עמודות שגוי";
+  const missing = rows.filter((r, i) => i > 0 && !hasInfo(r, 20));
+  return missing.length ? "יש שורה בלי מקור" : null;
+});
+
+check("הטבלה והמשפך מסכימים על אותן כמויות", () => {
+  clearAll();
+  setVal("file_check", "20000");
+  sandbox.calculate();
+  const counts = {}; stageKeys.forEach(k => { counts[k] = null; });
+  counts.file_check = 20000;
+  const flow = sandbox.Engine.constrainedCombine(counts, null);
+  const m = sandbox.Engine.constrainedMatrix(counts, null);
+  const byKey = {};
+  m.rows.forEach(r => { byKey[r.key] = r.count; });
+  const off = flow.rows.filter(r => !r.is_source &&
+    byKey[r.key] !== undefined && byKey[r.key] !== r.total);
+  return off.length ? "הטבלה והמשפך נפרדו ב«" + off[0].label + "»" : null;
+});
+
+check("חלונות שמאוחרים מתאריך היעד מסומנים בטבלה", () => {
+  clearAll();
+  setVal("submissions", "60000");
+  setVal("targetDate", inDays(30));
+  sandbox.calculate();
+  const head = registry.matrixBody.children[0];
+  const late = head.children.filter(c => c.classList.contains("late"));
+  // החלונות "חודש עד חודשיים" ואילך מתחילים אחרי יום 30
+  return late.length === 3 ? null : "סומנו " + late.length + " עמודות במקום 3";
+});
+
 check("מתי יתגייסו מוצג ומסתכם", () => {
   clearAll();
   setVal("submissions", "60000");
@@ -618,10 +747,12 @@ check("אין טווחים בתצוגה", () => {
 
 check("אין מלל באנגלית בשום מקום בתצוגה", () => {
   const nodes = ["heroCap", "heroNote", "constraintBody", "constraintLanes",
-                 "flowBody", "flowLanes", "timelineBody", "gapBody",
-                 "gapPlanBody", "gapPlanSub", "infoTitle", "infoText"];
+                 "flowBody", "flowLanes", "whenBody", "matrixBody",
+                 "timelineBody", "gapBody", "gapPlanBody", "gapPlanSub",
+                 "infoTitle", "infoText"];
   const btns = ["aboutBtn", "inputInfo", "heroInfo", "constraintInfo",
-                "flowInfo", "timelineInfo", "gapPlanInfo"];
+                "flowInfo", "whenInfo", "matrixInfo", "timelineInfo",
+                "gapPlanInfo"];
   const scan = () => {
     let t = "";
     nodes.forEach(id => { t += " " + allText(at(id)) + " " + infoOf(at(id)); });

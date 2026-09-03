@@ -93,6 +93,8 @@ def build_scenarios(eng):
                                   "counts": dict(counts), "days": d})
                 scenarios.append({"op": "constrained_timeline",
                                   "counts": dict(counts), "days": d})
+                scenarios.append({"op": "constrained_matrix",
+                                  "counts": dict(counts), "days": d})
             for t in TARGETS:
                 for d in (None, 10, 30, 122, 400):
                     scenarios.append({"op": "manager_plan", "counts": dict(counts),
@@ -128,6 +130,8 @@ def build_scenarios(eng):
                                       "counts": dict(counts), "days": d})
                     scenarios.append({"op": "constrained_timeline",
                                       "counts": dict(counts), "days": d})
+                    scenarios.append({"op": "constrained_matrix",
+                                      "counts": dict(counts), "days": d})
                     scenarios.append({"op": "constrained_gap", "counts": dict(counts),
                                       "target": 4000, "days": d})
                 for d in DAYS:
@@ -153,6 +157,8 @@ def build_scenarios(eng):
         scenarios.append({"op": "constrained_combine",
                           "counts": dict(counts_all), "days": d})
         scenarios.append({"op": "constrained_timeline",
+                          "counts": dict(counts_all), "days": d})
+        scenarios.append({"op": "constrained_matrix",
                           "counts": dict(counts_all), "days": d})
         scenarios.append({"op": "constrained_gap", "counts": dict(counts_all),
                           "target": 4000, "days": d})
@@ -212,6 +218,8 @@ def build_scenarios(eng):
                 scenarios.append({"op": "constrained_combine",
                                   "counts": dict(counts), "days": d})
                 scenarios.append({"op": "constrained_timeline",
+                                  "counts": dict(counts), "days": d})
+                scenarios.append({"op": "constrained_matrix",
                                   "counts": dict(counts), "days": d})
                 scenarios.append({"op": "constrained_gap", "counts": dict(counts),
                                   "target": 4000, "days": d})
@@ -273,6 +281,8 @@ def python_result(eng, sc):
         return eng.constrained_gap(sc["counts"], sc["target"], sc.get("days"))
     if op == "constrained_timeline":
         return eng.constrained_timeline(sc["counts"], sc.get("days"))
+    if op == "constrained_matrix":
+        return eng.constrained_matrix(sc["counts"], sc.get("days"))
     if op == "throughput_plan":
         return eng.throughput_plan(sc["target"], sc.get("days"))
     if op == "manager_plan":

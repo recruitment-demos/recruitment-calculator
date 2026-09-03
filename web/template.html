@@ -381,11 +381,28 @@
     padding: 7px 11px; margin: 0 0 10px;
   }
 
-  /* מתחת לכל כמות: הזמן שלוקח להגיע לשם, או הקצב הנדרש כשיש מועד. */
+  /* מתחת לכל כמות: הזמן שלוקח להגיע לשם, או הקצב הנדרש כשיש מועד.
+     הכמות יושבת ב-span משלה, כי אנימציית הספירה כותבת ל-textContent
+     ובדפדפן זה מוחק כל צאצא אחר של אותו תא. */
+  .fval .n { display: block; }
   .fval small {
     display: block; font-weight: 500; font-size: 10.5px;
     color: var(--faint); margin-top: 1px; white-space: nowrap;
   }
+
+  /* ---------- טבלת «כמה בכל שלב, ומתי» ---------- */
+  .mtable td.late, .mtable th.late { opacity: .45; }
+  .mtable tr.aside td { color: var(--faint); }
+  .mtable tr.aside td.stage::before { content: "↳ "; }
+
+  /* ---------- פריסת הזמנים ---------- */
+  .bar-val .n { display: block; }
+  .bar-val .pctchip {
+    display: block; font-size: 10.5px; font-weight: 500;
+    color: var(--faint); font-variant-numeric: tabular-nums;
+  }
+  .tlrow.aside .tlname { color: var(--faint); font-weight: 500; }
+  .tlrow.aside .tldot { background: #b9c4d3; }
 </style>
 </head>
 <body>
@@ -435,7 +452,7 @@
 
     <div class="card reveal" id="flowCard">
       <div class="titlerow">
-        <h2>כמה יתגייסו</h2>
+        <h2>כמה יגיעו לכל שלב</h2>
         <button class="info" id="flowInfo" type="button">ⓘ</button>
       </div>
       <div class="lanes" id="flowLanes"></div>
@@ -449,6 +466,22 @@
       </div>
       <p class="tally" id="gapPlanSub"></p>
       <div class="funnel" id="gapPlanBody"></div>
+    </div>
+
+    <div class="card reveal" id="whenCard">
+      <div class="titlerow">
+        <h2>מתי יגיעו לכל שלב</h2>
+        <button class="info" id="whenInfo" type="button">ⓘ</button>
+      </div>
+      <div id="whenBody"></div>
+    </div>
+
+    <div class="card reveal" id="matrixCard">
+      <div class="titlerow">
+        <h2>כמה בכל שלב, ומתי</h2>
+        <button class="info" id="matrixInfo" type="button">ⓘ</button>
+      </div>
+      <div class="scroller"><table class="mtable" id="matrixBody"></table></div>
     </div>
 
     <div class="card reveal" id="timelineCard">
@@ -1387,6 +1420,7 @@ const Engine = (() => {
         total: total, share_of_host: a.share_of_host,
         per_day: roundTo(total / span, 3),
         days_median: isSrc ? 0.0 : weightedDays(sources[i]),
+        sources: sourceList(sources[i]),
         is_source: isSrc,
         before_start: isSrc && i < start
       });
@@ -1476,6 +1510,90 @@ const Engine = (() => {
     };
   };
 
+  /* חלוקה אחידה של הנתיב הקבוע על פני חלונות הזמן. */
+  const uniformShares = (span) => {
+    const widths = DATA.time_buckets.map(b => {
+      const lo = b.min_days;
+      const hi = b.max_days === null ? span : Math.min(b.max_days, span);
+      return lo < span ? Math.max(0.0, hi - lo) : 0.0;
+    });
+    let total = 0;
+    widths.forEach(w => { total += w; });
+    return widths.map(w => total ? w / total : null);
+  };
+
+  const measuredBuckets = (fromKey, toKey) => {
+    if (fromKey === null || fromKey === toKey || !hasRate(fromKey)) return null;
+    const f = forward(fromKey).filter(x => x.key === toKey)[0];
+    return f ? f.buckets : null;
+  };
+
+  const constrainedMatrix = (counts, days) => {
+    const proj = constrainedCombine(counts, days);
+    if (proj === null) return null;
+    const sp = flowSpan(days);
+    const uniform = uniformShares(sp.span);
+
+    const blended = (sources, known, key) => {
+      const parts = [];
+      let weight = 0;
+      (sources || []).forEach(s => {
+        if (s.from === key || !s.count) return;
+        const b = measuredBuckets(s.from, key);
+        if (!b) return;
+        const map = {};
+        b.forEach(x => { map[x.key] = x.share; });
+        parts.push({ w: s.count, shares: map });
+        weight += s.count;
+      });
+      const total = weight + known;
+      if (!total) return null;
+      return DATA.time_buckets.map((b, i) => {
+        let acc = known * (uniform[i] === null ? 0.0 : uniform[i]);
+        parts.forEach(p => {
+          const v = p.shares[b.key];
+          acc += p.w * (v === null || v === undefined ? 0.0 : v);
+        });
+        return { key: b.key, label: b.label, share: acc / total };
+      });
+    };
+
+    const rows = [];
+    let order = 0;
+    proj.rows.concat(proj.aside).forEach(r => {
+      order += 1;
+      if (r.is_source) return;
+      const known = r.known || 0;
+      const shares = blended(r.sources, known, r.key);
+      if (shares === null) return;
+      rows.push({
+        key: r.key, label: r.label, count: r.total,
+        days_median: r.days_median,
+        is_hire: !!r.is_hire,
+        is_aside: Object.prototype.hasOwnProperty.call(r, "share_of_host"),
+        known: known,
+        cells: spread(r.total, shares),
+        order: order
+      });
+    });
+
+    rows.sort((a, b) => {
+      const da = a.days_median === null ? 0.0 : a.days_median;
+      const db = b.days_median === null ? 0.0 : b.days_median;
+      return da - db || a.order - b.order;
+    });
+    rows.forEach(r => { delete r.order; });
+    return {
+      buckets: DATA.time_buckets.map(b => ({
+        key: b.key, label: b.label,
+        min_days: b.min_days, max_days: b.max_days
+      })),
+      rows: rows,
+      span_days: sp.span, annual: days === null || days === undefined,
+      hires: proj.hires
+    };
+  };
+
   const constrainedTimeline = (counts, days) => {
     const proj = constrainedCombine(counts, days);
     if (proj === null) return null;
@@ -1503,16 +1621,10 @@ const Engine = (() => {
       });
     });
 
-    const widths = DATA.time_buckets.map(b => {
-      const lo = b.min_days;
-      const hi = b.max_days === null ? span : Math.min(b.max_days, span);
-      return lo < span ? Math.max(0.0, hi - lo) : 0.0;
-    });
-    let totalWidth = 0;
-    widths.forEach(w => { totalWidth += w; });
+    // הנתיב הקבוע: אחיד על פני החלון, לפי אותו עוזר שמשמש את הטבלה.
+    const uniform = uniformShares(span);
     const knownBuckets = DATA.time_buckets.map((b, i) => ({
-      key: b.key, label: b.label,
-      share: totalWidth ? widths[i] / totalWidth : null
+      key: b.key, label: b.label, share: uniform[i]
     }));
     const knownParts = spread(proj.known.hires, knownBuckets);
     knownParts.forEach((part, i) => {
@@ -1562,7 +1674,7 @@ const Engine = (() => {
            spread, combinedMatrix, managerPlan, throughputPlan,
            annualFlow, constrainedPlan,
            constrainedEntry, constrainedCombine, constrainedGap,
-           constrainedTimeline,
+           constrainedTimeline, constrainedMatrix,
            curveShare, hiresByDay, combinedByDay,
            crossCheck, requiredForTarget, requiredFunnel, requiredPlan,
            effectiveRate, observedCandidates, observedPerDay, capacity,
@@ -1786,12 +1898,14 @@ function chainRow(body, o, i) {
   }
 
   const val = el("div", "fval");
+  const n = el("span", "n");
   if (o.text !== undefined) {
-    val.textContent = o.text;
+    n.textContent = o.text;
     val.classList.add("blocked");
   } else {
-    countUp(val, o.value, 850);
+    countUp(n, o.value, 850);
   }
+  val.append(n);
   if (o.small) val.append(el("small", null, o.small));
 
   row.append(head, track, val);
@@ -2063,7 +2177,7 @@ function renderFlow(counts, targetDate, days) {
     info.push("מתחת לכל כמות כתוב הקצב: כמה מועמדים עוברים באותו שלב " +
       "ליום בתוך החלון שנותר.");
   }
-  setInfo("flowInfo", "כמה יתגייסו", info);
+  setInfo("flowInfo", "כמה יגיעו לכל שלב", info);
   return plan;
 }
 
@@ -2128,6 +2242,136 @@ function renderGapPlan(counts, target, targetDate, days) {
 }
 
 /* ------------------------------------------------------------------ *
+ *  מתי יגיעו לכל שלב - ציר זמן, נקודה לכל שלב                          *
+ *  הכמויות מהתזרים, הזמנים מהמדידה בקבצים.                             *
+ * ------------------------------------------------------------------ */
+function renderWhen(m, targetDate) {
+  const body = $("whenBody");
+  body.innerHTML = "";
+  if (!m || !m.rows.length) return false;
+
+  const start = todayDay();
+  const maxDay = Math.max.apply(null,
+    m.rows.map(r => r.days_median || 0).concat([1]));
+  const tl = el("div", "tl");
+
+  m.rows.forEach((r, i) => {
+    const row = el("div", "tlrow" +
+      (r.is_hire ? " hire" : r.is_aside ? " aside" : ""));
+
+    const head = el("div", "tlhead");
+    const name = el("div", "tlname");
+    name.append(el("span", null, (r.is_aside ? "↳ " : "") + r.label),
+      infoBtn(r.label, nf(r.count) + " מועמדים צפויים להגיע ל«" + r.label +
+        "», בחציון " + Math.round(r.days_median) + " ימים מנקודת הכניסה - " +
+        "כלומר סביב " + fmtDay(shiftDays(start, r.days_median)) + ". " +
+        "הכמות באה מתזרים הליך הגיוס; הזמן נמדד בקבצים על מועמדים שעברו " +
+        "את המסלול בפועל, והוא חציון: מחצית מגיעים מוקדם יותר ומחציתם " +
+        "מאוחר יותר." +
+        (r.known ? " " + nf(r.known) + " מהם הם האוכלוסייה המוכרת, " +
+          "שאינה עוברת מיון ומתחלקת אחיד על פני החלון." : "")));
+    head.append(name);
+    head.append(el("div", "tlcount", nf(r.count) + " מועמדים · " +
+      fmtDay(shiftDays(start, r.days_median))));
+
+    const track = el("div", "tltrack");
+    const fill = el("div", "tlfill");
+    const dot = el("div", "tldot");
+    track.append(fill, dot);
+    const w = ((r.days_median || 0) / maxDay) * 100;
+    later(() => {
+      fill.style.width = w.toFixed(1) + "%";
+      dot.style.insetInlineStart = w.toFixed(1) + "%";
+      dot.classList.add("on");
+    }, 90 + i * 90);
+
+    const day = el("div", "tlday", Math.round(r.days_median));
+    day.append(el("small", null, "ימים"));
+
+    row.append(head, track, day);
+    tl.append(row);
+  });
+
+  const axis = el("div", "tlaxis-wrap");
+  const axisLine = el("div", "tlaxis");
+  axisLine.append(el("span", null, "היום"),
+                  el("span", null, "יום " + Math.round(maxDay)));
+  axis.append(el("div"), axisLine, el("div"));
+  tl.append(axis);
+  body.append(tl);
+
+  setInfo("whenInfo", "מתי יגיעו לכל שלב",
+    ["הזמן זורם מימין לשמאל, בכיוון הקריאה. כל שלב הוא נקודה שממוקמת " +
+     "לפי חציון הימים מנקודת הכניסה ועד אליו.",
+     "הכמויות באות מתזרים הליך הגיוס, בדיוק כמו במשפך שלמעלה. הזמנים " +
+     "נמדדו בקבצים על מועמדים שעברו את המסלול בפועל.",
+     "חציון פירושו שמחצית מהמועמדים מגיעים מוקדם יותר ומחציתם מאוחר " +
+     "יותר, ולא שכולם מגיעים באותו יום. התאריכים מניחים שהמועמדים " +
+     "נמצאים היום בשלב שהוזן.",
+     "מרכז הערכה מסומן בחץ: הוא תחנת צד ואינו תחנת חובה בדרך לגיוס.",
+     targetDate ? "תאריך היעד שהוזן הוא " + fmtDay(targetDate) + "." : ""]);
+  return true;
+}
+
+/* ------------------------------------------------------------------ *
+ *  כמה בכל שלב, ומתי - טבלה אחת, שורה לכל שלב על פני חלונות הזמן      *
+ *  סכום התאים בשורה שווה בדיוק לסך הכול. טבלה שאינה מסתכמת נראית      *
+ *  כמו טעות.                                                          *
+ * ------------------------------------------------------------------ */
+function renderMatrix(m, targetDate, cutoffDays) {
+  const body = $("matrixBody");
+  body.innerHTML = "";
+  if (!m || !m.rows.length) return false;
+
+  const start = todayDay();
+  const timed = cutoffDays !== null && cutoffDays !== undefined;
+
+  const head = el("tr");
+  head.append(el("th", null, "שלב"));
+  m.buckets.forEach(b => {
+    const late = timed && b.min_days > cutoffDays;
+    head.append(el("th", late ? "late" : null, b.label));
+  });
+  head.append(el("th", null, "סך הכול"), el("th", null, "חציון ימים"));
+  body.append(head);
+
+  m.rows.forEach(r => {
+    const tr = el("tr", r.is_hire ? "hire" : r.is_aside ? "aside" : "");
+    const stage = el("td", "stage");
+    const cell = el("div", "cellname");
+    cell.append(el("span", null, r.label), infoBtn(r.label,
+      nf(r.count) + " מועמדים ב«" + r.label + "», מפוזרים על חלונות הזמן " +
+      "לפי התפלגות הזמנים שנמדדה בקבצים. " +
+      m.buckets.map((b, i) => b.label + ": " + nf(r.cells[i].count)).join(" · ") +
+      ". סכום החלונות שווה בדיוק לסך הכול." +
+      (r.known ? " " + nf(r.known) + " מהם הם האוכלוסייה המוכרת, שמתחלקת " +
+        "אחיד על פני החלון." : "")));
+    stage.append(cell);
+    tr.append(stage);
+    r.cells.forEach((c, i) => {
+      const late = timed && m.buckets[i].min_days > cutoffDays;
+      tr.append(el("td", "num" + (late ? " late" : ""), nf(c.count)));
+    });
+    tr.append(el("td", "num big hi", nf(r.count)));
+    tr.append(el("td", "num", Math.round(r.days_median)));
+    body.append(tr);
+  });
+
+  setInfo("matrixInfo", "כמה בכל שלב, ומתי",
+    ["שורה לכל שלב, עמודה לכל חלון זמן. התא הוא כמה מועמדים יגיעו לשלב " +
+     "ההוא בתוך החלון ההוא.",
+     "סכום התאים בשורה שווה בדיוק לעמודת «סך הכול»: הפיזור מעוגל על " +
+     "הסכום הרץ, כדי שהטבלה תמיד תסתכם.",
+     "החלונות נמדדים מהיום: " + m.buckets.map(b => b.label + " = " +
+       (b.max_days === null ? "אחרי " + fmtDay(shiftDays(start, b.min_days))
+                            : "עד " + fmtDay(shiftDays(start, b.max_days)))
+     ).join(" · ") + ".",
+     timed ? "החלונות שכולם אחרי " + fmtDay(targetDate) + " מסומנים בהיר - " +
+             "הם אינם נספרים במספר שבראש העמוד." : ""]);
+  return true;
+}
+
+/* ------------------------------------------------------------------ *
  *  מתי יתגייסו                                                        *
  * ------------------------------------------------------------------ */
 function renderTimeline(counts, days, targetDate) {
@@ -2170,7 +2414,9 @@ function renderTimeline(counts, days, targetDate) {
           90 + i * 60);
 
     const val = el("div", "bar-val");
-    countUp(val, r.hires, 850);
+    const vn = el("span", "n");
+    countUp(vn, r.hires, 850);
+    val.append(vn, el("small", "pctchip", pct(r.share)));
 
     row.append(name, track, val);
     bars.append(row);
@@ -2193,14 +2439,12 @@ function renderNotes(messages) {
   const body = $("gapBody");
   body.innerHTML = "";
   messages.forEach(m => body.append(el("div", "msg " + m.kind, m.text)));
-  if (!body.children.length) {
-    body.append(el("div", "msg flat", "אין הערות."));
-  }
+  return messages.length > 0;
 }
 
 /* --- חשיפת התוצאות --- */
 const ALL_CARDS = ["heroCard", "constraintCard", "flowCard", "gapCardPlan",
-                   "timelineCard", "gapCard"];
+                   "whenCard", "matrixCard", "timelineCard", "gapCard"];
 
 function revealResults(cards) {
   $("results").classList.remove("hidden");
@@ -2281,12 +2525,7 @@ function calculate() {
         "אין מספיק נתונים כדי לגזור את כמות ההגשות הדרושה.");
     }
 
-    if (days === null && badDate === null && rawDays === null) {
-      notes.push({ kind: "flat", text:
-        "לא הוזן תאריך יעד, ולכן היעד נקרא כיעד שנתי." });
-    }
-    renderNotes(notes);
-    cards.push("gapCard");
+    if (renderNotes(notes)) cards.push("gapCard");
     revealResults(cards);
     return;
   }
@@ -2296,8 +2535,9 @@ function calculate() {
   if (!flow) {
     renderHero("אין תשובה", 0, "", "אין תשובה",
       "אף אחד מהשלבים שהוזנו אינו ניתן לחיבור אל תזרים הליך הגיוס.");
-    renderNotes(notes);
-    revealResults(["heroCard", "gapCard"]);
+    const only = ["heroCard"];
+    if (renderNotes(notes)) only.push("gapCard");
+    revealResults(only);
     return;
   }
   cards.push("flowCard");
@@ -2327,8 +2567,10 @@ function calculate() {
        "הכמות שמוזנת בכל שלב היא נפח לאורך החלון, ולא מלאי רגעי."]);
   }
 
-  const hasTimeline = renderTimeline(counts, days, shownDate);
-  if (hasTimeline) cards.push("timelineCard");
+  const m = Engine.constrainedMatrix(counts, days);
+  if (renderWhen(m, shownDate)) cards.push("whenCard");
+  if (renderMatrix(m, shownDate, days)) cards.push("matrixCard");
+  if (renderTimeline(counts, days, shownDate)) cards.push("timelineCard");
 
   flow.entries.forEach(e => {
     if (e.below_known) {
@@ -2364,8 +2606,7 @@ function calculate() {
     }
   }
 
-  renderNotes(notes);
-  cards.push("gapCard");
+  if (renderNotes(notes)) cards.push("gapCard");
   revealResults(cards);
 }
 
@@ -2461,8 +2702,8 @@ function buildAbout() {
 buildInputs();
 buildAbout();
 watchHero();
-["heroInfo", "constraintInfo", "flowInfo", "gapPlanInfo", "timelineInfo",
- "inputInfo"].forEach(attachInfo);
+["heroInfo", "constraintInfo", "flowInfo", "gapPlanInfo", "whenInfo",
+ "matrixInfo", "timelineInfo", "inputInfo"].forEach(attachInfo);
 $("infoClose").addEventListener("click", closeInfo);
 $("infoModal").addEventListener("click", ev => {
   if (ev && ev.target === $("infoModal")) closeInfo();
