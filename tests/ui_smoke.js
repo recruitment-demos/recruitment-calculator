@@ -263,12 +263,75 @@ check("מצב תכנון מיעד נפתח כשהוזן רק יעד", () => {
   setVal("target", "400");
   sandbox.calculate();
   if (!shown("results")) return "אזור התוצאות מוסתר";
-  if (num(registry.heroValue.textContent) !== 400) return "היעד לא הוצג";
-  if (!registry.heroCap.textContent.includes("יעד")) return "כותרת שגויה";
+  // ההירו עונה על מה שנשאל בפועל: כמה הגשות צריך כדי לגייס 400,
+  // ולא חוזר על היעד שהוזן.
+  const cp = sandbox.Engine.constrainedPlan(400, null);
+  if (num(registry.heroValue.textContent) !== cp.submissions)
+    return "ההגשות הדרושות לא הוצגו: " + registry.heroValue.textContent;
+  if (!registry.heroCap.textContent.includes("400")) return "היעד לא נזכר";
+  if (!registry.heroCap.textContent.includes("הגשות")) return "כותרת שגויה";
+  if (!shown("constraintCard")) return "המחשבון עם האילוצים מוסתר";
   if (!shown("planCard")) return "כרטיס «כמה צריך בכל שלב» מוסתר";
   if (!shown("pipelineCard")) return "כרטיס המשפך הרציף מוסתר";
   if (shown("whenCard")) return "גרף הזמנים היה צריך להיות מוסתר";
   if (shown("timelineCard")) return "גרף ההתפלגות היה צריך להיות מוסתר";
+  return null;
+});
+
+/* --- המחשבון עם האילוצים --- */
+const constraintRows = () => registry.constraintBody.children;
+
+check("המשפך עם האילוצים מציג את כל השרשרת ואת תחנת הצד", () => {
+  clearAll();
+  setVal("target", "4000");
+  sandbox.calculate();
+  if (!shown("constraintCard")) return "הכרטיס מוסתר";
+  const plan = sandbox.Engine.constrainedPlan(4000, null);
+  const rows = constraintRows();
+  if (rows.length !== plan.rows.length + plan.aside.length)
+    return "מספר שורות שגוי: " + rows.length;
+  // מרכז הערכה מסומן כתחנת צד ואינו בשרשרת
+  const asideRows = rows.filter(r => r.classList.contains("aside"));
+  if (asideRows.length !== plan.aside.length)
+    return "מרכז הערכה אינו מסומן כתחנת צד";
+  if (!allText(asideRows[0]).includes("לא בשרשרת"))
+    return "תחנת הצד אינה אומרת שהיא מחוץ לשרשרת";
+  return null;
+});
+
+check("הכמויות במשפך האילוצים תואמות את המנוע", () => {
+  clearAll();
+  setVal("target", "4000");
+  sandbox.calculate();
+  const plan = sandbox.Engine.constrainedPlan(4000, null);
+  const shownNums = constraintRows()
+    .filter(r => !r.classList.contains("aside"))
+    .map(r => num(r.children.filter(c => c.classList.contains("fval"))[0].textContent));
+  const expected = plan.rows.map(r => r.total);
+  return JSON.stringify(shownNums) === JSON.stringify(expected)
+    ? null : "הכמויות אינן תואמות: " + shownNums;
+});
+
+check("כל שורה במשפך האילוצים אומרת ממה היא נגזרה", () => {
+  clearAll();
+  setVal("target", "4000");
+  sandbox.calculate();
+  const missing = constraintRows().filter(r =>
+    !r.children.some(c => c.classList.contains("fsrc") && c.textContent.length > 10));
+  if (missing.length) return missing.length + " שורות בלי מקור";
+  const txt = allText(constraintRows()[0]);
+  if (!txt.includes("אוכלוסייה מוכרת") || !txt.includes("אוכלוסייה חדשה"))
+    return "שורת ההגשות אינה מפרידה בין שני הנתיבים";
+  return null;
+});
+
+check("ההגשות הדרושות אינן כמות מטורפת", () => {
+  clearAll();
+  setVal("target", "4000");
+  sandbox.calculate();
+  const v = num(registry.heroValue.textContent);
+  if (v < 70000 || v > 95000)
+    return "כמות ההגשות ל-4,000 גיוסים אינה סבירה: " + v;
   return null;
 });
 

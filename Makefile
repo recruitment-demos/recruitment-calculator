@@ -1,4 +1,4 @@
-.PHONY: all data web excel test verify basis plan clean
+.PHONY: all data web excel test verify basis plan constrained clean
 
 all: data web excel
 
@@ -20,6 +20,9 @@ verify:        ## דוח בדיקה של קובצי המקור
 
 basis:         ## הצגת יחסי הגיוס וזמני הגיוס בשורת פקודה
 	python3 -m recruit_calc.cli --basis
+
+constrained:   ## המחשבון עם האילוצים. שימוש: make constrained T=4000
+	python3 -m recruit_calc.cli --target $(T) $(if $(BY),--by $(BY),) --constrained
 
 plan:          ## הלוח של מנהלת הגיוס. שימוש: make plan T=400 BY=2026-12-31
 	python3 -m recruit_calc.cli --target $(T) $(if $(BY),--by $(BY),) --manager

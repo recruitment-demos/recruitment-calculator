@@ -53,6 +53,104 @@ def activity_types(stage):
     return at if isinstance(at, list) else [at]
 
 
+
+def annual_flow(cfg, labels):
+    """פירוק תזרים הליך הגיוס לשני נתיבים, לפי התרשים שהתקבל.
+
+    התרשים נותן משפך אחד לכל הארגון, ומתחתיו פילוח של הגיוסים לשתי
+    אוכלוסיות: «מוכרת» ביחס 1:1 ו«חדשה» ביחס 1:31. שני המספרים האלה
+    אינם מתיישבים עם משפך אחד - אם 1,418 מגויסים מגיעים ביחס 1:1, הם
+    אינם עוברים סינון, ולכן אינם יכולים להימנות בשלבי הסינון.
+
+    הפירוק כאן הופך את זה למודל מפורש: האוכלוסייה המוכרת עוברת רק
+    בתחנות המנהליות (`passes` בקונפיג), האוכלוסייה החדשה עוברת בכל
+    השרשרת, ושיעורי המעבר מחושבים על האוכלוסייה החדשה בלבד. זה
+    ההבדל בין מחשבון שדורש כמות מטורפת של הגשות לבין מחשבון שאומר
+    את האמת: רק חלק מהגיוסים בכלל תלוי בהגשות.
+
+    אין כאן שום מספר שאינו מועתק מהתרשים או נגזר ממנו בחשבון פשוט.
+    """
+    af = cfg.get("annual_flow")
+    if not af:
+        return None
+
+    known = af["populations"]["known"]
+    new = af["populations"]["new"]
+    kh = known["hires"]
+    passes = set(known["passes"])
+
+    chain = []
+    for item in af["chain"]:
+        k = item["key"]
+        on_path = k in passes
+        chain.append({
+            "key": k,
+            "label": labels.get(k, k),
+            "volume": item["volume"],
+            "known": kh if on_path else 0,
+            "new": item["volume"] - (kh if on_path else 0),
+            "known_passes": on_path,
+        })
+
+    hire_row = {
+        "key": HIRE_KEY, "label": HIRE_LABEL,
+        "volume": af["hires"], "known": kh, "new": af["hires"] - kh,
+        "known_passes": True,
+    }
+
+    # שיעור ההגעה בין שני שלבים בשרשרת, נמדד על האוכלוסייה החדשה
+    # בלבד. שיעור על הנפח המעורב היה מערבב אוכלוסייה שאינה עוברת שם
+    # כלל, וכך היה מנפח את המעבר האחרון (יחב"מ->גיוס 80% בתרשים,
+    # 70% על האוכלוסייה החדשה).
+    steps = chain + [hire_row]
+    for i, row in enumerate(steps):
+        nxt = steps[i + 1] if i + 1 < len(steps) else None
+        row["to_next"] = nxt["key"] if nxt else None
+        row["rate_to_next"] = (None if nxt is None or not row["new"]
+                               else round(nxt["new"] / row["new"], 6))
+        # השיעור שבתרשים עצמו, על הנפח המעורב. נשמר לצורך השוואה בלבד.
+        row["chart_rate_to_next"] = (None if nxt is None or not row["volume"]
+                                     else round(nxt["volume"] / row["volume"], 6))
+
+    aside = []
+    for item in af.get("aside", []):
+        host = next(r for r in chain if r["key"] == item["after"])
+        aside.append({
+            "key": item["key"],
+            "label": labels.get(item["key"], item["key"]),
+            "after": item["after"],
+            "volume": item["volume"],
+            # תחנת צד: כולה על האוכלוסייה החדשה, כי המוכרת אינה עוברת
+            # סינון בכלל.
+            "share_of_host": round(item["volume"] / host["new"], 6),
+        })
+
+    return {
+        "source": af["source"],
+        "year": af["year"],
+        "year_days": af["year_days"],
+        "hires": af["hires"],
+        "known": {
+            "label": known["label"], "hires_per_year": kh,
+            "ratio": known["ratio"], "fixed": bool(known.get("fixed")),
+            "passes": known["passes"],
+            "share_of_hires": round(kh / af["hires"], 6),
+        },
+        "new": {
+            "label": new["label"], "hires_per_year": af["hires"] - kh,
+            "ratio_stated": new["ratio"],
+            "submissions": chain[0]["new"],
+            "ratio_measured": round(chain[0]["new"] / (af["hires"] - kh), 4),
+            "hire_rate": round((af["hires"] - kh) / chain[0]["new"], 6),
+            "share_of_hires": round((af["hires"] - kh) / af["hires"], 6),
+        },
+        "chain": chain,
+        "hire_row": hire_row,
+        "aside": aside,
+        "overall_rate": round(af["hires"] / chain[0]["volume"], 6),
+    }
+
+
 def load_config():
     with CONFIG_PATH.open(encoding="utf-8") as fh:
         return json.load(fh)
@@ -720,6 +818,9 @@ def main():
         "coverage_warning_below": cfg["coverage_warning_below"],
         "selective_below": cfg["selective_below"],
         "funnel": funnel,
+        # תזרים 2025 מהתרשים שהתקבל: הבסיס לתכנון עם האילוצים.
+        "annual_flow": annual_flow(
+            cfg, {s["key"]: s["label"] for s in cfg["stages"]}),
         "segments": segments,
         "hire_key": HIRE_KEY,
         "hire_label": HIRE_LABEL,

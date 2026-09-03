@@ -950,6 +950,144 @@ class Engine:
             "rows": rows,
         }
 
+    def annual_flow(self):
+        """תזרים 2025 מהתרשים שהתקבל, אם יש."""
+        return self.data.get("annual_flow")
+
+    def constrained_plan(self, target_hires, days=None):
+        """המחשבון עם האילוצים: כמה צריך בכל שלב כדי לגייס X בשנה.
+
+        זו התשובה הראשית לשאלת התכנון, והיא מחליפה את throughput_plan.
+        שלושה אילוצים מפרידים בינה לבין כל מה שקדם לה:
+
+        1. **שני נתיבים, לא אחד.** לפי התרשים, 1,418 מתוך 3,294 הגיוסים
+           (43%) הם «אוכלוסייה מוכרת» ביחס 1:1 - הם אינם עוברים מיון,
+           ולכן אינם נגזרים מכמות ההגשות. רק 1,876 הגיוסים של
+           «האוכלוסייה החדשה» תלויים במשפך, ביחס 1:31.
+
+        2. **הנתיב המוכר קבוע.** לפי הנחיה מפורשת של המשתמש אין דרך
+           להגדיל אותו. הוא תורם 1,418 גיוסים בשנה, מתפרסים באופן
+           אחיד על פני 365 יום, ולכן בחלון של חצי שנה הוא תורם 709.
+
+        3. **היחסים באים מהתרשים, לא מקבצי הפעילויות.** רישום הפעילויות
+           חסר ושגוי בחלקו (רק 51% מהמגויסים נרשמו בכלל כהגשה), ולכן
+           הוא נותן יחס הגשה->קבצים של 61% במקום 51%. התרשים נבחר
+           כמקור מפני שהוא שומר על היחס ההגיוני.
+
+        התוצאה: ל-4,000 גיוסים בשנה דרושות כ-82 אלף הגשות - פי 1.37
+        מ-2025 - ולא 124,778 (required_plan) ולא 61,359 (throughput_plan).
+        המספר גדול מפי 1.21 (=4,000/3,294) דווקא מפני שהנתיב המוכר אינו
+        גדל: כל התוספת נופלת על הנתיב היחיד שכן גדל.
+        """
+        af = self.annual_flow()
+        if af is None or target_hires is None:
+            return None
+        year = af["year_days"]
+        span = year if days is None else days
+        if span is None or span <= 0:
+            return None
+
+        known_hires = af["known"]["hires_per_year"] * span / year
+        new_hires = target_hires - known_hires
+        # יעד שקטן מהנתיב המוכר מושג בלי אף הגשה. זו תשובה אמיתית,
+        # לא שגיאה, והיא מוצגת ככזו.
+        shortfall = new_hires < 0
+        if shortfall:
+            new_hires = 0.0
+
+        chain = af["chain"]
+        volumes = {af["hire_row"]["key"]: new_hires}
+        v = new_hires
+        for row in reversed(chain):
+            r = row["rate_to_next"]
+            if not r:
+                return None
+            v = v / r
+            volumes[row["key"]] = v
+
+        def make(row, is_hire):
+            n = volumes[row["key"]]
+            kn = known_hires if row["known_passes"] else 0.0
+            new_i = round_half_up(n)
+            known_i = round_half_up(kn)
+            base_per_day = row["volume"] / year
+            per_day = (new_i + known_i) / span
+            return {
+                "key": row["key"], "label": row["label"],
+                "is_hire": is_hire,
+                "total": new_i + known_i,
+                "new": new_i, "known": known_i,
+                "known_passes": row["known_passes"],
+                "rate_to_next": row["rate_to_next"],
+                "to_next": row["to_next"],
+                "baseline": row["volume"],
+                "baseline_new": row["new"],
+                "baseline_known": row["known"],
+                "baseline_per_day": round_to(base_per_day, 3),
+                "per_day": round_to(per_day, 3),
+                "pace": (None if not base_per_day
+                         else round_to(per_day / base_per_day, 3)),
+            }
+
+        rows = [make(r, False) for r in chain]
+        rows.append(make(af["hire_row"], True))
+
+        aside = []
+        for a in af["aside"]:
+            total = round_half_up(volumes[a["after"]] * a["share_of_host"])
+            base_per_day = a["volume"] / year
+            per_day = total / span
+            aside.append({
+                "key": a["key"], "label": a["label"], "after": a["after"],
+                "total": total, "share_of_host": a["share_of_host"],
+                "baseline": a["volume"],
+                "baseline_per_day": round_to(base_per_day, 3),
+                "per_day": round_to(per_day, 3),
+                "pace": (None if not base_per_day
+                         else round_to(per_day / base_per_day, 3)),
+            })
+
+        top = rows[0]
+        return {
+            "target": target_hires,
+            "days": days,
+            "span_days": span,
+            "annual": days is None,
+            "source": af["source"],
+            "year": af["year"],
+            "shortfall": shortfall,
+            "known": {
+                "label": af["known"]["label"],
+                "hires": round_half_up(known_hires),
+                "per_year": af["known"]["hires_per_year"],
+                "ratio": af["known"]["ratio"],
+                "share": (None if not target_hires
+                          else round_to(known_hires / target_hires, 4)),
+            },
+            "new": {
+                "label": af["new"]["label"],
+                "hires": round_half_up(new_hires),
+                "per_year": af["new"]["hires_per_year"],
+                "ratio": af["new"]["ratio_measured"],
+                "hire_rate": af["new"]["hire_rate"],
+                "share": (None if not target_hires
+                          else round_to(new_hires / target_hires, 4)),
+            },
+            "submissions": top["total"],
+            "baseline_submissions": top["baseline"],
+            "baseline_hires": af["hires"],
+            # השוואה לשנה מלאה מול חלון קצר היתה משווה תפוחים לתפוזים:
+            # 110,892 הגשות ב-119 יום נראו כמו «פי 1.85» מ-59,978 בשנה,
+            # בעוד שבפועל זהו קצב של פי 5.67. שתי הצמיחות מחושבות מול
+            # אותו חלון: הבסיס מוקטן לפי אורכו.
+            "baseline_in_span": round_half_up(top["baseline"] * span / year),
+            "baseline_hires_in_span": round_half_up(af["hires"] * span / year),
+            "growth": top["pace"],
+            "target_growth": rows[-1]["pace"],
+            "rows": rows,
+            "aside": aside,
+        }
+
     def gap_pipeline(self, counts, target_hires, key, days=None):
         """אותה השלמה, כמשפך רציף אחד משלב כניסה נבחר."""
         plan = self.gap_plan(counts, target_hires, days)

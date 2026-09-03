@@ -1422,5 +1422,213 @@ class TestThroughputPlan(unittest.TestCase):
 
 
 
+class TestConstrainedPlan(unittest.TestCase):
+    """המחשבון עם האילוצים: התשובה הראשית לשאלת התכנון.
+
+    המשתמש שלח את «תזרים הליך הגיוס 2025» וקבע שלושה אילוצים:
+      1. חלק גדול מהגיוסים אינו עובר בהליך המיון כלל, ולכן אינו נגזר
+         מכמות ההגשות.
+      2. האוכלוסייה המוכרת אינה ניתנת להגדלה. היא תורמת אותה כמות בכל
+         שנה, מתפרסת אחיד על פני השנה.
+      3. היחסים בין השלבים - ובראשם הגשה->קבצים - נלקחים מהתרשים, גם
+         היכן שרישום הפעילויות סותר אותם.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.eng = load_engine()
+        cls.af = cls.eng.annual_flow()
+
+    def test_the_chart_that_was_sent_is_in_the_dataset(self):
+        self.assertIsNotNone(self.af)
+        self.assertIn("תזרים הליך הגיוס 2025.pptx", self.af["source"])
+        self.assertEqual(self.af["chain"][0]["volume"], 59978)
+        self.assertEqual(self.af["hires"], 3294)
+        self.assertEqual(self.af["known"]["hires_per_year"], 1418)
+        self.assertEqual(self.af["new"]["hires_per_year"], 1876)
+
+    def test_the_submission_to_file_ratio_stays_what_the_chart_says(self):
+        """האילוץ המפורש: היחס ההגיוני בין הגשה לקבצים נשמר.
+
+        רישום הפעילויות נותן 61.2%, והתרשים נותן 51%. התרשים גובר,
+        מפני שהרישום חסר: רק כמחצית מהמגויסים בכלל נרשמו כהגשה.
+        """
+        top = self.af["chain"][0]
+        self.assertAlmostEqual(top["chart_rate_to_next"], 0.51, places=2)
+        # ועל האוכלוסייה החדשה בלבד, אחרי הוצאת המוכרת משני הצדדים
+        self.assertAlmostEqual(top["rate_to_next"], 0.50, places=2)
+        # וזה רחוק ממה שרישום הפעילויות מראה
+        measured = self.eng.stage("submissions")["forward"]
+        to_files = next(f for f in measured if f["key"] == "file_check")
+        self.assertGreater(to_files["reach"]["mid"] - top["rate_to_next"], 0.08)
+
+    def test_the_known_population_is_fixed_and_spread_over_the_year(self):
+        """הנתיב המוכר אינו גדל עם היעד, ומתחלק אחיד על פני השנה."""
+        year = self.eng.constrained_plan(4000)
+        self.assertEqual(year["known"]["hires"], 1418)
+        # פי שניים מהיעד לא משנה את הנתיב המוכר
+        self.assertEqual(self.eng.constrained_plan(8000)["known"]["hires"], 1418)
+        # חצי שנה - חצי מהכמות
+        half = self.eng.constrained_plan(4000, 182)
+        self.assertEqual(half["known"]["hires"], round_half_up(1418 * 182 / 365))
+
+    def test_only_the_new_population_grows_with_the_target(self):
+        a = self.eng.constrained_plan(3294)
+        b = self.eng.constrained_plan(4000)
+        self.assertEqual(a["known"]["hires"], b["known"]["hires"])
+        self.assertGreater(b["new"]["hires"], a["new"]["hires"])
+        self.assertEqual(b["new"]["hires"] - a["new"]["hires"], 4000 - 3294)
+
+    def test_the_baseline_year_reproduces_itself(self):
+        """יעד השווה לגיוסי 2025 מחזיר בדיוק את נפחי 2025."""
+        plan = self.eng.constrained_plan(3294)
+        for row in plan["rows"]:
+            self.assertAlmostEqual(row["total"] / row["baseline"], 1.0, places=2,
+                                   msg=row["key"])
+        self.assertAlmostEqual(plan["growth"], 1.0, places=2)
+
+    def test_it_is_not_an_insane_number_of_submissions(self):
+        """הבקשה המפורשת: מחשבון כמו שצריך, לא כמות מטורפת של הגשות.
+
+        הגבולות נעולים כאן בכוונה. אם קובץ תזרים עתידי יוציא את
+        התוצאה מהם, הבדיקה תיפול ותאלץ התייחסות במקום שהמספר ישתנה
+        בשקט.
+        """
+        plan = self.eng.constrained_plan(4000)
+        self.assertGreater(plan["submissions"], 70000)
+        self.assertLess(plan["submissions"], 95000)
+        # ורחוק מאוד משתי התשובות הקודמות
+        self.assertLess(plan["submissions"],
+                        self.eng.required_plan(4000)["rows"][0]["required"] / 1.3)
+        self.assertGreater(plan["submissions"],
+                           self.eng.throughput_plan(4000)["rows"][0]["required"])
+
+    def test_the_submissions_grow_faster_than_the_target(self):
+        """זהו כל העניין: הנתיב המוכר אינו גדל, ולכן כל התוספת נופלת
+        על הנתיב היחיד שכן גדל. יעד פי 1.21 דורש הגשות פי 1.37."""
+        plan = self.eng.constrained_plan(4000)
+        self.assertAlmostEqual(plan["target_growth"], 4000 / self.af["hires"],
+                               places=2)
+        self.assertGreater(plan["growth"], plan["target_growth"])
+
+    def test_both_growths_are_measured_against_the_same_window(self):
+        """השוואת חלון קצר לשנה מלאה היתה משווה תפוחים לתפוזים.
+
+        110,892 הגשות ב-119 יום נראו כמו «פי 1.85» מ-59,978 בשנה,
+        בעוד שבפועל זהו קצב של פי 5.67. שתי הצמיחות נמדדות מול
+        אותו חלון, ולכן היחס ביניהן נשמר בכל אורך זמן.
+        """
+        year = self.eng.constrained_plan(4000)
+        short = self.eng.constrained_plan(4000, 119)
+        self.assertEqual(year["growth"], year["rows"][0]["pace"])
+        self.assertEqual(short["growth"], short["rows"][0]["pace"])
+        self.assertEqual(short["target_growth"], short["rows"][-1]["pace"])
+        # החלון הקצר יקר הרבה יותר, ובשני המספרים גם יחד
+        self.assertGreater(short["growth"], year["growth"] * 3)
+        self.assertGreater(short["target_growth"], year["target_growth"] * 3)
+        # ובכל אורך זמן ההגשות גדלות מהר יותר מהגיוסים
+        for p in (year, short):
+            self.assertGreater(p["growth"], p["target_growth"])
+
+    def test_a_target_under_the_known_lane_needs_no_submissions_at_all(self):
+        plan = self.eng.constrained_plan(700)
+        self.assertTrue(plan["shortfall"])
+        self.assertEqual(plan["new"]["hires"], 0)
+        self.assertEqual(plan["rows"][0]["new"], 0)
+        # הנתיב המוכר לבדו נותר, ולכן יש עדיין נפח בתחנות המנהליות
+        self.assertEqual(plan["rows"][0]["total"], plan["known"]["hires"])
+
+    def test_every_row_splits_into_the_two_lanes_and_they_add_up(self):
+        plan = self.eng.constrained_plan(4000)
+        for r in plan["rows"]:
+            self.assertEqual(r["total"], r["new"] + r["known"], r["key"])
+            if r["known_passes"]:
+                self.assertEqual(r["known"], plan["known"]["hires"], r["key"])
+            else:
+                self.assertEqual(r["known"], 0, r["key"])
+
+    def test_the_screening_stations_carry_only_the_new_population(self):
+        """האוכלוסייה המוכרת מגיעה ביחס 1:1 - היא אינה עוברת סינון.
+
+        זה מה שהכיסוי שנמדד בקבצים מראה: בדיקת קבצים ויחב"מ מכסים
+        כ-90% מהמגויסים, ואילו יום מיון מקוון ומרכז הערכה כמחצית
+        ופחות.
+        """
+        plan = self.eng.constrained_plan(4000)
+        by = {r["key"]: r for r in plan["rows"]}
+        for k in ("online_day", "screening_day"):
+            self.assertEqual(by[k]["known"], 0, k)
+        for k in ("submissions", "file_check", "yachbam", "hire"):
+            self.assertGreater(by[k]["known"], 0, k)
+
+    def test_the_hire_row_is_exactly_the_target(self):
+        for t in (1500, 3294, 4000, 6000):
+            plan = self.eng.constrained_plan(t)
+            self.assertEqual(plan["rows"][-1]["total"], t, t)
+
+    def test_the_funnel_narrows_all_the_way_down(self):
+        """תרשים משפך: כל שלב קטן מזה שלפניו. ללא מרכז הערכה."""
+        plan = self.eng.constrained_plan(4000)
+        totals = [r["total"] for r in plan["rows"]]
+        self.assertEqual(totals, sorted(totals, reverse=True))
+        self.assertEqual(len(set(totals)), len(totals))
+
+    def test_the_assessment_centre_is_off_the_chain(self):
+        """בקשה מפורשת: מרכז הערכה אינו בתרשים המשפך.
+
+        הוא נשאר במערכת כתחנת צד, אך אינו משתתף בשרשרת החישוב -
+        אף שיעור מעבר אינו נגזר דרכו.
+        """
+        plan = self.eng.constrained_plan(4000)
+        self.assertNotIn("assessment", [r["key"] for r in plan["rows"]])
+        self.assertEqual([a["key"] for a in plan["aside"]], ["assessment"])
+        aside = plan["aside"][0]
+        self.assertEqual(aside["after"], "screening_day")
+        # והוא באמת גדול מהשלב שאחריו בשרשרת - ולכן היה שובר את המשפך
+        by = {r["key"]: r for r in plan["rows"]}
+        self.assertGreater(aside["total"], by["yachbam"]["total"])
+
+    def test_the_chain_rates_are_measured_on_the_new_population_only(self):
+        """שיעור על הנפח המעורב היה מנפח את המעבר האחרון.
+
+        בתרשים יחב"מ->גיוס הוא 80%, אבל 1,418 מהגיוסים שם לא נמדדו
+        ביחב"מ בכלל כחלק מהמשפך. על האוכלוסייה החדשה זה 70%.
+        """
+        last = self.af["chain"][-1]
+        self.assertAlmostEqual(last["chart_rate_to_next"], 0.80, places=2)
+        self.assertAlmostEqual(last["rate_to_next"], 0.70, places=2)
+
+    def test_the_quantities_do_not_depend_on_the_window_except_the_known_lane(self):
+        """הזמן משנה רק את מה שהנתיב המוכר מספק, ואת הקצב."""
+        year = self.eng.constrained_plan(4000)
+        half = self.eng.constrained_plan(4000, 182)
+        # בחצי שנה הנתיב המוכר נותן פחות, ולכן צריך יותר הגשות
+        self.assertGreater(half["submissions"], year["submissions"])
+        self.assertLess(half["known"]["hires"], year["known"]["hires"])
+        # והקצב הנדרש גבוה בהרבה
+        self.assertGreater(half["rows"][0]["pace"], year["rows"][0]["pace"] * 1.8)
+
+    def test_a_window_that_is_not_a_window_returns_nothing(self):
+        self.assertIsNone(self.eng.constrained_plan(4000, 0))
+        self.assertIsNone(self.eng.constrained_plan(4000, -5))
+        self.assertIsNone(self.eng.constrained_plan(None))
+
+    def test_it_replaces_the_two_answers_that_came_before_it(self):
+        """שלוש תשובות שונות לאותה שאלה, ואסור שיתלכדו בשקט.
+
+        required_plan מנפח (רק חצי מהגיוסים נרשמו כהגשה),
+        throughput_plan מכווץ (הוא מניח שכל הגיוסים גדלים יחד),
+        ורק constrained_plan מפריד בין הנתיב שגדל לזה שאינו גדל.
+        """
+        sub = lambda p: p["rows"][0]["required"]
+        cohort = sub(self.eng.required_plan(4000))
+        volume = sub(self.eng.throughput_plan(4000))
+        constrained = self.eng.constrained_plan(4000)["submissions"]
+        self.assertLess(volume, constrained)
+        self.assertLess(constrained, cohort)
+
+
+
+
 if __name__ == "__main__":
     unittest.main()

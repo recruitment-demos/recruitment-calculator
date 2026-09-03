@@ -603,6 +603,111 @@
       }
     ]
   },
+  "annual_flow": {
+    "source": "נתונים למערכת/תזרים הליך הגיוס 2025.pptx",
+    "year": 2025,
+    "year_days": 365,
+    "hires": 3294,
+    "known": {
+      "label": "אוכלוסייה מוכרת",
+      "hires_per_year": 1418,
+      "ratio": 1,
+      "fixed": true,
+      "passes": [
+        "submissions",
+        "file_check",
+        "yachbam"
+      ],
+      "share_of_hires": 0.43048
+    },
+    "new": {
+      "label": "אוכלוסייה חדשה",
+      "hires_per_year": 1876,
+      "ratio_stated": 31,
+      "submissions": 58560,
+      "ratio_measured": 31.2154,
+      "hire_rate": 0.032036,
+      "share_of_hires": 0.56952
+    },
+    "chain": [
+      {
+        "key": "submissions",
+        "label": "הגשות",
+        "volume": 59978,
+        "known": 1418,
+        "new": 58560,
+        "known_passes": true,
+        "to_next": "file_check",
+        "rate_to_next": 0.497883,
+        "chart_rate_to_next": 0.509754
+      },
+      {
+        "key": "file_check",
+        "label": "בדיקת קבצים",
+        "volume": 30574,
+        "known": 1418,
+        "new": 29156,
+        "known_passes": true,
+        "to_next": "online_day",
+        "rate_to_next": 0.247839,
+        "chart_rate_to_next": 0.236345
+      },
+      {
+        "key": "online_day",
+        "label": "יום מיון מקוון",
+        "volume": 7226,
+        "known": 0,
+        "new": 7226,
+        "known_passes": false,
+        "to_next": "screening_day",
+        "rate_to_next": 0.721423,
+        "chart_rate_to_next": 0.721423
+      },
+      {
+        "key": "screening_day",
+        "label": "יום מיון",
+        "volume": 5213,
+        "known": 0,
+        "new": 5213,
+        "known_passes": false,
+        "to_next": "yachbam",
+        "rate_to_next": 0.513716,
+        "chart_rate_to_next": 0.785728
+      },
+      {
+        "key": "yachbam",
+        "label": "יחב\"מ",
+        "volume": 4096,
+        "known": 1418,
+        "new": 2678,
+        "known_passes": true,
+        "to_next": "hire",
+        "rate_to_next": 0.700523,
+        "chart_rate_to_next": 0.804199
+      }
+    ],
+    "hire_row": {
+      "key": "hire",
+      "label": "גיוס",
+      "volume": 3294,
+      "known": 1418,
+      "new": 1876,
+      "known_passes": true,
+      "to_next": null,
+      "rate_to_next": null,
+      "chart_rate_to_next": null
+    },
+    "aside": [
+      {
+        "key": "assessment",
+        "label": "מרכז הערכה",
+        "after": "screening_day",
+        "volume": 4325,
+        "share_of_host": 0.829657
+      }
+    ],
+    "overall_rate": 0.05492
+  },
   "segments": [
     {
       "key": "all",
@@ -2404,7 +2509,7 @@
   "hire_key": "hire",
   "hire_label": "גיוס",
   "meta": {
-    "generated_at": "2026-09-02 15:42",
+    "generated_at": "2026-09-03 15:08",
     "activities_files": [
       "נתונים למערכת/פעילויות למחשבון.xlsx",
       "נתונים למערכת/כלל פעולות למערכת.xlsx",

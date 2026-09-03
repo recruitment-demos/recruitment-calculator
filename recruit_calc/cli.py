@@ -149,6 +149,56 @@ def print_volume(eng, target, days):
           "כוללות גם מי שאינו עובר\n  דרך ההגשות.")
 
 
+def print_constrained(eng, target, days):
+    """המחשבון עם האילוצים: המשפך של תזרים 2025, בשני נתיבים.
+
+    זו התשובה הראשית. היא שונה מ-print_volume בכך שהיא אינה מניחה
+    שכל הגיוסים גדלים יחד: הנתיב המוכר קבוע ואינו נגזר מההגשות.
+    """
+    plan = eng.constrained_plan(target, days)
+    if plan is None:
+        raise SystemExit("אין תזרים שנתי במאגר, או שחלון הזמן אינו חוקי. "
+                         "יש להריץ make.")
+
+    span = ("שנה שלמה (365 יום)" if plan["annual"]
+            else f"-{plan['span_days']:,} ימים")
+    print(f"\nכמה צריך כדי לגייס {target:,} ב{span}")
+    print(f"  מקור היחסים: תזרים הליך הגיוס {plan['year']} "
+          f"({plan['baseline_submissions']:,} הגשות, "
+          f"{plan['baseline_hires']:,} גיוסים).\n")
+
+    print(f"  {plan['known']['label']:<20}{plan['known']['hires']:>9,}   "
+          f"יחס 1:{plan['known']['ratio']}, קבוע - אינו עובר מיון ואינו גדל")
+    print(f"  {plan['new']['label']:<20}{plan['new']['hires']:>9,}   "
+          f"יחס 1:{round(plan['new']['ratio'])}, הנתיב היחיד שנגזר מההגשות\n")
+
+    print(f"  {'שלב':<20}{'סך הכול':>10}{'חדשה':>10}{'מוכרת':>9}"
+          f"{plan['year']:>10}{'פי כמה':>9}")
+    aside_after = {}
+    for a in plan["aside"]:
+        aside_after.setdefault(a["after"], []).append(a)
+
+    for r in plan["rows"]:
+        print(f"  {r['label']:<20}{r['total']:>10,}{r['new']:>10,}"
+              f"{r['known']:>9,}{r['baseline']:>10,}"
+              f"{'×' + format(r['pace'], '.2f'):>9}")
+        for a in aside_after.get(r["key"], []):
+            print(f"    ↳ {a['label']:<17}{a['total']:>10,}{'—':>10}{'—':>9}"
+                  f"{a['baseline']:>10,}{'×' + format(a['pace'], '.2f'):>9}"
+                  f"   [תחנת צד, לא בשרשרת]")
+
+    if plan["shortfall"]:
+        print(f"\n  היעד קטן מהנתיב המוכר ({plan['known']['per_year']:,} "
+              f"בשנה), ולכן אינו דורש אף הגשה חדשה.")
+    else:
+        print(f"\n  {plan['submissions']:,} הגשות לעומת "
+              f"{plan['baseline_in_span']:,} בקצב של {plan['year']} "
+              f"באותו אורך זמן - פי {plan['growth']:.2f},\n  בעוד "
+              f"שהגיוסים גדלים פי {plan['target_growth']:.2f} בלבד. "
+              f"ההפרש נובע מכך שהנתיב המוכר אינו גדל,\n  וכל התוספת "
+              f"נופלת על הנתיב היחיד שכן גדל.")
+
+
 def print_manager(eng, target, by, days, counts=None):
     """הלוח של מנהלת הגיוס: כמה צריך בכל שלב, ועד מתי."""
     plan = eng.manager_plan(counts or {}, target, days)
@@ -193,6 +243,8 @@ def main():
                    help="משפך המיון המלא, כפי שנמדד בקבצים")
     p.add_argument("--segments", action="store_true",
                    help="הפער בין ערוצי הגיוס")
+    p.add_argument("--constrained", action="store_true",
+                   help="המחשבון עם האילוצים: המשפך של תזרים 2025 בשני נתיבים")
     p.add_argument("--volume", action="store_true",
                    help="כמה צריך שיעברו בכל שלב, לפי המשפך שנמדד בפועל")
     p.add_argument("--manager", action="store_true",
@@ -305,11 +357,16 @@ def main():
                 raise SystemExit(f"התאריך {fmt_day(by)} כבר עבר.")
             days = left
 
+        if args.constrained:
+            print_constrained(eng, args.target, days)
+            return
+
         if args.volume:
             print_volume(eng, args.target, days)
             return
 
         if args.manager:
+            print_constrained(eng, args.target, days)
             print_volume(eng, args.target, days)
             print_manager(eng, args.target, by, days)
             return

@@ -71,6 +71,7 @@ def build_scenarios(eng):
         scenarios.append({"op": "required_funnel", "target": t})
         for d in (None, 10, 30, 122, 365, 400):
             scenarios.append({"op": "throughput_plan", "target": t, "days": d})
+            scenarios.append({"op": "constrained_plan", "target": t, "days": d})
         for d in (None, 10, 30, 122, 400):
             scenarios.append({"op": "required_plan", "target": t, "days": d})
             scenarios.append({"op": "feasible_stages", "target": t, "days": d})
@@ -170,6 +171,12 @@ def build_scenarios(eng):
     scenarios.append({"op": "combined_when", "counts": dict(counts_zero)})
     scenarios.append({"op": "combined_timeline", "counts": dict(counts_zero)})
 
+    # המחשבון עם האילוצים: יעד מתחת לנתיב המוכר, בדיוק עליו, ומעליו,
+    # ובחלונות זמן שונים - כולל חלון לא חוקי.
+    for t in (0, 1, 700, 1418, 1419, 3294, 4000, 9999):
+        for d in (None, -1, 0, 1, 30, 122, 182, 365, 730):
+            scenarios.append({"op": "constrained_plan", "target": t, "days": d})
+
     return scenarios
 
 
@@ -217,6 +224,8 @@ def python_result(eng, sc):
         return eng.combined_matrix(sc["counts"])
     if op == "spread":
         return eng.spread(sc["total"], sc["buckets"])
+    if op == "constrained_plan":
+        return eng.constrained_plan(sc["target"], sc.get("days"))
     if op == "throughput_plan":
         return eng.throughput_plan(sc["target"], sc.get("days"))
     if op == "manager_plan":

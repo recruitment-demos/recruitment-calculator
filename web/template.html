@@ -184,6 +184,30 @@
     border-radius: 999px; padding: 1px 7px;
   }
 
+  /* ---------- המחשבון עם האילוצים: משפך דו-נתיבי ---------- */
+  /* שני נתיבים בתוך אותו עמוד: «אוכלוסייה מוכרת» שאינה עוברת מיון
+     ואינה גדלה, ו«אוכלוסייה חדשה» שהיא היחידה שנגזרת מההגשות.
+     הצבע מפריד ביניהם בכל שלב, כדי שיהיה גלוי מיד איזה חלק מהנפח
+     בכלל תלוי בכמות ההגשות.                                          */
+  .fbar.split { display: flex; background: none; }
+  .fseg { height: 100%; width: 0; transition: width .8s cubic-bezier(.2,.7,.3,1); }
+  .fseg.newpop { background: linear-gradient(90deg, var(--brand), var(--brand-2)); }
+  .fseg.knownpop { background: linear-gradient(90deg, #a8730f, #e0a83a); }
+  .fstage.hire .fseg.newpop { background: linear-gradient(90deg, #0a7a52, #24b581); }
+  /* תחנת צד: מרכז הערכה. מתוארת בקו מקווקו כדי שלא תיקרא כתחנת חובה. */
+  .fstage.aside .fname { color: var(--faint); font-weight: 500; }
+  .fstage.aside .ftrack { background: transparent; border: 1px dashed #c6cedb; }
+  .fstage.aside .fbar { background: repeating-linear-gradient(135deg, #c6cedb 0 6px, #dde3ec 6px 12px); }
+  .fstage.aside .fval { color: var(--faint); font-weight: 600; }
+  .lanes { display: flex; gap: 12px; flex-wrap: wrap; margin: 12px 0 4px; }
+  .lanebox { flex: 1 1 210px; border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; }
+  .lanebox .lname { font-size: 11.5px; color: var(--faint); }
+  .lanebox .lval { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .lanebox .lwhy { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .lanebox.known { border-inline-start: 4px solid #e0a83a; }
+  .lanebox.newp { border-inline-start: 4px solid var(--brand); }
+  .lanebox.tot { border-inline-start: 4px solid var(--good); }
+
   /* ---------- גרף 2: מתי בכל שלב ---------- */
   .tl { margin-top: 14px; }
   .tlrow {
@@ -369,6 +393,14 @@
       <div class="big" id="heroValue">0</div>
       <div class="note" id="heroNote"></div>
       <div class="from" id="heroFrom"></div>
+    </div>
+
+    <div class="card reveal" id="constraintCard">
+      <h2>כמה צריך כדי לגייס את היעד</h2>
+      <p class="cardsub" id="constraintSub"></p>
+      <div class="lanes" id="constraintLanes"></div>
+      <div class="funnel" id="constraintBody"></div>
+      <p class="cardsub" id="constraintFoot"></p>
     </div>
 
     <div class="card reveal" id="volumeCard">
@@ -1139,6 +1171,100 @@ const Engine = (() => {
     };
   };
 
+  const annualFlow = () => DATA.annual_flow || null;
+
+  /* המחשבון עם האילוצים. התשובה הראשית לשאלת התכנון.
+     שני נתיבים: «אוכלוסייה מוכרת» קבועה שאינה עוברת מיון ואינה גדלה,
+     ו«אוכלוסייה חדשה» שהיא היחידה שנגזרת מכמות ההגשות. היחסים באים
+     מתרשים תזרים 2025 ולא מקבצי הפעילויות, שרישומם חסר.
+     ההסבר המלא נמצא ב-recruit_calc/engine.py. */
+  const constrainedPlan = (target, days) => {
+    const af = annualFlow();
+    if (af === null || target === null || target === undefined) return null;
+    if (days === undefined) days = null;
+    const year = af.year_days;
+    const span = days === null ? year : days;
+    if (span === null || span <= 0) return null;
+
+    const knownHires = af.known.hires_per_year * span / year;
+    let newHires = target - knownHires;
+    const shortfall = newHires < 0;
+    if (shortfall) newHires = 0.0;
+
+    const chain = af.chain;
+    const volumes = {};
+    volumes[af.hire_row.key] = newHires;
+    let v = newHires;
+    for (let i = chain.length - 1; i >= 0; i--) {
+      const r = chain[i].rate_to_next;
+      if (!r) return null;
+      v = v / r;
+      volumes[chain[i].key] = v;
+    }
+
+    const make = (row, isHire) => {
+      const n = volumes[row.key];
+      const kn = row.known_passes ? knownHires : 0.0;
+      const newI = roundHalfUp(n);
+      const knownI = roundHalfUp(kn);
+      const basePerDay = row.volume / year;
+      const perDay = (newI + knownI) / span;
+      return {
+        key: row.key, label: row.label, is_hire: isHire,
+        total: newI + knownI, new: newI, known: knownI,
+        known_passes: row.known_passes,
+        rate_to_next: row.rate_to_next, to_next: row.to_next,
+        baseline: row.volume, baseline_new: row.new,
+        baseline_known: row.known,
+        baseline_per_day: roundTo(basePerDay, 3),
+        per_day: roundTo(perDay, 3),
+        pace: !basePerDay ? null : roundTo(perDay / basePerDay, 3)
+      };
+    };
+
+    const rows = chain.map(r => make(r, false));
+    rows.push(make(af.hire_row, true));
+
+    const aside = af.aside.map(a => {
+      const total = roundHalfUp(volumes[a.after] * a.share_of_host);
+      const basePerDay = a.volume / year;
+      const perDay = total / span;
+      return {
+        key: a.key, label: a.label, after: a.after, total: total,
+        share_of_host: a.share_of_host, baseline: a.volume,
+        baseline_per_day: roundTo(basePerDay, 3),
+        per_day: roundTo(perDay, 3),
+        pace: !basePerDay ? null : roundTo(perDay / basePerDay, 3)
+      };
+    });
+
+    const top = rows[0];
+    return {
+      target: target, days: days, span_days: span, annual: days === null,
+      source: af.source, year: af.year, shortfall: shortfall,
+      known: {
+        label: af.known.label, hires: roundHalfUp(knownHires),
+        per_year: af.known.hires_per_year, ratio: af.known.ratio,
+        share: !target ? null : roundTo(knownHires / target, 4)
+      },
+      new: {
+        label: af.new.label, hires: roundHalfUp(newHires),
+        per_year: af.new.hires_per_year, ratio: af.new.ratio_measured,
+        hire_rate: af.new.hire_rate,
+        share: !target ? null : roundTo(newHires / target, 4)
+      },
+      submissions: top.total,
+      baseline_submissions: top.baseline,
+      baseline_hires: af.hires,
+      // שתי הצמיחות מול אותו חלון. ראו את ההסבר ב-engine.py.
+      baseline_in_span: roundHalfUp(top.baseline * span / year),
+      baseline_hires_in_span: roundHalfUp(af.hires * span / year),
+      growth: top.pace,
+      target_growth: rows[rows.length - 1].pace,
+      rows: rows, aside: aside
+    };
+  };
+
   const gapPipeline = (counts, target, k, days) => {
     const plan = gapPlan(counts, target, days);
     if (plan === null || !hasRate(k)) return null;
@@ -1166,6 +1292,7 @@ const Engine = (() => {
            coverage, coveredShare, lowCoverage,
            projectCohort, timeline, combine, combinedWhen, combinedTimeline,
            spread, combinedMatrix, managerPlan, throughputPlan,
+           annualFlow, constrainedPlan,
            curveShare, hiresByDay, combinedByDay,
            crossCheck, requiredForTarget, requiredFunnel, requiredPlan,
            effectiveRate, observedCandidates, observedPerDay, capacity,
@@ -1841,6 +1968,163 @@ function renderGapPipeline(plan, cutoffDays) {
  * מהגיוסים. לפיו יצאו 124,778 הגשות ל-4,000 גיוסים, בעוד שבפועל
  * 35,711 הגשות דרו בכפיפה אחת עם 2,328 גיוסים. כאן היחס הוא של
  * הארגון כולו, ולכן הוא עומד מול מה שקרה.                          */
+/* --- המחשבון עם האילוצים --- *
+ * תרשים משפך אחד שעונה על השאלה «כמה הגשות צריך כדי לגייס X», עם שלושת
+ * האילוצים שהמשתמש הגדיר:
+ *   1. שני נתיבים. «אוכלוסייה מוכרת» מגיעה ביחס 1:1 ואינה עוברת מיון,
+ *      ולכן אינה נגזרת מכמות ההגשות. רק «האוכלוסייה החדשה» כן.
+ *   2. הנתיב המוכר קבוע ואינו ניתן להגדלה, ומתפרס אחיד על פני השנה.
+ *   3. היחסים באים מתרשים תזרים 2025 ולא מקבצי הפעילויות, שרישומם חסר
+ *      ונותן יחס הגשה->קבצים של 61% במקום 51%.
+ * מרכז הערכה מוצג כתחנת צד מקווקוות ואינו בשרשרת - בקשה מפורשת.        */
+function renderConstrained(target, targetDate, days) {
+  const plan = Engine.constrainedPlan(target, days);
+  const body = $("constraintBody");
+  const lanes = $("constraintLanes");
+  body.innerHTML = "";
+  lanes.innerHTML = "";
+  if (!plan) return false;
+
+  const span = plan.span_days;
+  const spanText = plan.annual
+    ? "שנה שלמה (365 יום)"
+    : nf(span) + " ימים, עד " + fmtDay(targetDate);
+
+  $("constraintSub").textContent =
+    "היעד: " + nf(plan.target) + " גיוסים ב" + spanText + ". " +
+    "היחסים נלקחו מתזרים הליך הגיוס " + plan.year + " שהתקבל בתרשים, " +
+    "ולא מרישום הפעילויות. הגיוסים מפוצלים לשני נתיבים, ורק אחד מהם " +
+    "גדל עם ההגשות: כחול הוא האוכלוסייה החדשה, כתום היא האוכלוסייה " +
+    "המוכרת שאינה עוברת מיון ואינה ניתנת להגדלה.";
+
+  const box = (cls, name, val, why) => {
+    const d = el("div", "lanebox " + cls);
+    d.append(el("div", "lname", name), el("div", "lval", nf(val)),
+             el("div", "lwhy", why));
+    return d;
+  };
+
+  lanes.append(box("known", plan.known.label + " · יחס 1:" + plan.known.ratio,
+    plan.known.hires,
+    "קבוע. " + nf(plan.known.per_year) + " גיוסים בשנה שאינם עוברים מיון, " +
+    (plan.annual ? "ואין דרך להגדילם."
+                 : "מחולקים אחיד על פני השנה - " + nf(span) + " ימים הם " +
+                   nf(plan.known.hires) + ".")));
+
+  lanes.append(box("newp", plan.new.label + " · יחס 1:" +
+      Math.round(plan.new.ratio), plan.new.hires,
+    plan.shortfall
+      ? "היעד קטן מהנתיב המוכר, ולכן אינו דורש אף הגשה."
+      : "כל השאר. אלה הגיוסים היחידים שנגזרים מכמות ההגשות, בשיעור " +
+        pct(plan.new.hire_rate) + " מהגשה לגיוס."));
+
+  lanes.append(box("tot", "הגשות דרושות", plan.submissions,
+    "לעומת " + nf(plan.baseline_in_span) + " בקצב של " + plan.year +
+    (plan.annual ? "" : " באותו אורך זמן") + " - פי " +
+    plan.growth.toFixed(2) + "."));
+
+  const max = Math.max.apply(null, plan.rows.map(r => r.total).concat([1]));
+  const asideAfter = {};
+  plan.aside.forEach(a => {
+    if (!asideAfter[a.after]) asideAfter[a.after] = [];
+    asideAfter[a.after].push(a);
+  });
+
+  let i = 0;
+  const addAside = (a) => {
+    const row = el("div", "fstage aside");
+    const head = el("div", "fhead");
+    head.append(el("span", "fname", "↳ " + a.label),
+                el("span", "fpct", pct(a.share_of_host) + " מ«" +
+                   Engine.label(a.after) + "»"));
+    const track = el("div", "ftrack");
+    const bar = el("div", "fbar");
+    track.append(bar);
+    const width = ((a.total / max) * 100).toFixed(1);
+    later(() => { bar.style.width = width + "%"; }, 70 + (i++) * 60);
+    const val = el("div", "fval", nf(a.total));
+    row.append(head, track, val, el("div", "fsrc",
+      "תחנת צד, לא בשרשרת. בתרשים היא יושבת בין «" + Engine.label(a.after) +
+      "» ל«יחב״מ», ו-95% ממי שמגיע אליה ממשיך הלאה - היא כמעט אינה " +
+      "מסננת. ב-" + plan.year + " עברו בה " + nf(a.baseline) + ", וכאן " +
+      nf(a.total) + ". היא אינה משתתפת בחישוב ואינה תחנת חובה בדרך לגיוס."));
+    body.append(row);
+  };
+
+  plan.rows.forEach(r => {
+    const row = el("div", "fstage" + (r.is_hire ? " hire" : ""));
+    const head = el("div", "fhead");
+    head.append(el("span", "fname", r.label));
+    if (!r.is_hire) {
+      head.append(el("span", "fpct", "מהם " + pct(r.total / plan.submissions) +
+        " מכלל ההגשות"));
+    }
+
+    const track = el("div", "ftrack");
+    const bar = el("div", "fbar split");
+    const segNew = el("div", "fseg newpop");
+    const segKnown = el("div", "fseg knownpop");
+    bar.append(segNew, segKnown);
+    track.append(bar);
+    const wNew = ((r.new / max) * 100).toFixed(2);
+    const wKnown = ((r.known / max) * 100).toFixed(2);
+    later(() => {
+      segNew.style.width = wNew + "%";
+      segKnown.style.width = wKnown + "%";
+    }, 70 + (i++) * 60);
+
+    const val = el("div", "fval");
+    countUp(val, r.total, 850);
+
+    // מקור הכמות. הצבע בעמודה מפריד בין הנתיבים, וכאן נאמר במפורש
+    // כמה תרם כל אחד מהם - דרישה מפורשת: כל מספר אומר ממה הוא נגזר.
+    let why = "";
+    if (r.known) {
+      why += nf(r.new) + " " + plan.new.label + " (כחול)  +  " +
+             nf(r.known) + " " + plan.known.label + " (כתום). ";
+    } else {
+      why += nf(r.new) + " " + plan.new.label + " בלבד - " +
+             plan.known.label + " אינה עוברת בשלב הזה. ";
+    }
+    if (r.rate_to_next) {
+      why += "מכאן מגיעים ל«" + Engine.label(r.to_next) + "» " +
+             pct(r.rate_to_next) + " מהאוכלוסייה החדשה. ";
+    }
+    why += "ב-" + plan.year + " עברו כאן " + nf(r.baseline) + " (" +
+           nf(r.baseline_new) + " חדשה + " + nf(r.baseline_known) +
+           " מוכרת), וכאן " + nf(r.total) + " - פי " + r.pace.toFixed(2) + ".";
+    if (!plan.annual) {
+      why += " בקצב של " + fmtRate(r.per_day) + " ליום, לעומת " +
+             fmtRate(r.baseline_per_day) + " ב-" + plan.year + ".";
+    }
+    row.append(head, track, val, el("div", "fsrc", why));
+    body.append(row);
+
+    (asideAfter[r.key] || []).forEach(addAside);
+  });
+
+  let foot =
+    "כל המספרים נגזרים מתזרים " + plan.year + ": " +
+    nf(plan.baseline_submissions) + " הגשות ו-" + nf(plan.baseline_hires) +
+    " גיוסים, שמהם " + nf(plan.known.per_year) + " " + plan.known.label +
+    " ביחס 1:1 ו-" + nf(plan.new.per_year) + " " + plan.new.label +
+    " ביחס 1:" + Math.round(plan.new.ratio) + ". ";
+  if (plan.shortfall) {
+    foot += "היעד שהוזן קטן מהנתיב המוכר, ולכן הוא מושג בלי אף הגשה חדשה.";
+  } else {
+    foot += "שיעורי המעבר בשרשרת חושבו על האוכלוסייה החדשה בלבד, מפני " +
+      "שהאוכלוסייה המוכרת אינה עוברת סינון - חישוב על הנפח המעורב היה " +
+      "מנפח את המעבר האחרון (80% בתרשים לעומת " +
+      pct(plan.rows[plan.rows.length - 2].rate_to_next) + " בפועל). " +
+      "הגיוסים גדלים פי " + plan.target_growth.toFixed(2) +
+      " אך ההגשות פי " + plan.growth.toFixed(2) + " - שתי הצמיחות מול " +
+      "אותו חלון זמן - מפני שהנתיב המוכר אינו גדל וכל התוספת נופלת על " +
+      "הנתיב היחיד שכן גדל.";
+  }
+  $("constraintFoot").textContent = foot;
+  return true;
+}
+
 function renderVolume(target, targetDate, days) {
   const plan = Engine.throughputPlan(target, days);
   const body = $("volumeBody");
@@ -2236,7 +2520,7 @@ function renderNotes(messages) {
 }
 
 /* --- חשיפת התוצאות --- */
-const ALL_CARDS = ["heroCard", "volumeCard", "managerCard", "gapCardPlan", "pipelineCard",
+const ALL_CARDS = ["heroCard", "constraintCard", "volumeCard", "managerCard", "gapCardPlan", "pipelineCard",
                    "planCard", "funnelCard", "matrixCard", "whenCard",
                    "timelineCard", "gapCard"];
 
@@ -2308,15 +2592,36 @@ function calculate() {
     planDate = targetDate;
     planDays = onlyDays !== null && onlyDays >= 0 ? onlyDays : null;
 
-    renderHero("יעד גיוס", target,
-      "כמה מועמדים צריך בכל שלב כדי להגיע ליעד הזה" +
-      (targetDate ? ", ועד מתי" : ""),
-      targetDate
-        ? "כל כמות נגזרת משיעור הגיוס הנמדד של אותו שלב, וכל תאריך מהיעד " +
-          fmtDay(targetDate) + " פחות חציון הזמן עד הגיוס."
-        : "כל כמות נגזרת משיעור הגיוס הנמדד של אותו שלב. " +
-          "מילוי «תאריך היעד» יוסיף גם עד מתי הם צריכים להיות שם.");
+    /* ההירו מציג את מה שנשאל בפועל: כמה הגשות צריך. הכמות באה
+       מהמחשבון עם האילוצים, ולא מרישום הפעילויות. */
+    const cp = Engine.constrainedPlan(target, planDays);
+    if (cp) {
+      renderHero(
+        "הגשות דרושות ל-" + nf(target) + " גיוסים",
+        cp.submissions,
+        (cp.annual ? "בשנה שלמה" : "עד " + fmtDay(targetDate) + " (" +
+          nf(cp.span_days) + " ימים)") + ", לעומת " +
+          nf(cp.baseline_in_span) + " בקצב של " + cp.year +
+          " באותו אורך זמן - פי " + cp.growth.toFixed(2),
+        nf(cp.known.hires) + " מהגיוסים מגיעים מ«" + cp.known.label +
+        "» ואינם עוברים בהליך המיון כלל, ולכן אינם דורשים הגשות. " +
+        "רק " + nf(cp.new.hires) + " הגיוסים של «" + cp.new.label +
+        "» נגזרים מהמשפך, ביחס 1:" + Math.round(cp.new.ratio) + ".");
+    } else {
+      renderHero("יעד גיוס", target,
+        "כמה מועמדים צריך בכל שלב כדי להגיע ליעד הזה" +
+        (targetDate ? ", ועד מתי" : ""),
+        targetDate
+          ? "כל כמות נגזרת משיעור הגיוס הנמדד של אותו שלב, וכל תאריך מהיעד " +
+            fmtDay(targetDate) + " פחות חציון הזמן עד הגיוס."
+          : "כל כמות נגזרת משיעור הגיוס הנמדד של אותו שלב. " +
+            "מילוי «תאריך היעד» יוסיף גם עד מתי הם צריכים להיות שם.");
+    }
 
+    /* המחשבון עם האילוצים הוא התשובה הראשית, ולכן הוא ראשון.
+       שלוש הטבלאות שאחריו עונות על אותה שאלה בלי האילוצים, והן
+       נשמרות לצורך השוואה בלבד. */
+    const hasConstraint = renderConstrained(target, targetDate, planDays);
     const hasVolume = renderVolume(target, targetDate, planDays);
     const hasManager = renderManager({}, target, targetDate, planDays);
     renderPipeline(target, targetDate, planDays);
@@ -2326,6 +2631,13 @@ function calculate() {
       "שתי הטבלאות עונות על אותה שאלה בשתי דרכים. הראשונה מתייחסת לכל שלב " +
       "בנפרד, והשורות שלה אינן מצטברות. השנייה היא משפך אחד רציף: קבוצה " +
       "אחת שנכנסת בשלב אחד ועוברת את התהליך." });
+    if (hasConstraint) {
+      notes.unshift({ kind: "flat", text:
+        "התשובה הראשית היא «כמה צריך כדי לגייס את היעד» שבראש העמוד. היא " +
+        "היחידה שמפרידה בין הגיוסים שעוברים בהליך המיון לבין אלה שאינם " +
+        "עוברים בו, ולכן היא היחידה שאינה מנפחת את כמות ההגשות. כל מה " +
+        "שמתחתיה מחשב על בסיס רישום הפעילויות בלבד, ומוצג לשם השוואה." });
+    }
     if (targetDate) {
       notes.push({ kind: "warn", text:
         "התאריכים מבוססים על חציון הזמן עד הגיוס. חציון פירושו שמחצית " +
@@ -2345,6 +2657,7 @@ function calculate() {
       n => notes.push(n));
     renderNotes(notes);
     const targetCards = ["heroCard"];
+    if (hasConstraint) targetCards.push("constraintCard");
     if (hasVolume) targetCards.push("volumeCard");
     if (hasManager) targetCards.push("managerCard");
     targetCards.push("pipelineCard", "planCard", "gapCard");
