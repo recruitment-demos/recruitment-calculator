@@ -70,7 +70,8 @@ vm.createContext(sandbox);
 const exposed = script + "\n;globalThis.DATA = DATA; globalThis.Engine = Engine;" +
                 "globalThis.calculate = calculate; globalThis.reset = reset;" +
                 "globalThis.activeCounts = activeCounts;" +
-                "globalThis.applyActiveRows = applyActiveRows;";
+                "globalThis.applyActiveRows = applyActiveRows;" +
+                "globalThis.setPopulation = setPopulation;";
 vm.runInContext(exposed, sandbox, { filename: "index.html" });
 
 /* ---------- תרחישים ---------- */
@@ -857,10 +858,11 @@ check("אין מלל באנגלית בשום מקום בתצוגה", () => {
                  "flowBody", "flowLanes", "whenBody", "matrixBody",
                  "timelineBody", "gapBody", "gapPlanBody", "gapPlanSub",
                  "chartAllBody", "chartNewBody", "chartAllHead", "chartNewHead",
+                 "unitBody", "unitGap", "importMsg",
                  "infoTitle", "infoText"];
   const btns = ["aboutBtn", "inputInfo", "heroInfo", "constraintInfo",
                 "flowInfo", "whenInfo", "matrixInfo", "timelineInfo",
-                "gapPlanInfo", "chartInfo"];
+                "gapPlanInfo", "chartInfo", "importInfo", "unitInfo"];
   const scan = () => {
     let t = "";
     nodes.forEach(id => { t += " " + allText(at(id)) + " " + infoOf(at(id)); });
@@ -1224,12 +1226,167 @@ check("אין מלל באנגלית באזור הטעינה", () => {
   return m ? "אנגלית באזור הטעינה: " + m[0] : null;
 });
 
+/* ---------- כל פורמט, ולא רק זה שנשלח ---------- */
+const rowsOf = table => (table || []).length;
+
+check("שורות שער מעל שורת הכותרות אינן מפריעות", () => {
+  const t = [["דוח מועמדים פעילים", null], [], []]
+    .concat(activeTable([["1", "בבחינה"], ["2", "קבצים"], ["3", "קבצים"]]));
+  const res = sandbox.activeCounts(t);
+  if (!res.ok) return "הכותרת לא נמצאה";
+  return res.counts.submissions === 1 && res.counts.file_check === 2
+    ? null : "הספירה שגויה: " + JSON.stringify(res.counts);
+});
+
+check("קובץ שנכתב לאורך נקרא כמו קובץ שנכתב לרוחב", () => {
+  const t = activeTable([["1", "בבחינה"], ["2", "בבחינה"], ["3", "קבצים"]]);
+  const flipped = t[0].map((_, c) => t.map(r => r[c]));
+  const res = sandbox.activeCounts(flipped);
+  if (!res.ok) return "הפריסה ההפוכה לא זוהתה";
+  if (!res.flipped) return "לא נאמר שהקובץ נקרא הפוך";
+  return res.counts.submissions === 2 && res.counts.file_check === 1
+    ? null : "הספירה שגויה: " + JSON.stringify(res.counts);
+});
+
+check("טבלת ריכוז לפי עמודות", () => {
+  const res = sandbox.activeCounts([
+    ["תהליך נוכחי", "בבחינה", "קבצים", "מרכז הערכה"],
+    ["סה\"כ", 2644, 825, 781]
+  ]);
+  if (!res.ok || res.mode !== "pivot") return "לא זוהתה טבלת ריכוז";
+  return res.counts.submissions === 2644 && res.counts.file_check === 825 &&
+         res.counts.assessment === 781
+    ? null : "הכמויות שגויות: " + JSON.stringify(res.counts);
+});
+
+check("טבלת ריכוז לפי שורות", () => {
+  const res = sandbox.activeCounts([
+    ["תהליך נוכחי", "סה\"כ"],
+    ["בבחינה", 2644], ["קבצים", 825],
+    ["יום מיון", 637], ["רפואי", 332],
+    [IMP.ignore[0], 9]
+  ]);
+  if (!res.ok || res.mode !== "pivot") return "לא זוהתה טבלת ריכוז";
+  // שני סטטוסים שונים שמתמפים לאותו שלב חייבים להיסכם
+  return res.counts.submissions === 2644 && res.counts.online_day === 969
+    ? null : "הכמויות שגויות: " + JSON.stringify(res.counts);
+});
+
+check("שורת «סה\"כ» בתוך ריכוז אינה נספרת פעמיים", () => {
+  const res = sandbox.activeCounts([
+    ["יחידה ארגונית", "בבחינה", "קבצים", "סה\"כ"],
+    ["מחוז א", 300, 100, 400],
+    ["מחוז ב", 200, 80, 280],
+    ["סה\"כ", 500, 180, 680]
+  ]);
+  if (res.counts.submissions !== 500) return "הסך הכול נספר פעמיים";
+  const units = Object.keys(res.units);
+  if (units.length !== 2) return "היחידות לא זוהו: " + units.join(", ");
+  return res.units["מחוז א"].file_check === 100 ? null : "פילוח שגוי";
+});
+
+check("שם עמודה אחר מתקבל", () => {
+  const res = sandbox.activeCounts([
+    ["מספר מועמד", "סטטוס", "מחוז"],
+    ["1", "בבחינה", "צפון"], ["2", "קבצים", "דרום"], ["2", "קבצים", "דרום"]
+  ]);
+  if (!res.ok) return "העמודות לא זוהו";
+  if (res.counts.file_check !== 1) return "כפילות נספרה פעמיים";
+  return Object.keys(res.units).length === 2 ? null : "עמודת המחוז לא זוהתה";
+});
+
+check("עמודת סטטוס לבדה מספיקה", () => {
+  const res = sandbox.activeCounts([
+    ["תהליך נוכחי"], ["בבחינה"], ["בבחינה"], ["קבצים"]
+  ]);
+  if (!res.ok) return "לא זוהתה עמודת הסטטוס";
+  if (res.dedup) return "נטען שיש ניכוי כפילויות בלי עמודת מועמד";
+  return res.counts.submissions === 2 && res.counts.file_check === 1
+    ? null : "הספירה שגויה: " + JSON.stringify(res.counts);
+});
+
+check("קובץ שאין בו שום שלב אינו נקרא", () => {
+  const res = sandbox.activeCounts([["שם", "עיר"], ["דנה", "חיפה"]]);
+  return res.ok ? "קובץ לא רלוונטי זוהה כטבלת מועמדים" : null;
+});
+
+/* ---------- טבלת היחידות ---------- */
+check("טבלת היחידות נבנית, מסתכמת, ומופיעה רק כשיש יחידה", () => {
+  sandbox.reset();
+  sandbox.applyActiveRows(activeTable([["1", "בבחינה"], ["2", "קבצים"]]));
+  if (revealed("unitCard") || !registry.unitCard.classList.contains("hidden"))
+    return "הטבלה הופיעה בלי עמודת יחידה";
+
+  sandbox.reset();
+  const head = ["מועמד(קוד)", "תהליך נוכחי", "יחידה ארגונית"];
+  const body = [];
+  for (let i = 0; i < 400; i++) body.push([String(i), "בבחינה", "מחוז א"]);
+  for (let i = 400; i < 600; i++) body.push([String(i), "קבצים", "מחוז ב"]);
+  sandbox.applyActiveRows([head].concat(body));
+  if (registry.unitCard.classList.contains("hidden")) return "הטבלה לא הופיעה";
+
+  const rows = registry.unitBody.children;
+  if (rows.length !== 4) return "מספר שורות לא צפוי: " + rows.length;
+  const cells = r => (rows[r].children || []).map(c => c.textContent);
+  const sumRow = cells(3);
+  const a = num(cells(1)[2]), b = num(cells(2)[2]);
+  if (num(sumRow[1]) !== 600) return "סך המועמדים הפעילים שגוי";
+  if (num(sumRow[2]) !== a + b) return "שורת הסך הכול אינה סכום השורות";
+  return null;
+});
+
+check("טבלת היחידות משתנה עם בורר האוכלוסייה", () => {
+  const before = num((registry.unitBody.children[3].children || [])[2].textContent);
+  sandbox.setPopulation(true);
+  const after = num((registry.unitBody.children[3].children || [])[2].textContent);
+  sandbox.setPopulation(false);
+  return after < before ? null :
+    "«גיוסים חדשים בלבד» חייב לתת פחות גיוסים מאותו מלאי";
+});
+
+check("הפרש העיגול נאמר במפורש", () => {
+  const t = registry.unitGap.textContent;
+  if (!t) return null;   // אין הפרש - אין מה לומר
+  return t.includes("עיגול") ? null : "ההפרש לא הוסבר";
+});
+
+check("איפוס מנקה גם את טבלת היחידות", () => {
+  sandbox.reset();
+  clearAll();
+  setVal("submissions", "5000");
+  sandbox.calculate();
+  return registry.unitCard.classList.contains("hidden")
+    ? null : "טבלת היחידות נשארה אחרי איפוס";
+});
+
 check("איפוס מנקה גם את הטעינה", () => {
   sandbox.applyActiveRows(activeTable([["1", "בבחינה"]]));
   sandbox.reset();
   return allText(registry.importMsg).trim() === "" &&
          registry.importFile.value === ""
     ? null : "האיפוס השאיר את סיכום הטעינה";
+});
+
+check("הכותרת ובורר האוכלוסייה ממורכזים", () => {
+  if (!/<div class="card head">/.test(html)) return "כרטיס הכותרת אינו מסומן";
+  if (!/\.card\.head\s*\{[^}]*text-align:\s*center/.test(html))
+    return "הכותרת אינה ממורכזת";
+  return /\.card\.head \.titlerow\s*\{[^}]*justify-content:\s*center/.test(html)
+    ? null : "שורת הכותרת אינה ממורכזת";
+});
+
+check("התאמה לנייד", () => {
+  if (!/viewport-fit=cover/.test(html)) return "אין viewport-fit באייפון";
+  if (!/env\(safe-area-inset-bottom\)/.test(html))
+    return "הכפתור הצף אינו מתחשב באזור הבטוח";
+  if (!/@media \(max-width: 680px\)[\s\S]*?\.import button\.load/.test(html))
+    return "כפתור הטעינה לא הותאם למסך צר";
+  if (!/@media \(max-width: 680px\)[\s\S]*?\.segbar button \{[^}]*flex:\s*1/.test(html))
+    return "בורר האוכלוסייה לא הותאם למסך צר";
+  if (!/\.unitwrap\s*\{[^}]*overflow:\s*auto/.test(html))
+    return "טבלת היחידות אינה נגללת בתוך עצמה";
+  // שדות הקלט נשארים 16px כדי שהאייפון לא יבצע זום בלחיצה
+  return /font-size:\s*16px/.test(html) ? null : "שדה קלט קטן מ-16px בנייד";
 });
 
 check("איפוס מנקה הכל", () => {

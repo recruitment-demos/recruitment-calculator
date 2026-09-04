@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <title>מחשבון גיוס</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <style>
   :root {
     --bg: #eff2f7;
@@ -123,6 +123,13 @@
   .impmsg .detail { color: var(--muted); }
   .impmsg .warn { color: var(--warn); }
   .impmsg .bad { color: var(--bad); font-weight: 600; }
+
+  /* טבלת היחידות יכולה להיות ארוכה - היא נגללת בתוך עצמה, לגובה
+     ולרוחב, ולא מותחת את העמוד. */
+  .unitwrap { max-height: 60vh; overflow: auto; }
+  .unitwrap th { position: sticky; top: 0; z-index: 1; }
+  #unitBody td.unit { white-space: normal; font-weight: 600; }
+  #unitBody tr.sum td { background: var(--brand-soft); font-weight: 700; }
 
   /* ---------- הופעת התוצאות ---------- */
   .reveal {
@@ -320,6 +327,8 @@
   }
   @media (max-width: 680px) {
     .wrap { padding: 14px 11px 48px; }
+    .segbar { display: flex; width: 100%; }
+    .segbar button { flex: 1; padding: 10px 8px; font-size: 13px; }
     .card { padding: 16px 14px 18px; border-radius: 14px; margin-bottom: 12px; }
     h1 { font-size: 20px; }
     .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
@@ -339,8 +348,23 @@
     .bar-row > :first-child { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
     .ftrack, .tltrack { height: 24px; }
   }
+  @media (max-width: 680px) {
+    /* אזור הטעינה: הכפתור לרוחב מלא, ומטרת נגיעה גדולה מספיק לאצבע. */
+    .import button.load { padding: 13px 16px; font-size: 14px; line-height: 1.35; }
+    .importhead { gap: 8px; }
+    .impmsg { font-size: 12px; }
+
+    /* טבלת היחידות נגללת בתוך עצמה, ולא מותחת את העמוד. */
+    .unitwrap { max-height: 56vh; }
+    #unitBody th, #unitBody td { padding: 7px 7px; font-size: 12.5px; }
+
+    /* מקום לכפתור הצף בתחתית, כולל האזור הבטוח באייפון. */
+    .wrap { padding-bottom: 84px; padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+  }
   @media (max-width: 360px) {
     .grid { grid-template-columns: 1fr; }
+    h1 { font-size: 18px; }
+    .import button.load { font-size: 13px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -413,6 +437,11 @@
   }
 
   /* ---------- בורר האוכלוסייה ---------- */
+  /* כרטיס הכותרת ממורכז - הכותרת, שורת ההסבר ובורר האוכלוסייה. */
+  .card.head { text-align: center; }
+  .card.head .titlerow { justify-content: center; }
+  .card.head .sub { margin-inline: auto; }
+
   .segbar {
     display: inline-flex; background: #eef1f6; border: 1px solid var(--line);
     border-radius: 999px; padding: 3px; gap: 3px; margin-top: 10px;
@@ -430,7 +459,12 @@
 
   /* ---------- כפתור צף ליצירת קשר ---------- */
   .floatbtn {
-    position: fixed; bottom: 20px; inset-inline-end: 20px; z-index: 9999;
+    position: fixed; z-index: 9999;
+    /* env() שומר על הכפתור מעל פס המחוות של האייפון. דפדפן שאינו
+       מכיר את הפונקציה מקבל את שורת ה-bottom הקודמת. */
+    bottom: 20px; inset-inline-end: 20px;
+    bottom: calc(20px + env(safe-area-inset-bottom));
+    inset-inline-end: calc(20px + env(safe-area-inset-right));
     width: 56px; height: 56px; border-radius: 50%;
     background: #25d366; box-shadow: 0 6px 18px rgba(9, 30, 66, .28);
     display: flex; align-items: center; justify-content: center;
@@ -449,7 +483,12 @@
     opacity: 1; transform: none;
   }
   @media (max-width: 680px) {
-    .floatbtn { width: 50px; height: 50px; bottom: 14px; inset-inline-end: 14px; }
+    .floatbtn {
+      width: 50px; height: 50px;
+      bottom: 14px; inset-inline-end: 14px;
+      bottom: calc(14px + env(safe-area-inset-bottom));
+      inset-inline-end: calc(14px + env(safe-area-inset-right));
+    }
     .floatbtn svg { width: 27px; height: 27px; }
   }
 
@@ -492,7 +531,7 @@
     <span class="n" id="stickyValue">0</span>
   </div>
 
-  <div class="card">
+  <div class="card head">
     <div class="titlerow">
       <h1>מחשבון גיוס</h1>
       <button class="info" id="aboutBtn" type="button">ⓘ</button>
@@ -520,7 +559,8 @@
         <button class="load" id="importBtn" type="button">טען נתונים מקובץ מועמדים פעילים</button>
         <button class="info" id="importInfo" type="button">ⓘ</button>
       </div>
-      <input id="importFile" type="file" accept=".xlsx,.xlsm,.xls" />
+      <input id="importFile" type="file"
+             accept=".xlsx,.xlsm,.xlsb,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" />
       <div class="impmsg" id="importMsg"></div>
     </div>
   </div>
@@ -582,6 +622,15 @@
         <button class="info" id="timelineInfo" type="button">ⓘ</button>
       </div>
       <div id="timelineBody"></div>
+    </div>
+
+    <div class="card reveal" id="unitCard">
+      <div class="titlerow">
+        <h2>גיוס לפי יחידה</h2>
+        <button class="info" id="unitInfo" type="button">ⓘ</button>
+      </div>
+      <div class="scroller unitwrap"><table class="mtable" id="unitBody"></table></div>
+      <p class="tally" id="unitGap"></p>
     </div>
 
     <div class="card reveal" id="gapCard">
@@ -2217,66 +2266,298 @@ function txt(v) {
   return v === null || v === undefined ? "" : String(v).trim();
 }
 
-/* טבלה גולמית - שורה ראשונה כותרות - אל ספירת מועמדים ייחודיים לכל
-   שלב. פונקציה טהורה, כדי שאפשר יהיה לבדוק אותה בלי דפדפן. */
-function activeCounts(table) {
-  const out = {
-    ok: false, rows: 0, counted: 0, unique: 0, ignored: 0,
-    unknown: {}, unknownRows: 0, noId: 0, twice: 0, counts: {}
-  };
-  DATA.stages.forEach(s => { out.counts[s.key] = null; });
-  if (!table || !table.length) return out;
+/* השוואת שמות בלי רווחים ובלי מירכאות: «יחב"מ» ו«יחב״מ» אותו דבר,
+   ו«מועמד(קוד)» זהה ל«מועמד (קוד)». */
+function normKey(v) {
+  return txt(v).replace(/[\s"'״׳“”]/g, "");
+}
 
-  const head = (table[0] || []).map(txt);
-  const findCol = names => {
-    for (let i = 0; i < names.length; i++) {
-      const j = head.indexOf(names[i]);
-      if (j >= 0) return j;
+/* מיפוי מנורמל של הסטטוסים, כדי שהתאמה לא תיפול על רווח או מירכאה. */
+const MAP_N = {};
+Object.keys(IMPORT.map).forEach(s => { MAP_N[normKey(s)] = IMPORT.map[s]; });
+const IGNORE_N = {};
+IMPORT.ignore.forEach(s => { IGNORE_N[normKey(s)] = true; });
+
+function stageOf(v) { return MAP_N[normKey(v)] || null; }
+function isIgnored(v) { return !!IGNORE_N[normKey(v)]; }
+
+/* ציון התאמה של כותרת לשם עמודה מוכר: זהות מלאה, או שהכותרת
+   שבקובץ מתחילה בשם המוכר («מועמד(קוד)» מתחיל ב«מועמד»). לא מספיק
+   שהשם מופיע באמצע - «מקור מועמדות» אינו עמודת מועמד. */
+function headScore(cell, names) {
+  const c = normKey(cell);
+  if (!c) return 0;
+  let best = 0;
+  for (let i = 0; i < names.length; i++) {
+    const k = normKey(names[i]);
+    if (!k) continue;
+    if (c === k) return 3;
+    if (c.indexOf(k) === 0) best = Math.max(best, 2);
+  }
+  return best;
+}
+
+function bestColumn(head, names) {
+  let index = -1, score = 0;
+  for (let i = 0; i < head.length; i++) {
+    const s = headScore(head[i], names);
+    if (s > score) { score = s; index = i; }
+  }
+  return { index: index, score: score };
+}
+
+function isNumeric(v) {
+  if (typeof v === "number") return isFinite(v);
+  const s = txt(v).replace(/,/g, "");
+  return s !== "" && isFinite(Number(s));
+}
+
+function toNumber(v) {
+  if (typeof v === "number") return v;
+  return Number(txt(v).replace(/,/g, "")) || 0;
+}
+
+function isTotalLabel(v) {
+  return headScore(v, IMPORT.columns.total) > 0;
+}
+
+/* היפוך הטבלה. אותה טבלה בדיוק, רק שהשורות הן העמודות - כך אותו
+   קוד זיהוי מטפל גם בקובץ שנכתב לרוחב וגם בקובץ שנכתב לאורך. */
+function transpose(table) {
+  let width = 0;
+  table.forEach(r => { if (r && r.length > width) width = r.length; });
+  const out = [];
+  for (let c = 0; c < width; c++) {
+    const row = [];
+    for (let r = 0; r < table.length; r++) {
+      row.push(table[r] ? table[r][c] : null);
     }
-    return -1;
+    out.push(row);
+  }
+  return out;
+}
+
+const UNKNOWN_UNIT = "לא צוין";
+
+function emptyCounts() {
+  const c = {};
+  DATA.stages.forEach(s => { c[s.key] = null; });
+  return c;
+}
+
+function addTo(bag, key, n) {
+  if (bag[key] === null || bag[key] === undefined) bag[key] = 0;
+  bag[key] += n;
+}
+
+/* ------------------------------------------------------------------ *
+ *  קריאת טבלה בפריסה של «שורה למועמד»                                 *
+ *  שורת כותרות כלשהי (לא בהכרח הראשונה), עמודת סטטוס, ואם יש -        *
+ *  עמודת מועמד לניכוי כפילויות ועמודת יחידה לפילוח.                    *
+ * ------------------------------------------------------------------ */
+function readRecords(table, r, cols) {
+  const res = {
+    mode: "records", headerRow: r, columns: cols, dedup: cols.candidate >= 0,
+    rows: 0, unique: 0, ignored: 0, noId: 0, twice: 0,
+    unknown: {}, unknownRows: 0, counts: emptyCounts(), units: {}
   };
-  const ci = findCol(IMPORT.columns.candidate);
-  const si = findCol(IMPORT.columns.status);
-  if (ci < 0 || si < 0) return out;
-  out.ok = true;
-
-  const ignored = {};
-  IMPORT.ignore.forEach(s => { ignored[s] = true; });
-  const perStage = {};   // שלב -> קבוצת מועמדים, כדי שכפילות תיספר פעם אחת
-  const perCand = {};    // מועמד -> באילו שלבים הוא נמצא
-
-  for (let r = 1; r < table.length; r++) {
-    const row = table[r] || [];
-    const id = txt(row[ci]);
-    const status = txt(row[si]);
-    if (!id && !status) continue;
-    out.rows++;
-    if (!status || ignored[status]) { out.ignored++; continue; }
-    const key = IMPORT.map[status];
+  const perStage = {}, perCand = {}, perUnit = {};
+  for (let i = r + 1; i < table.length; i++) {
+    const row = table[i] || [];
+    const status = txt(row[cols.status]);
+    const id = cols.candidate >= 0 ? txt(row[cols.candidate]) : "";
+    const unit = cols.unit >= 0 ? (txt(row[cols.unit]) || UNKNOWN_UNIT) : null;
+    if (!status && !id) continue;
+    res.rows++;
+    if (!status || isIgnored(status)) { res.ignored++; continue; }
+    const key = stageOf(status);
     if (!key) {
-      out.unknown[status] = (out.unknown[status] || 0) + 1;
-      out.unknownRows++;
+      res.unknown[status] = (res.unknown[status] || 0) + 1;
+      res.unknownRows++;
       continue;
     }
-    if (!id) { out.noId++; continue; }
+    // בלי עמודת מועמד כל שורה היא מועמד. אין דרך לדעת אחרת, וזה נאמר.
+    const mark = res.dedup ? id : "#" + i;
+    if (res.dedup && !id) { res.noId++; continue; }
     if (!perStage[key]) perStage[key] = {};
-    perStage[key][id] = true;
-    if (!perCand[id]) perCand[id] = {};
-    perCand[id][key] = true;
+    perStage[key][mark] = true;
+    if (!perCand[mark]) perCand[mark] = {};
+    perCand[mark][key] = true;
+    if (unit !== null) {
+      if (!perUnit[unit]) perUnit[unit] = {};
+      if (!perUnit[unit][key]) perUnit[unit][key] = {};
+      perUnit[unit][key][mark] = true;
+    }
   }
-
   DATA.stages.forEach(s => {
-    const bag = perStage[s.key];
-    if (bag) out.counts[s.key] = Object.keys(bag).length;
-  });
-  DATA.stages.forEach(s => {
-    if (out.counts[s.key] !== null) out.counted += out.counts[s.key];
+    if (perStage[s.key]) res.counts[s.key] = Object.keys(perStage[s.key]).length;
   });
   Object.keys(perCand).forEach(id => {
-    out.unique++;
-    if (Object.keys(perCand[id]).length > 1) out.twice++;
+    res.unique++;
+    if (Object.keys(perCand[id]).length > 1) res.twice++;
   });
-  return out;
+  Object.keys(perUnit).forEach(u => {
+    const c = emptyCounts();
+    Object.keys(perUnit[u]).forEach(k => {
+      c[k] = Object.keys(perUnit[u][k]).length;
+    });
+    res.units[u] = c;
+  });
+  return res;
+}
+
+/* ------------------------------------------------------------------ *
+ *  קריאת טבלת ריכוז (PIVOT)                                           *
+ *  שמות השלבים הם הכותרות, והתאים שמתחתיהם הם כמויות. שורה אחת -      *
+ *  סיכום כללי; כמה שורות - שורה ליחידה, אם יש עמודת תווית מוכרת.      *
+ *  הפריסה ההפוכה (שלבים בעמודה) מטופלת על ידי היפוך הטבלה.            *
+ * ------------------------------------------------------------------ */
+function readPivot(table, r, statusCols, labelCol) {
+  const res = {
+    mode: "pivot", headerRow: r, columns: { candidate: -1, status: -1, unit: labelCol },
+    dedup: false, rows: 0, unique: 0, ignored: 0, noId: 0, twice: 0,
+    unknown: {}, unknownRows: 0, counts: emptyCounts(), units: {}
+  };
+  const data = [];
+  for (let i = r + 1; i < table.length; i++) {
+    const row = table[i] || [];
+    let any = false;
+    statusCols.forEach(sc => { if (isNumeric(row[sc.index])) any = true; });
+    if (any) data.push({ row: row, label: labelCol >= 0 ? txt(row[labelCol]) : "" });
+  }
+  // שורת «סה"כ» בתוך ריכוז שיש בו כמה שורות היא כפילות, ולא נתון נוסף.
+  const rows = data.length > 1 ? data.filter(d => !isTotalLabel(d.label)) : data;
+  rows.forEach(d => {
+    const c = emptyCounts();
+    let any = 0;
+    statusCols.forEach(sc => {
+      if (!isNumeric(d.row[sc.index])) return;
+      const n = Math.round(toNumber(d.row[sc.index]));
+      if (!n) return;
+      addTo(res.counts, sc.key, n);
+      addTo(c, sc.key, n);
+      any += n;
+    });
+    res.rows += any;
+    res.unique += any;
+    if (labelCol >= 0 && any) {
+      const name = d.label || UNKNOWN_UNIT;
+      if (!res.units[name]) res.units[name] = emptyCounts();
+      DATA.stages.forEach(s => {
+        if (c[s.key] !== null) addTo(res.units[name], s.key, c[s.key]);
+      });
+    }
+  });
+  // סטטוסים שבכותרות ואינם מוכרים - כדי שייאמר עליהם, בדיוק כמו
+  // בטבלה רגילה.
+  (table[r] || []).forEach((cell, i) => {
+    const name = txt(cell);
+    if (!name || i === labelCol) return;
+    if (stageOf(name) || isIgnored(name)) return;
+    if (headScore(name, IMPORT.columns.total) > 0) return;
+    let numeric = false;
+    for (let k = r + 1; k < table.length; k++) {
+      if (table[k] && isNumeric(table[k][i])) { numeric = true; break; }
+    }
+    if (numeric) {
+      res.unknown[name] = (res.unknown[name] || 0) + 1;
+      res.unknownRows++;
+    }
+  });
+  return res;
+}
+
+/* ------------------------------------------------------------------ *
+ *  זיהוי הפריסה                                                       *
+ *  עוברים על השורות הראשונות ומחפשים שורת כותרות. שלוש אפשרויות,      *
+ *  לפי איכות: עמודת מועמד וסטטוס (100), טבלת ריכוז (60), עמודת        *
+ *  סטטוס בלבד (40). הטבלה נבדקת גם כמו שהיא וגם הפוכה, והזוכה הוא     *
+ *  הזיהוי הטוב יותר - כך אותו קוד קורא קובץ לרוחב וקובץ לאורך.        *
+ * ------------------------------------------------------------------ */
+function scanLayout(table) {
+  const limit = Math.min(table.length, 20);
+  let best = null;
+  for (let r = 0; r < limit; r++) {
+    const head = table[r] || [];
+    if (!head.length) continue;
+
+    const statusCols = [];
+    head.forEach((cell, i) => {
+      const key = stageOf(cell);
+      if (key) statusCols.push({ index: i, key: key });
+    });
+
+    const cand = bestColumn(head, IMPORT.columns.candidate);
+    const stat = bestColumn(head, IMPORT.columns.status);
+    const unit = bestColumn(head, IMPORT.columns.unit);
+
+    // שורה למועמד: עמודת סטטוס לפי שם, ומתחתיה סטטוסים אמיתיים.
+    if (stat.score > 0 && statusCols.length < 2) {
+      let hits = 0;
+      for (let i = r + 1; i < table.length && i < r + 400; i++) {
+        const v = (table[i] || [])[stat.index];
+        if (stageOf(v) || isIgnored(v)) hits++;
+      }
+      if (hits) {
+        const score = cand.score > 0 ? 100 : 40;
+        if (!best || score > best.score) {
+          best = { score: score, kind: "records", row: r, cols: {
+            candidate: cand.score > 0 ? cand.index : -1,
+            status: stat.index,
+            unit: unit.score > 0 ? unit.index : -1
+          } };
+        }
+      }
+    }
+
+    // טבלת ריכוז: שני שמות שלב או יותר ככותרות, ומתחתיהם מספרים.
+    if (statusCols.length >= 2) {
+      let numeric = false;
+      for (let i = r + 1; i < table.length && !numeric; i++) {
+        statusCols.forEach(sc => {
+          if (isNumeric((table[i] || [])[sc.index])) numeric = true;
+        });
+      }
+      if (numeric && (!best || best.score < 60)) {
+        let labelCol = unit.score > 0 ? unit.index : -1;
+        if (labelCol >= 0 && stageOf(head[labelCol])) labelCol = -1;
+        best = { score: 60, kind: "pivot", row: r,
+                 statusCols: statusCols, labelCol: labelCol };
+      }
+    }
+  }
+  return best;
+}
+
+/* הקריאה המלאה: זיהוי, ואם ההפוך טוב יותר - קוראים אותו. */
+function activeCounts(table) {
+  const blank = {
+    ok: false, mode: null, flipped: false, dedup: false,
+    rows: 0, unique: 0, ignored: 0, noId: 0, twice: 0,
+    unknown: {}, unknownRows: 0, counts: emptyCounts(), units: {}
+  };
+  if (!table || !table.length) return blank;
+
+  const direct = scanLayout(table);
+  let flat = null, use = direct, source = table, flipped = false;
+  if (!direct || direct.score < 100) {
+    flat = transpose(table);
+    const other = scanLayout(flat);
+    if (other && (!direct || other.score > direct.score)) {
+      use = other; source = flat; flipped = true;
+    }
+  }
+  if (!use) return blank;
+
+  const res = use.kind === "records"
+    ? readRecords(source, use.row, use.cols)
+    : readPivot(source, use.row, use.statusCols, use.labelCol);
+  res.ok = true;
+  res.flipped = flipped;
+  let total = 0;
+  DATA.stages.forEach(s => { if (res.counts[s.key]) total += res.counts[s.key]; });
+  res.counted = total;
+  return res;
 }
 
 /* השורות שמתחת לכפתור. הודעה אחת ראשית, ומתחתיה מה שצריך לדעת. */
@@ -2295,16 +2576,23 @@ function importBlankStages(res) {
                     .map(s => s.label);
 }
 
+/* הפילוח לפי יחידה, אם הקובץ נשא עמודת יחידה. נשמר כאן כדי שהטבלה
+   תיבנה מחדש בכל חישוב - עם התאריך שהוזן ועם בורר האוכלוסייה. */
+let ACTIVE_UNITS = null;
+
 /* ממלא את השדות מתוך הטבלה ומריץ את החישוב. מחזיר את הספירה. */
 function applyActiveRows(table) {
   const res = activeCounts(table);
   if (!res.ok) {
+    ACTIVE_UNITS = null;
     importMsg([{ cls: "bad", text:
-      "לא נמצאו בקובץ העמודות הדרושות: «" + IMPORT.columns.candidate[0] +
-      "» ו«" + IMPORT.columns.status[0] + "»." }]);
+      "לא זוהתה בקובץ עמודה של שלב המועמד. צריך שיהיה בו שדה אחד " +
+      "לפחות עם שמות השלבים - למשל «" + IMPORT.columns.status[0] +
+      "» - או טבלת ריכוז שבה שמות השלבים הם הכותרות." }]);
     return res;
   }
   if (!res.counted) {
+    ACTIVE_UNITS = null;
     importMsg([{ cls: "bad", text:
       "לא נמצאה בקובץ אף שורה בסטטוס שהמחשבון מכיר." }]);
     return res;
@@ -2315,16 +2603,30 @@ function applyActiveRows(table) {
       res.counts[s.key] === null ? "" : String(res.counts[s.key]);
   });
 
+  const unitNames = Object.keys(res.units);
+  ACTIVE_UNITS = unitNames.length ? res.units : null;
+
   const parts = DATA.stages
     .filter(s => res.counts[s.key] !== null)
     .map(s => s.label + " " + nf(res.counts[s.key]));
 
+  const what = res.dedup ? "מועמדים" : "רשומות";
   const lines = [
     { cls: "head", text:
-      "נטענו " + nf(res.unique) + " מועמדים מתוך " + nf(res.rows) +
-      " שורות בקובץ." },
+      "נטענו " + nf(res.unique) + " " + what +
+      (res.mode === "pivot" ? " מטבלת ריכוז." : " מתוך " + nf(res.rows) +
+       " שורות בקובץ.") },
     { cls: "detail", text: parts.join("  ·  ") }
   ];
+  if (res.flipped) {
+    lines.push({ cls: "detail", text:
+      "הקובץ נקרא לפי שורות: שמות השלבים נמצאו בעמודה ולא בשורת כותרות." });
+  }
+  if (!res.dedup && res.mode === "records") {
+    lines.push({ cls: "warn", text:
+      "אין בקובץ עמודת מספר מועמד, ולכן כל שורה נספרה כמועמד. " +
+      "כפילויות, אם יש, נספרות פעמיים." });
+  }
   const blank = importBlankStages(res);
   if (blank.length) {
     lines.push({ cls: "detail", text:
@@ -2347,7 +2649,12 @@ function applyActiveRows(table) {
   if (unknown.length) {
     lines.push({ cls: "warn", text:
       "סטטוסים שאינם מוכרים למחשבון ולא נספרו: " +
-      unknown.map(s => "«" + s + "» " + nf(res.unknown[s])).join(", ") + "." });
+      unknown.map(s => "«" + s + "»").join(", ") + "." });
+  }
+  if (unitNames.length) {
+    lines.push({ cls: "detail", text:
+      "נמצאה עמודת יחידה עם " + nf(unitNames.length) +
+      " יחידות. הפילוח מופיע בטבלה שבסוף העמוד." });
   }
   importMsg(lines);
   calculate();
@@ -2371,15 +2678,110 @@ function loadActiveFile(file) {
   reader.onload = ev => {
     try {
       const book = XLSX.read(new Uint8Array(ev.target.result), { type: "array" });
-      const sheet = book.Sheets[book.SheetNames[0]];
-      const table = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
-      applyActiveRows(table);
+      // כל הגיליונות נבדקים, והראשון שממנו יוצא משהו הוא הנבחר.
+      // בקובץ ריכוז הגיליון הראשון הוא לא פעם דף שער.
+      let best = null;
+      for (let i = 0; i < book.SheetNames.length; i++) {
+        const sheet = book.Sheets[book.SheetNames[i]];
+        if (!sheet) continue;
+        const table = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
+        const res = activeCounts(table);
+        if (res.ok && res.counted && (!best || res.counted > best.counted)) {
+          best = res; best.table = table;
+        }
+      }
+      if (!best) { applyActiveRows([]); return; }
+      applyActiveRows(best.table);
     } catch (err) {
       importMsg([{ cls: "bad", text:
         "הקובץ אינו קובץ אקסל תקין, או שאינו נקרא." }]);
     }
   };
   reader.readAsArrayBuffer(file);
+}
+
+/* ------------------------------------------------------------------ *
+ *  גיוס לפי יחידה                                                     *
+ *                                                                     *
+ *  מוצג רק כשהקובץ שנטען נשא עמודת יחידה. לכל יחידה רצה בדיוק אותה    *
+ *  זרימה קדימה שרצה על הסך הכול, עם אותו בורר אוכלוסייה ואותו חלון    *
+ *  זמן, ולכן הטבלה משתנה יחד עם שאר העמוד.                             *
+ *                                                                     *
+ *  סכום השורות יכול להיבדל בכמה מהמספר הראשי: כל שורה מעוגלת בפני     *
+ *  עצמה. זה נאמר במפורש ב-ⓘ.                                          *
+ * ------------------------------------------------------------------ */
+function renderUnits(counts, days, targetDate) {
+  if (!ACTIVE_UNITS) return false;
+  const names = Object.keys(ACTIVE_UNITS);
+  if (!names.length) return false;
+
+  const unitHires = one => {
+    const flow = Engine.constrainedCombine(one, days, NEW_ONLY);
+    // אותה הבחנה בדיוק שבכרטיס הראשי: עם תאריך מוצג רק מה שנכנס בחלון.
+    const timed = flow && !flow.annual && flow.hires_in_time !== null &&
+                  flow.hires_in_time !== undefined;
+    return !flow ? 0 : (timed ? flow.hires_in_time : flow.hires);
+  };
+
+  const rows = names.map(name => {
+    const mine = ACTIVE_UNITS[name];
+    let active = 0;
+    DATA.stages.forEach(s => { if (mine[s.key]) active += mine[s.key]; });
+    return { name: name, active: active, hires: unitHires(mine) };
+  }).filter(r => r.active > 0);
+
+  if (!rows.length) return false;
+  rows.sort((a, b) => b.hires - a.hires || b.active - a.active);
+
+  let sumActive = 0, sumHires = 0;
+  rows.forEach(r => { sumActive += r.active; sumHires += r.hires; });
+
+  const table = $("unitBody");
+  table.innerHTML = "";
+  const head = el("tr");
+  head.append(el("th", null, "יחידה"), el("th", null, "מועמדים פעילים"),
+              el("th", null, days === null ? "מגויסים צפויים"
+                                           : "מגויסים עד התאריך"),
+              el("th", null, "חלק מהגיוסים"));
+  table.append(head);
+
+  rows.forEach(r => {
+    const tr = el("tr");
+    tr.append(el("td", "unit", r.name),
+              el("td", "num", nf(r.active)),
+              el("td", "num big", nf(r.hires)),
+              el("td", "num", sumHires ? pct(r.hires / sumHires) : "—"));
+    table.append(tr);
+  });
+
+  const sum = el("tr", "sum");
+  sum.append(el("td", "unit", "סך הכול"), el("td", "num", nf(sumActive)),
+             el("td", "num big", nf(sumHires)), el("td", "num", "100.0%"));
+  table.append(sum);
+
+  /* כל שורה מעוגלת בפני עצמה, ולכן סכום השורות יכול להיות קטן במעט
+     מהמספר הראשי. אומרים את זה במפורש - מספר שאינו מסתדר עם הכרטיס
+     שמעליו נראה כמו תקלה. */
+  const whole = unitHires(counts);
+  const gapText = $("unitGap");
+  const diff = whole - sumHires;
+  gapText.textContent = diff === 0 ? "" :
+    "סכום השורות הוא " + nf(sumHires) + ", והמספר הראשי הוא " + nf(whole) +
+    ". ההפרש, " + nf(Math.abs(diff)) + ", הוא עיגול: כל שורה מעוגלת " +
+    "בפני עצמה, ויש כאן " + nf(rows.length) + " שורות.";
+
+  setInfo("unitInfo", "גיוס לפי יחידה",
+    ["הטבלה נבנית מעמודת היחידה שבקובץ שנטען. לכל יחידה רצה בדיוק אותה " +
+     "זרימה קדימה שרצה על הסך הכול: כמה מועמדים פעילים יש לה בכל שלב, " +
+     "וכמה מהם צפויים להתגייס.",
+     "היא משתנה יחד עם שאר העמוד - בורר האוכלוסייה ותאריך היעד חלים " +
+     "עליה בדיוק כמו על המספר הראשי." +
+     (targetDate ? " כאן מוצג מה שנכנס עד " + fmtDay(targetDate) + "." : ""),
+     "כל שורה מעוגלת בפני עצמה, ולכן סכום השורות יכול להיבדל בכמה " +
+     "מגויסים מהמספר הראשי שבראש העמוד.",
+     "מועמד בלי יחידה בקובץ מופיע כ«" + UNKNOWN_UNIT + "». מועמד שרשום " +
+     "בשתי יחידות נספר בשתיהן."]);
+  return true;
 }
 
 /* ---------- כרטיס התוצאה ---------- */
@@ -3109,7 +3511,8 @@ function renderNotes(messages) {
 
 /* --- חשיפת התוצאות --- */
 const ALL_CARDS = ["heroCard", "constraintCard", "flowCard", "gapCardPlan",
-                   "whenCard", "matrixCard", "timelineCard", "gapCard"];
+                   "whenCard", "matrixCard", "timelineCard", "unitCard",
+                   "gapCard"];
 
 function revealResults(cards) {
   $("results").classList.remove("hidden");
@@ -3322,6 +3725,7 @@ function calculate() {
     }
   }
 
+  if (renderUnits(counts, days, shownDate)) cards.push("unitCard");
   if (renderNotes(notes)) cards.push("gapCard");
   revealResults(cards);
 }
@@ -3332,6 +3736,7 @@ function reset() {
   $("in_targetDate").value = "";
   $("importFile").value = "";
   importMsg([]);
+  ACTIVE_UNITS = null;
   $("results").classList.add("hidden");
   $("stickyBar").classList.remove("show");
   ALL_CARDS.forEach(id => $(id).classList.remove("in"));
@@ -3432,9 +3837,18 @@ function buildAbout() {
      "ומשם והלאה רץ בדיוק אותו חישוב.",
      "הקובץ נקרא בדפדפן שלך בלבד. הוא אינו נשלח לשום מקום, אינו נשמר, " +
      "ואינו הופך לחלק מנתוני המחשבון.",
-     "נקראות שתי עמודות: «" + IMPORT.columns.candidate[0] + "» ו«" +
-     IMPORT.columns.status[0] + "». מועמד שיש לו כמה שורות באותו שלב " +
-     "נספר פעם אחת.",
+     "הקובץ יכול להיות בכל מבנה. המחשבון מחפש בו שני שדות בלבד: " +
+     "«" + IMPORT.columns.status[0] + "» - השלב שבו נמצא המועמד - " +
+     "ו«" + IMPORT.columns.candidate[0] + "», שמשמש לניכוי כפילויות. " +
+     "שדה השלב לבדו מספיק; בלי שדה המועמד כל שורה נספרת כמועמד, " +
+     "ונאמר על כך. שאר העמודות שבקובץ אינן נקראות כלל.",
+     "שורת הכותרות אינה חייבת להיות הראשונה, שמות העמודות יכולים " +
+     "להיות שונים במקצת, והקובץ יכול להיות כתוב לרוחב או לאורך - " +
+     "הוא נבדק בשני הכיוונים. גם טבלת ריכוז מתקבלת: אם שמות השלבים " +
+     "הם הכותרות והתאים הם כמויות, הכמויות נלקחות כמו שהן.",
+     "אם יש בקובץ עמודת יחידה - «" + IMPORT.columns.unit[0] + "» או " +
+     "דומה לה - נוספת בסוף העמוד טבלה של הגיוס הצפוי מכל יחידה. " +
+     "כל שאר החישוב זהה, עם עמודת יחידה או בלעדיה.",
      "המיפוי: " + mapLines.join("; ") + ".",
      "סטטוסים שאינם עמדה במיון אינם נספרים כלל: " +
      IMPORT.ignore.map(x => "«" + x + "»").join(", ") + ".",
@@ -3464,7 +3878,7 @@ renderChart();
 watchHero();
 ["heroInfo", "constraintInfo", "flowInfo", "gapPlanInfo", "whenInfo",
  "matrixInfo", "timelineInfo", "inputInfo", "chartInfo",
- "importInfo"].forEach(attachInfo);
+ "importInfo", "unitInfo"].forEach(attachInfo);
 $("infoClose").addEventListener("click", closeInfo);
 $("infoModal").addEventListener("click", ev => {
   if (ev && ev.target === $("infoModal")) closeInfo();
