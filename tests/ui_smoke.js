@@ -68,7 +68,9 @@ vm.createContext(sandbox);
 // הצהרות const בראש הסקריפט אינן הופכות למשתני גלובל בהקשר של vm,
 // ולכן נחשפות במפורש בסוף כדי שהבדיקה תוכל להפעיל אותן.
 const exposed = script + "\n;globalThis.DATA = DATA; globalThis.Engine = Engine;" +
-                "globalThis.calculate = calculate; globalThis.reset = reset;";
+                "globalThis.calculate = calculate; globalThis.reset = reset;" +
+                "globalThis.activeCounts = activeCounts;" +
+                "globalThis.applyActiveRows = applyActiveRows;";
 vm.runInContext(exposed, sandbox, { filename: "index.html" });
 
 /* ---------- תרחישים ---------- */
@@ -1140,6 +1142,94 @@ check("כפתור יצירת הקשר צף ומקושר", () => {
   if (!/\.floatbtn\s*\{[^}]*z-index:\s*9999/.test(html))
     return "אין z-index";
   return /\.floatbtn\s*\{[^}]*#25d366/.test(html) ? null : "האייקון אינו ירוק";
+});
+
+/* ---------- טעינת קובץ המועמדים הפעילים ---------- */
+const IMP = D.active_import;
+
+/* טבלה מזויפת בצורת הקובץ: שורה ראשונה כותרות. */
+function activeTable(rows) {
+  const head = [IMP.columns.candidate[0], "דרישה", IMP.columns.status[0]];
+  return [head].concat(rows.map(r => [r[0], "דרישה כלשהי", r[1]]));
+}
+
+check("המיפוי בא מהנתונים ולא מהקוד", () => {
+  if (!IMP) return "אין active_import בנתונים";
+  const keys = new Set(stageKeys);
+  const bad = Object.keys(IMP.map).filter(s => !keys.has(IMP.map[s]));
+  if (bad.length) return "סטטוס ממופה לשלב שאינו קיים: " + bad.join(", ");
+  if (!IMP.ignore.length) return "אין רשימת סטטוסים להתעלמות";
+  // התבנית היא הקוד עצמו, בלי הנתונים המוזרקים. סטטוס שמופיע בה
+  // פירושו מיפוי שנכתב בקוד במקום להישאב מהקונפיג.
+  const tpl = fs.readFileSync(path.join(ROOT, "web", "template.html"), "utf8");
+  if (!tpl.includes("DATA.active_import")) return "המיפוי אינו נשאב מהנתונים";
+  return tpl.includes("בבחינה") ? "המיפוי כתוב בקוד הממשק" : null;
+});
+
+check("קובץ מועמדים פעילים ממלא את השדות ומריץ חישוב", () => {
+  sandbox.reset();
+  const res = sandbox.applyActiveRows(activeTable([
+    ["1", "בבחינה"], ["1", "בבחינה"], ["2", "בבחינה"],   // כפילות נספרת פעם אחת
+    ["3", "קבצים"],
+    ["4", "יום מיון"], ["5", "רפואי"],                    // שניהם יום מיון מקוון
+    ["6", "מרכז הערכה"],
+    ["7", "יחב\"מ"], ["8", "זימון לגיוס"], ["9", "גיוס"],
+    ["10", IMP.ignore[0]],                                // אינו נספר
+    ["11", "סטטוס שלא קיים"]                              // אינו מוכר
+  ]));
+  if (!res.ok) return "העמודות לא זוהו";
+  const want = { submissions: 2, file_check: 1, online_day: 2,
+                 assessment: 1, yachbam: 3 };
+  const wrong = Object.keys(want)
+    .filter(k => Number(registry["in_" + k].value) !== want[k]);
+  if (wrong.length) return "שדה שלא מולא נכון: " + wrong.join(", ");
+  if (registry.in_screening_day.value !== "" ||
+      registry.in_online_invite.value !== "")
+    return "שלב בלי סטטוס מקביל מולא בכל זאת";
+  if (res.ignored !== 1) return "שורה בסטטוס להתעלמות נספרה";
+  if (res.unknownRows !== 1) return "סטטוס לא מוכר לא דווח";
+  if (!shown("results")) return "החישוב לא רץ אחרי הטעינה";
+  const msg = allText(registry.importMsg);
+  if (!msg.includes("מועמדים")) return "אין סיכום מתחת לכפתור";
+  return msg.includes("סטטוס שלא קיים") ? null : "הסטטוס שלא זוהה לא נאמר";
+});
+
+check("הכמויות שנטענו הן אותן כמויות שהמחשבון מקבל", () => {
+  sandbox.reset();
+  sandbox.applyActiveRows(activeTable([
+    ["1", "קבצים"], ["2", "קבצים"], ["3", "קבצים"], ["3", "קבצים"]
+  ]));
+  const counts = {}; stageKeys.forEach(k => { counts[k] = null; });
+  counts.file_check = 3;
+  const flow = sandbox.Engine.constrainedCombine(counts, null);
+  return num(registry.stickyValue.textContent) === flow.hires
+    ? null : "התוצאה אינה תואמת את מה שהוזן";
+});
+
+check("קובץ בלי העמודות הדרושות אינו שובר את העמוד", () => {
+  sandbox.reset();
+  const res = sandbox.applyActiveRows([["עמודה", "אחרת"], ["1", "2"]]);
+  if (res.ok) return "עמודות שאינן קיימות זוהו";
+  const msg = allText(registry.importMsg);
+  if (!msg.trim()) return "לא נאמר למשתמש שהקובץ אינו מתאים";
+  return stageKeys.every(k => registry["in_" + k].value === "")
+    ? null : "שדה מולא למרות שהקובץ לא נקרא";
+});
+
+check("אין מלל באנגלית באזור הטעינה", () => {
+  sandbox.reset();
+  sandbox.applyActiveRows(activeTable([["1", "בבחינה"], ["2", "קבצים"]]));
+  const t = allText(at("importMsg")) + " " + infoOf(at("importInfo"));
+  const m = /[A-Za-z]+/.exec(t);
+  return m ? "אנגלית באזור הטעינה: " + m[0] : null;
+});
+
+check("איפוס מנקה גם את הטעינה", () => {
+  sandbox.applyActiveRows(activeTable([["1", "בבחינה"]]));
+  sandbox.reset();
+  return allText(registry.importMsg).trim() === "" &&
+         registry.importFile.value === ""
+    ? null : "האיפוס השאיר את סיכום הטעינה";
 });
 
 check("איפוס מנקה הכל", () => {

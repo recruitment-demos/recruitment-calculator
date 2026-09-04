@@ -5,8 +5,10 @@
   index.html          - הגרסה שמוגשת ב-GitHub Pages משורש המאגר.
   מחשבון גיוס.html    - קובץ עצמאי לשליחה או לפתיחה בלחיצה כפולה.
 
-שניהם עצמאיים לחלוטין: הנתונים מוטמעים בתוך ה-HTML, אין קריאות רשת
-ואין ספריות חיצוניות. הקבצים האלה הם תוצר בנייה - אין לערוך אותם ידנית.
+שניהם עצמאיים לחלוטין: הנתונים מוטמעים בתוך ה-HTML ואין קריאות רשת.
+גם ספריית קריאת האקסל (web/vendor/xlsx.mini.min.js), שמשמשת את טעינת
+קובץ המועמדים הפעילים בדפדפן, מוטמעת בתוכם. הקבצים האלה הם תוצר בנייה -
+אין לערוך אותם ידנית.
 """
 
 import json
@@ -16,9 +18,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 TEMPLATE = ROOT / "web" / "template.html"
 DATA = ROOT / "data" / "recruitment_data.json"
+SHEETJS = ROOT / "web" / "vendor" / "xlsx.mini.min.js"
 OUTPUTS = [ROOT / "index.html", ROOT / "מחשבון גיוס.html"]
 
 MARKER = "/*__DATA__*/"
+SHEETJS_MARKER = "/*__SHEETJS__*/"
 
 
 def render():
@@ -36,6 +40,16 @@ def render():
     payload = payload.replace("</", "<\\/")
 
     html = template[:start] + payload + template[end + len(MARKER):]
+
+    # ספריית קריאת האקסל מוטמעת ולא נטענת מרשת, כדי שהקובץ העצמאי
+    # יעבוד גם בלי חיבור. הסימן יושב אחרי הסקריפט הראשי בכוונה:
+    # בדיקת הממשק חותכת את הסקריפט הראשון שבעמוד.
+    if SHEETJS_MARKER not in html:
+        sys.exit(f"לא נמצא סימן ההזרקה {SHEETJS_MARKER} בתבנית.")
+    if not SHEETJS.exists():
+        sys.exit("ספריית קריאת האקסל חסרה: web/vendor/xlsx.mini.min.js")
+    html = html.replace(SHEETJS_MARKER,
+                        SHEETJS.read_text(encoding="utf-8"), 1)
 
     banner = ("<!-- קובץ זה נוצר אוטומטית על ידי tools/build_web.py. "
               "אין לערוך אותו ידנית - יש לערוך את web/template.html ולהריץ make. -->\n")

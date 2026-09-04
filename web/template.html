@@ -105,6 +105,25 @@
   }
   .ghost { background: #f1f4f9; color: var(--muted); border: 1px solid var(--line); font-weight: 500; }
 
+  /* ---------- טעינת קובץ המועמדים הפעילים ----------
+     אזור צדדי. דרך העבודה הרגילה היא הזנה ידנית, והכפתור הזה רק
+     ממלא את אותם שדות במקומה. */
+  .import {
+    margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--line);
+  }
+  .importhead { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .import button.load {
+    background: #fff; color: var(--brand); border: 1px dashed var(--brand);
+    font-size: 13px; font-weight: 600; padding: 9px 18px;
+  }
+  .import button.load:hover { background: var(--brand-soft); }
+  .import input[type="file"] { display: none; }
+  .impmsg { margin-top: 9px; font-size: 12.5px; line-height: 1.6; }
+  .impmsg .head { font-weight: 600; color: var(--ink); }
+  .impmsg .detail { color: var(--muted); }
+  .impmsg .warn { color: var(--warn); }
+  .impmsg .bad { color: var(--bad); font-weight: 600; }
+
   /* ---------- הופעת התוצאות ---------- */
   .reveal {
     opacity: 0; transform: translateY(14px);
@@ -494,6 +513,15 @@
     <div class="row">
       <button class="primary" id="calcBtn">חשב</button>
       <button class="ghost" id="resetBtn">איפוס</button>
+    </div>
+
+    <div class="import">
+      <div class="importhead">
+        <button class="load" id="importBtn" type="button">טען נתונים מקובץ מועמדים פעילים</button>
+        <button class="info" id="importInfo" type="button">ⓘ</button>
+      </div>
+      <input id="importFile" type="file" accept=".xlsx,.xlsm,.xls" />
+      <div class="impmsg" id="importMsg"></div>
     </div>
   </div>
 
@@ -2172,6 +2200,188 @@ function readInputs() {
   };
 }
 
+/* ------------------------------------------------------------------ *
+ *  טעינת קובץ «מועמדים פעילים»                                        *
+ *                                                                     *
+ *  זו דרך צדדית למלא את אותם שדות קלט, ולא דרך עבודה אחרת. אין כאן    *
+ *  שום חישוב: הקובץ נספר, המספרים נכתבים לשדות מול עיני המשתמש,       *
+ *  ומשם והלאה רץ בדיוק אותו מחשבון.                                    *
+ *                                                                     *
+ *  הקריאה מתבצעת כולה בדפדפן. הקובץ אינו נשלח לשום מקום ואינו נשמר.   *
+ *  המיפוי בין הסטטוסים שבקובץ לשלבי המחשבון בא מ-DATA.active_import    *
+ *  (config/params.json) ואינו כתוב כאן.                                *
+ * ------------------------------------------------------------------ */
+const IMPORT = DATA.active_import;
+
+function txt(v) {
+  return v === null || v === undefined ? "" : String(v).trim();
+}
+
+/* טבלה גולמית - שורה ראשונה כותרות - אל ספירת מועמדים ייחודיים לכל
+   שלב. פונקציה טהורה, כדי שאפשר יהיה לבדוק אותה בלי דפדפן. */
+function activeCounts(table) {
+  const out = {
+    ok: false, rows: 0, counted: 0, unique: 0, ignored: 0,
+    unknown: {}, unknownRows: 0, noId: 0, twice: 0, counts: {}
+  };
+  DATA.stages.forEach(s => { out.counts[s.key] = null; });
+  if (!table || !table.length) return out;
+
+  const head = (table[0] || []).map(txt);
+  const findCol = names => {
+    for (let i = 0; i < names.length; i++) {
+      const j = head.indexOf(names[i]);
+      if (j >= 0) return j;
+    }
+    return -1;
+  };
+  const ci = findCol(IMPORT.columns.candidate);
+  const si = findCol(IMPORT.columns.status);
+  if (ci < 0 || si < 0) return out;
+  out.ok = true;
+
+  const ignored = {};
+  IMPORT.ignore.forEach(s => { ignored[s] = true; });
+  const perStage = {};   // שלב -> קבוצת מועמדים, כדי שכפילות תיספר פעם אחת
+  const perCand = {};    // מועמד -> באילו שלבים הוא נמצא
+
+  for (let r = 1; r < table.length; r++) {
+    const row = table[r] || [];
+    const id = txt(row[ci]);
+    const status = txt(row[si]);
+    if (!id && !status) continue;
+    out.rows++;
+    if (!status || ignored[status]) { out.ignored++; continue; }
+    const key = IMPORT.map[status];
+    if (!key) {
+      out.unknown[status] = (out.unknown[status] || 0) + 1;
+      out.unknownRows++;
+      continue;
+    }
+    if (!id) { out.noId++; continue; }
+    if (!perStage[key]) perStage[key] = {};
+    perStage[key][id] = true;
+    if (!perCand[id]) perCand[id] = {};
+    perCand[id][key] = true;
+  }
+
+  DATA.stages.forEach(s => {
+    const bag = perStage[s.key];
+    if (bag) out.counts[s.key] = Object.keys(bag).length;
+  });
+  DATA.stages.forEach(s => {
+    if (out.counts[s.key] !== null) out.counted += out.counts[s.key];
+  });
+  Object.keys(perCand).forEach(id => {
+    out.unique++;
+    if (Object.keys(perCand[id]).length > 1) out.twice++;
+  });
+  return out;
+}
+
+/* השורות שמתחת לכפתור. הודעה אחת ראשית, ומתחתיה מה שצריך לדעת. */
+function importMsg(lines) {
+  const box = $("importMsg");
+  box.innerHTML = "";
+  lines.forEach(l => {
+    if (!l || !l.text) return;
+    box.append(el("div", l.cls || "detail", l.text));
+  });
+}
+
+/* שמות השלבים שנשארים ריקים - אין להם סטטוס מקביל בקובץ. */
+function importBlankStages(res) {
+  return DATA.stages.filter(s => res.counts[s.key] === null)
+                    .map(s => s.label);
+}
+
+/* ממלא את השדות מתוך הטבלה ומריץ את החישוב. מחזיר את הספירה. */
+function applyActiveRows(table) {
+  const res = activeCounts(table);
+  if (!res.ok) {
+    importMsg([{ cls: "bad", text:
+      "לא נמצאו בקובץ העמודות הדרושות: «" + IMPORT.columns.candidate[0] +
+      "» ו«" + IMPORT.columns.status[0] + "»." }]);
+    return res;
+  }
+  if (!res.counted) {
+    importMsg([{ cls: "bad", text:
+      "לא נמצאה בקובץ אף שורה בסטטוס שהמחשבון מכיר." }]);
+    return res;
+  }
+
+  DATA.stages.forEach(s => {
+    $("in_" + s.key).value =
+      res.counts[s.key] === null ? "" : String(res.counts[s.key]);
+  });
+
+  const parts = DATA.stages
+    .filter(s => res.counts[s.key] !== null)
+    .map(s => s.label + " " + nf(res.counts[s.key]));
+
+  const lines = [
+    { cls: "head", text:
+      "נטענו " + nf(res.unique) + " מועמדים מתוך " + nf(res.rows) +
+      " שורות בקובץ." },
+    { cls: "detail", text: parts.join("  ·  ") }
+  ];
+  const blank = importBlankStages(res);
+  if (blank.length) {
+    lines.push({ cls: "detail", text:
+      "נשארו ריקים: " + blank.join(", ") +
+      " - אין להם סטטוס מקביל בקובץ." });
+  }
+  if (res.ignored) {
+    lines.push({ cls: "detail", text:
+      nf(res.ignored) + " שורות בסטטוסים שאינם עמדה במיון לא נספרו." });
+  }
+  if (res.twice) {
+    lines.push({ cls: "warn", text:
+      nf(res.twice) + " מועמדים מופיעים בשני שלבים ונספרו בשניהם." });
+  }
+  if (res.noId) {
+    lines.push({ cls: "warn", text:
+      nf(res.noId) + " שורות בלי מספר מועמד לא נספרו." });
+  }
+  const unknown = Object.keys(res.unknown);
+  if (unknown.length) {
+    lines.push({ cls: "warn", text:
+      "סטטוסים שאינם מוכרים למחשבון ולא נספרו: " +
+      unknown.map(s => "«" + s + "» " + nf(res.unknown[s])).join(", ") + "." });
+  }
+  importMsg(lines);
+  calculate();
+  return res;
+}
+
+/* קריאת הקובץ עצמה. הכל אצל המשתמש: הקובץ נקרא לזיכרון הדפדפן,
+   נספר, ונזרק. אין שליחה ואין שמירה. */
+function loadActiveFile(file) {
+  if (!file) return;
+  if (typeof XLSX === "undefined") {
+    importMsg([{ cls: "bad", text:
+      "ספריית קריאת האקסל לא נטענה, ולכן אי אפשר לקרוא את הקובץ." }]);
+    return;
+  }
+  importMsg([{ cls: "detail", text: "קורא את הקובץ..." }]);
+  const reader = new FileReader();
+  reader.onerror = () => {
+    importMsg([{ cls: "bad", text: "לא הצלחתי לקרוא את הקובץ." }]);
+  };
+  reader.onload = ev => {
+    try {
+      const book = XLSX.read(new Uint8Array(ev.target.result), { type: "array" });
+      const sheet = book.Sheets[book.SheetNames[0]];
+      const table = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
+      applyActiveRows(table);
+    } catch (err) {
+      importMsg([{ cls: "bad", text:
+        "הקובץ אינו קובץ אקסל תקין, או שאינו נקרא." }]);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
 /* ---------- כרטיס התוצאה ---------- */
 function renderHero(cap, value, note, infoTitle, infoText) {
   $("heroCap").textContent = cap;
@@ -3120,6 +3330,8 @@ function reset() {
   DATA.stages.forEach(s => { $("in_" + s.key).value = ""; });
   $("in_target").value = "";
   $("in_targetDate").value = "";
+  $("importFile").value = "";
+  importMsg([]);
   $("results").classList.add("hidden");
   $("stickyBar").classList.remove("show");
   ALL_CARDS.forEach(id => $(id).classList.remove("in"));
@@ -3200,6 +3412,37 @@ function buildAbout() {
   $("aboutBtn").setAttribute("data-info", full.join(" "));
   attachInfo("aboutBtn");
 
+  const byStage = {};
+  Object.keys(IMPORT.map).forEach(st => {
+    const key = IMPORT.map[st];
+    if (!byStage[key]) byStage[key] = [];
+    byStage[key].push(st);
+  });
+  const mapLines = DATA.stages
+    .filter(s => byStage[s.key])
+    .map(s => byStage[s.key].map(x => "«" + x + "»").join(" ו") +
+              " נספרים כ«" + s.label + "»");
+  const blankStages = DATA.stages
+    .filter(s => !byStage[s.key])
+    .map(s => "«" + s.label + "»");
+
+  setInfo("importInfo", "טעינה מקובץ מועמדים פעילים",
+    ["דרך העבודה הרגילה של המחשבון היא הזנה ידנית, והיא לא השתנתה. " +
+     "הכפתור הזה רק ממלא את אותם שדות מתוך קובץ «מועמדים פעילים», " +
+     "ומשם והלאה רץ בדיוק אותו חישוב.",
+     "הקובץ נקרא בדפדפן שלך בלבד. הוא אינו נשלח לשום מקום, אינו נשמר, " +
+     "ואינו הופך לחלק מנתוני המחשבון.",
+     "נקראות שתי עמודות: «" + IMPORT.columns.candidate[0] + "» ו«" +
+     IMPORT.columns.status[0] + "». מועמד שיש לו כמה שורות באותו שלב " +
+     "נספר פעם אחת.",
+     "המיפוי: " + mapLines.join("; ") + ".",
+     "סטטוסים שאינם עמדה במיון אינם נספרים כלל: " +
+     IMPORT.ignore.map(x => "«" + x + "»").join(", ") + ".",
+     blankStages.join(" ו") + " נשארים ריקים - אין להם סטטוס מקביל " +
+     "בקובץ, ומילוי שלהם היה המצאת נתון.",
+     "סטטוס שאינו מופיע ברשימות האלה אינו נספר, ונאמר עליו במפורש " +
+     "מתחת לכפתור."]);
+
   setInfo("inputInfo", "מה להזין",
     ["ממלאים «יעד גיוס» בלבד - ומקבלים כמה צריך בכל שלב כדי להגיע אליו.",
      "ממלאים שלב - ומקבלים כמה יתגייסו ממנו. אפשר להזין כמה שלבים.",
@@ -3220,7 +3463,8 @@ setPopulation(false);   // «כלל הגיוסים» בכל רענון, בלי �
 renderChart();
 watchHero();
 ["heroInfo", "constraintInfo", "flowInfo", "gapPlanInfo", "whenInfo",
- "matrixInfo", "timelineInfo", "inputInfo", "chartInfo"].forEach(attachInfo);
+ "matrixInfo", "timelineInfo", "inputInfo", "chartInfo",
+ "importInfo"].forEach(attachInfo);
 $("infoClose").addEventListener("click", closeInfo);
 $("infoModal").addEventListener("click", ev => {
   if (ev && ev.target === $("infoModal")) closeInfo();
@@ -3229,10 +3473,20 @@ $("popAll").addEventListener("click", () => setPopulation(false));
 $("popNew").addEventListener("click", () => setPopulation(true));
 $("calcBtn").addEventListener("click", calculate);
 $("resetBtn").addEventListener("click", reset);
+$("importBtn").addEventListener("click", () => $("importFile").click());
+$("importFile").addEventListener("change", ev => {
+  const picked = ev && ev.target && ev.target.files ? ev.target.files[0] : null;
+  loadActiveFile(picked);
+});
 document.addEventListener("keydown", e => {
   if (e.key === "Escape") closeInfo();
   else if (e.key === "Enter") calculate();
 });
 </script>
+
+<!-- ספריית קריאת האקסל, מוטמעת בבנייה מתוך web/vendor/xlsx.mini.min.js.
+     היא יושבת אחרי הסקריפט הראשי בכוונה: היא נחוצה רק בלחיצה על
+     «טען נתונים מקובץ מועמדים פעילים», והעמוד עצמו אינו תלוי בה. -->
+<script>/*__SHEETJS__*/</script>
 </body>
 </html>

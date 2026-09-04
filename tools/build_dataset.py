@@ -842,6 +842,9 @@ def main():
             "unmapped_activity_types": unmapped,
             "hires_without_activity": hires_without_activity,
         },
+        # מיפוי הסטטוסים של קובץ «מועמדים פעילים». הקובץ עצמו נקרא
+        # בדפדפן ואינו נכנס לכאן - רק כללי המיפוי, כדי שלא ייכתבו בקוד.
+        "active_import": cfg["active_import"],
         "duration_filter": cfg["duration_filter"],
         "time_buckets": cfg["time_buckets"],
         "stages": stages,
