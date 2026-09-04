@@ -124,12 +124,65 @@
   .impmsg .warn { color: var(--warn); }
   .impmsg .bad { color: var(--bad); font-weight: 600; }
 
-  /* טבלת היחידות יכולה להיות ארוכה - היא נגללת בתוך עצמה, לגובה
-     ולרוחב, ולא מותחת את העמוד. */
+  /* ---------- גיוס לפי יחידה: טבעת וטבלה ---------- */
+  .unitgrid {
+    display: grid; grid-template-columns: 240px minmax(0, 1fr);
+    gap: 18px 22px; align-items: start;
+  }
+  .donutbox { display: flex; flex-direction: column; gap: 12px; }
+  .donutsvg { width: 100%; height: auto; display: block; }
+  .donutsvg .slice { transition: opacity .15s; }
+  .donutsvg:hover .slice { opacity: .55; }
+  .donutsvg .slice:hover { opacity: 1; }
+  .donutsvg .dnum {
+    text-anchor: middle; font-size: 26px; font-weight: 800; fill: var(--ink);
+    font-family: inherit;
+  }
+  .donutsvg .dcap {
+    text-anchor: middle; font-size: 10.5px; font-weight: 600; fill: var(--faint);
+    font-family: inherit;
+  }
+  .legend { display: flex; flex-direction: column; gap: 5px; }
+  .lgitem {
+    display: grid; grid-template-columns: 10px minmax(0, 1fr) auto;
+    align-items: center; gap: 8px; font-size: 12px;
+  }
+  .lgdot {
+    width: 10px; height: 10px; border-radius: 3px; display: inline-block;
+    flex: none;
+  }
+  .lgname {
+    color: var(--muted); overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .lgval { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  /* הטבלה נגללת בתוך עצמה, לגובה ולרוחב, ואינה מותחת את העמוד. */
   .unitwrap { max-height: 60vh; overflow: auto; }
-  .unitwrap th { position: sticky; top: 0; z-index: 1; }
-  #unitBody td.unit { white-space: normal; font-weight: 600; }
-  #unitBody tr.sum td { background: var(--brand-soft); font-weight: 700; }
+  .utable th {
+    position: sticky; top: 0; z-index: 1;
+    border-bottom: 1px solid var(--line);
+  }
+  .utable td { border-bottom: 1px solid #eef1f7; }
+  .utable tr:hover td { background: #f7f9fc; }
+  .utable td.dotcell { width: 18px; padding-inline-end: 0; }
+  .utable td.unit { white-space: normal; font-weight: 600; }
+  .utable tr.lead td.unit { font-weight: 700; }
+  .utable tr.lead td.big { color: var(--brand); }
+  .utable td.share { min-width: 92px; }
+  .utable .sharenum {
+    display: block; font-size: 12px; font-weight: 600; color: var(--muted);
+  }
+  .utable .minibar {
+    display: block; height: 4px; border-radius: 999px; background: #eef1f7;
+    margin-top: 3px; overflow: hidden;
+  }
+  .utable .minifill { display: block; height: 100%; border-radius: 999px; }
+  .utable tr.sum td {
+    background: var(--brand-soft); font-weight: 700; border-bottom: none;
+    position: sticky; bottom: 0;
+  }
+  .utable tr.sum:hover td { background: var(--brand-soft); }
 
   /* ---------- הופעת התוצאות ---------- */
   .reveal {
@@ -208,7 +261,9 @@
   .fseg { height: 100%; width: 0; transition: width .8s cubic-bezier(.2,.7,.3,1); }
   /* פס שאינו אפס נשאר גלוי גם כשהוא זעיר ביחס לשורה הגדולה, אחרת
      השורה נראית ריקה והמשפך «נהיה קווים בלבד». */
-  .fseg.on { min-width: 3px; }
+  /* פס קטן מאוד עדיין נראה כמו פס, ולא כמו רצועה ריקה. */
+  .fseg.on { min-width: 6px; }
+  .fbar.on { min-width: 6px; }
   .fbar.on { min-width: 3px; }
   .fseg.newpop { background: linear-gradient(90deg, var(--brand), var(--brand-2)); }
   .fseg.knownpop { background: linear-gradient(90deg, #a8730f, #e0a83a); }
@@ -354,9 +409,13 @@
     .importhead { gap: 8px; }
     .impmsg { font-size: 12px; }
 
-    /* טבלת היחידות נגללת בתוך עצמה, ולא מותחת את העמוד. */
+    /* הטבעת עוברת מעל הטבלה, והטבלה נגללת בתוך עצמה. */
+    .unitgrid { grid-template-columns: 1fr; gap: 14px; }
+    .donutbox { max-width: 320px; margin: 0 auto; width: 100%; }
+    .legend { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
     .unitwrap { max-height: 56vh; }
     #unitBody th, #unitBody td { padding: 7px 7px; font-size: 12.5px; }
+    .utable td.share { min-width: 74px; }
 
     /* מקום לכפתור הצף בתחתית, כולל האזור הבטוח באייפון. */
     .wrap { padding-bottom: 84px; padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
@@ -420,6 +479,14 @@
     font-size: 13px; color: var(--muted); line-height: 1.65; margin: 0 0 10px;
   }
   .sheet p:last-child { margin-bottom: 0; }
+
+  /* חלון שגיאה: אותו חלון, בגוון אזהרה, עם סימן שמזהים מרחוק. */
+  .modal.alert .sheet { border-top: 4px solid var(--bad); }
+  .modal.alert .sheethead h3 { color: var(--bad); }
+  .modal.alert .sheethead h3::before {
+    content: "⚠"; margin-inline-end: 7px; font-size: 15px;
+  }
+  .modal.alert .sheet p:first-of-type { color: var(--ink); font-weight: 500; }
 
   /* ---------- שני משפכים זה לצד זה ---------- */
   .twofunnels { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; }
@@ -629,7 +696,15 @@
         <h2>גיוס לפי יחידה</h2>
         <button class="info" id="unitInfo" type="button">ⓘ</button>
       </div>
-      <div class="scroller unitwrap"><table class="mtable" id="unitBody"></table></div>
+      <div class="unitgrid">
+        <div class="donutbox">
+          <div id="unitDonut"></div>
+          <div class="legend" id="unitLegend"></div>
+        </div>
+        <div class="scroller unitwrap">
+          <table class="mtable utable" id="unitBody"></table>
+        </div>
+      </div>
       <p class="tally" id="unitGap"></p>
     </div>
 
@@ -2182,7 +2257,11 @@ function openInfo(title, text) {
   $("infoModal").classList.add("open");
 }
 
-function closeInfo() { $("infoModal").classList.remove("open"); }
+function closeInfo() {
+  const modal = $("infoModal");
+  modal.classList.remove("open");
+  modal.classList.remove("alert");
+}
 
 function infoBtn(title, text) {
   const b = el("button", "info", "ⓘ");
@@ -2269,7 +2348,8 @@ function txt(v) {
 /* השוואת שמות בלי רווחים ובלי מירכאות: «יחב"מ» ו«יחב״מ» אותו דבר,
    ו«מועמד(קוד)» זהה ל«מועמד (קוד)». */
 function normKey(v) {
-  return txt(v).replace(/[\s"'״׳“”]/g, "");
+  // כולל סימני כיווניות ורווח קשיח, שנדבקים לכותרות שיוצאות ממערכות.
+  return txt(v).replace(/[\s"'״׳“”\u200e\u200f\u202a-\u202e\u00a0]/g, "");
 }
 
 /* מיפוי מנורמל של הסטטוסים, כדי שהתאמה לא תיפול על רווח או מירכאה. */
@@ -2284,37 +2364,57 @@ function isIgnored(v) { return !!IGNORE_N[normKey(v)]; }
 /* ציון התאמה של כותרת לשם עמודה מוכר: זהות מלאה, או שהכותרת
    שבקובץ מתחילה בשם המוכר («מועמד(קוד)» מתחיל ב«מועמד»). לא מספיק
    שהשם מופיע באמצע - «מקור מועמדות» אינו עמודת מועמד. */
-function headScore(cell, names) {
+function headMatch(cell, names) {
   const c = normKey(cell);
-  if (!c) return 0;
-  let best = 0;
+  const none = { level: 0, rank: 999 };
+  if (!c) return none;
+  let best = none;
   for (let i = 0; i < names.length; i++) {
     const k = normKey(names[i]);
     if (!k) continue;
-    if (c === k) return 3;
-    if (c.indexOf(k) === 0) best = Math.max(best, 2);
+    let level = 0;
+    if (c === k) level = 3;
+    else if (c.indexOf(k) === 0) level = 2;
+    if (!level) continue;
+    if (level > best.level || (level === best.level && i < best.rank))
+      best = { level: level, rank: i };
   }
   return best;
 }
 
+function headScore(cell, names) { return headMatch(cell, names).level; }
+
+/* סדר הרשימה שבקונפיג הוא סדר עדיפויות, ולא סדר העמודות שבקובץ:
+   «י.ארגונית מחוזית» נבחרת לפני «יחידה ארגונית» גם כששתיהן קיימות
+   וגם כשהשנייה מופיעה קודם. זו היתה תקלה שדווחה. */
 function bestColumn(head, names) {
-  let index = -1, score = 0;
+  let index = -1, level = 0, rank = 999;
   for (let i = 0; i < head.length; i++) {
-    const s = headScore(head[i], names);
-    if (s > score) { score = s; index = i; }
+    const m = headMatch(head[i], names);
+    if (!m.level) continue;
+    if (m.level > level || (m.level === level && m.rank < rank)) {
+      level = m.level; rank = m.rank; index = i;
+    }
   }
-  return { index: index, score: score };
+  return { index: index, score: level, rank: rank };
+}
+
+/* מספר יכול להגיע כטקסט, עם פסיקים, עם רווחים, עם סימני כיווניות
+   ואפילו עם אחוז. כל אלה מנוקים לפני הבדיקה. */
+function cleanNum(v) {
+  return txt(v).replace(/[\s,\u200e\u200f\u00a0%]/g, "");
 }
 
 function isNumeric(v) {
   if (typeof v === "number") return isFinite(v);
-  const s = txt(v).replace(/,/g, "");
-  return s !== "" && isFinite(Number(s));
+  const s = cleanNum(v);
+  return s !== "" && /^-?\d+(\.\d+)?$/.test(s);
 }
 
 function toNumber(v) {
   if (typeof v === "number") return v;
-  return Number(txt(v).replace(/,/g, "")) || 0;
+  const s = cleanNum(v);
+  return /^-?\d+(\.\d+)?$/.test(s) ? Number(s) : 0;
 }
 
 function isTotalLabel(v) {
@@ -2335,6 +2435,26 @@ function transpose(table) {
     out.push(row);
   }
   return out;
+}
+
+/* תא ממוזג נושא ערך בפינה אחת בלבד, ושאר התאים בטווח חוזרים ריקים.
+   כאן הערך מועתק לכל התאים שבטווח, לפי רשימת המיזוגים של הגיליון -
+   ולא לפי ניחוש. בלי זה טבלה עם כותרת ממוזגת נראית כמו טבלה ריקה. */
+function expandMerges(sheet) {
+  const merges = sheet && sheet["!merges"];
+  if (!merges || !merges.length || typeof XLSX === "undefined") return;
+  merges.forEach(m => {
+    if (!m || !m.s || !m.e) return;
+    const from = XLSX.utils.encode_cell({ r: m.s.r, c: m.s.c });
+    const anchor = sheet[from];
+    if (!anchor) return;
+    for (let r = m.s.r; r <= m.e.r; r++) {
+      for (let c = m.s.c; c <= m.e.c; c++) {
+        const at = XLSX.utils.encode_cell({ r: r, c: c });
+        if (!sheet[at]) sheet[at] = { t: anchor.t, v: anchor.v, w: anchor.w };
+      }
+    }
+  });
 }
 
 const UNKNOWN_UNIT = "לא צוין";
@@ -2562,6 +2682,7 @@ function activeCounts(table) {
 
 /* השורות שמתחת לכפתור. הודעה אחת ראשית, ומתחתיה מה שצריך לדעת. */
 function importMsg(lines) {
+  IMPORT_LINES = lines || [];
   const box = $("importMsg");
   box.innerHTML = "";
   lines.forEach(l => {
@@ -2579,6 +2700,9 @@ function importBlankStages(res) {
 /* הפילוח לפי יחידה, אם הקובץ נשא עמודת יחידה. נשמר כאן כדי שהטבלה
    תיבנה מחדש בכל חישוב - עם התאריך שהוזן ועם בורר האוכלוסייה. */
 let ACTIVE_UNITS = null;
+
+/* שורות הסיכום האחרונות, כדי שאפשר יהיה להחזיר אותן אחרי כישלון. */
+let IMPORT_LINES = [];
 
 /* ממלא את השדות מתוך הטבלה ומריץ את החישוב. מחזיר את הספירה. */
 function applyActiveRows(table) {
@@ -2661,43 +2785,136 @@ function applyActiveRows(table) {
   return res;
 }
 
+/* ------------------------------------------------------------------ *
+ *  שחזור מצב וטיפול בשגיאות                                           *
+ *                                                                     *
+ *  טעינה שנכשלה אינה משאירה את העמוד באמצע. לפני כל ניסיון נשמר       *
+ *  צילום של כל השדות, של הפילוח ושל שורות הסיכום, וכל כישלון מחזיר    *
+ *  אותו בדיוק כפי שהיה - ומסביר במפורש מה קרה.                        *
+ * ------------------------------------------------------------------ */
+function snapshotInputs() {
+  const values = {};
+  DATA.stages.forEach(s => { values[s.key] = $("in_" + s.key).value; });
+  return {
+    values: values,
+    target: $("in_target").value,
+    date: $("in_targetDate").value,
+    units: ACTIVE_UNITS,
+    lines: IMPORT_LINES,
+    shown: !$("results").classList.contains("hidden")
+  };
+}
+
+function restoreInputs(snap) {
+  if (!snap) return;
+  DATA.stages.forEach(s => { $("in_" + s.key).value = snap.values[s.key]; });
+  $("in_target").value = snap.target;
+  $("in_targetDate").value = snap.date;
+  ACTIVE_UNITS = snap.units;
+  importMsg(snap.lines);
+  if (snap.shown) calculate();
+}
+
+/* הודעת שגיאה מעוצבת. אותו חלון של ההסברים, בגוון אזהרה. */
+function openAlert(title, text) {
+  const modal = $("infoModal");
+  if (modal.classList) modal.classList.add("alert");
+  openInfo(title, text);
+}
+
+function failImport(snap, short, title, lines) {
+  restoreInputs(snap);
+  importMsg((snap && snap.lines && snap.lines.length ? snap.lines : [])
+    .concat([{ cls: "bad", text: short }]));
+  openAlert(title, lines);
+}
+
 /* קריאת הקובץ עצמה. הכל אצל המשתמש: הקובץ נקרא לזיכרון הדפדפן,
    נספר, ונזרק. אין שליחה ואין שמירה. */
 function loadActiveFile(file) {
   if (!file) return;
+  const snap = snapshotInputs();
   if (typeof XLSX === "undefined") {
-    importMsg([{ cls: "bad", text:
-      "ספריית קריאת האקסל לא נטענה, ולכן אי אפשר לקרוא את הקובץ." }]);
+    failImport(snap, "ספריית קריאת האקסל לא נטענה.",
+      "אי אפשר לקרוא את הקובץ",
+      ["ספריית קריאת האקסל לא נטענה בעמוד הזה, ולכן אין דרך לפתוח את " +
+       "הקובץ. רענון העמוד בדרך כלל פותר את זה.",
+       "בינתיים אפשר להזין את המספרים ידנית - זו דרך העבודה הרגילה של " +
+       "המחשבון, והיא לא השתנתה."]);
     return;
   }
   importMsg([{ cls: "detail", text: "קורא את הקובץ..." }]);
   const reader = new FileReader();
   reader.onerror = () => {
-    importMsg([{ cls: "bad", text: "לא הצלחתי לקרוא את הקובץ." }]);
+    failImport(snap, "לא הצלחתי לקרוא את הקובץ.",
+      "הקובץ לא נקרא",
+      ["הדפדפן לא הצליח לפתוח את הקובץ שנבחר. זה קורה כשהקובץ נמחק או " +
+       "הועבר אחרי הבחירה, או כשאין הרשאה לקרוא אותו.",
+       "השדות הוחזרו בדיוק למצב שהיו בו לפני הניסיון."]);
   };
   reader.onload = ev => {
     try {
       const book = XLSX.read(new Uint8Array(ev.target.result), { type: "array" });
-      // כל הגיליונות נבדקים, והראשון שממנו יוצא משהו הוא הנבחר.
-      // בקובץ ריכוז הגיליון הראשון הוא לא פעם דף שער.
-      let best = null;
-      for (let i = 0; i < book.SheetNames.length; i++) {
-        const sheet = book.Sheets[book.SheetNames[i]];
+      const names = (book && book.SheetNames) || [];
+      if (!names.length) {
+        failImport(snap, "אין בקובץ אף גיליון.",
+          "הקובץ ריק",
+          ["הקובץ נפתח, אבל אין בו אף גיליון עם נתונים.",
+           "השדות הוחזרו בדיוק למצב שהיו בו לפני הניסיון."]);
+        return;
+      }
+      // כל הגיליונות נבדקים, והטוב שבהם נבחר. בקובץ ריכוז הגיליון
+      // הראשון הוא לא פעם דף שער.
+      let best = null, anyRows = false;
+      for (let i = 0; i < names.length; i++) {
+        const sheet = book.Sheets[names[i]];
         if (!sheet) continue;
-        const table = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
+        expandMerges(sheet);
+        const table = XLSX.utils.sheet_to_json(
+          sheet, { header: 1, defval: null, raw: true, blankrows: false });
+        if (table.length) anyRows = true;
         const res = activeCounts(table);
         if (res.ok && res.counted && (!best || res.counted > best.counted)) {
           best = res; best.table = table;
         }
       }
-      if (!best) { applyActiveRows([]); return; }
-      applyActiveRows(best.table);
+      if (!best) {
+        const what = anyRows
+          ? "לא נמצאה בקובץ עמודה של שלב המועמד."
+          : "אין בקובץ שורות.";
+        failImport(snap, what, "הקובץ אינו מתאים",
+          [anyRows
+            ? "הקובץ נקרא, אבל לא נמצא בו שדה שמכיל את שלב המועמד - " +
+              "כלומר עמודה כמו «" + IMPORT.columns.status[0] + "» עם ערכים " +
+              "כמו אלה שהמחשבון מכיר, או טבלת ריכוז שבה שמות השלבים הם " +
+              "הכותרות."
+            : "הקובץ נפתח אבל אין בו שורות עם תוכן.",
+           "אפשר לתקן את הקובץ ולנסות שוב: מספיק שדה אחד עם שם השלב. " +
+           "שדה מספר המועמד אינו חובה - הוא רק מונע ספירה כפולה.",
+           "השדות שבמחשבון הוחזרו בדיוק למצב שהיו בו לפני הניסיון."]);
+        return;
+      }
+      const done = applyActiveRows(best.table);
+      if (!done || !done.ok || !done.counted) restoreInputs(snap);
     } catch (err) {
-      importMsg([{ cls: "bad", text:
-        "הקובץ אינו קובץ אקסל תקין, או שאינו נקרא." }]);
+      failImport(snap, "פורמט הקובץ אינו נתמך.",
+        "פורמט הקובץ אינו נתמך",
+        ["לא הצלחתי לפתוח את הקובץ. זה קורה כשהקובץ פגום, כשהוא מוגן " +
+         "בסיסמה, או כשהוא אינו קובץ גיליון אלא משהו אחר ששינו לו את " +
+         "הסיומת.",
+         "נתמכים קובצי אקסל (xlsx, xlsm, xlsb, xls) וקובצי טקסט מופרדים " +
+         "בפסיקים. אם הקובץ נפתח באקסל - שמירה מחדש בשם פותרת את זה " +
+         "כמעט תמיד.",
+         "השדות הוחזרו בדיוק למצב שהיו בו לפני הניסיון."]);
     }
   };
-  reader.readAsArrayBuffer(file);
+  try {
+    reader.readAsArrayBuffer(file);
+  } catch (err) {
+    failImport(snap, "לא הצלחתי לקרוא את הקובץ.", "הקובץ לא נקרא",
+      ["הדפדפן לא הצליח לפתוח את הקובץ שנבחר.",
+       "השדות הוחזרו בדיוק למצב שהיו בו לפני הניסיון."]);
+  }
 }
 
 /* ------------------------------------------------------------------ *
@@ -2709,6 +2926,87 @@ function loadActiveFile(file) {
  *                                                                     *
  *  סכום השורות יכול להיבדל בכמה מהמספר הראשי: כל שורה מעוגלת בפני     *
  *  עצמה. זה נאמר במפורש ב-ⓘ.                                          *
+ * ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------ *
+ *  צבעי הפילוח                                                        *
+ *                                                                     *
+ *  סדר קבוע, ולא מחזורי: כל יחידה מקבלת את הצבע לפי מקומה בדירוג,     *
+ *  ו«אחר» תמיד אפור - הוא אינו יחידה אלא איחוד של כמה. הסדר נבחר      *
+ *  כך שכל שני צבעים סמוכים נבדלים גם בעיוורון צבעים, ונבדק בכלי       *
+ *  בדיקה ולא בעין. הזהות לעולם אינה בצבע בלבד: לכל פרוסה יש שורה      *
+ *  בטבלה עם השם, הכמות והאחוז.                                        *
+ * ------------------------------------------------------------------ */
+const SLICE_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100",
+                      "#e87ba4", "#008300", "#4a3aa7", "#e34948"];
+const OTHER_COLOR = "#8a99ad";
+const OTHER_LABEL = "אחר";
+const SLICE_MIN = 0.05;   // יחידה שחלקה קטן מ-5% מתאחדת ל«אחר»
+
+function escapeText(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+                  .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/* קשת אחת בטבעת. הזוויות מתחילות למעלה ומתקדמות עם כיוון השעון. */
+function donutArc(cx, cy, rOut, rIn, from, to) {
+  const at = (r, a) => [(cx + r * Math.cos(a)).toFixed(2),
+                        (cy + r * Math.sin(a)).toFixed(2)];
+  const big = (to - from) > Math.PI ? 1 : 0;
+  const o1 = at(rOut, from), o2 = at(rOut, to);
+  const i2 = at(rIn, to), i1 = at(rIn, from);
+  return "M" + o1[0] + "," + o1[1] +
+         "A" + rOut + "," + rOut + " 0 " + big + " 1 " + o2[0] + "," + o2[1] +
+         "L" + i2[0] + "," + i2[1] +
+         "A" + rIn + "," + rIn + " 0 " + big + " 0 " + i1[0] + "," + i1[1] + "Z";
+}
+
+/* טבעת שלמה מתוך רשימת חלקים. מוחזרת כמחרוזת SVG, כדי שלא תידרש
+   יצירת אלמנטים במרחב שמות - וכך אותו קוד רץ גם בבדיקות. */
+function donutSvg(parts, centerBig, centerSmall) {
+  const size = 200, cx = 100, cy = 100, rOut = 92, rIn = 62;
+  const total = parts.reduce((a, p) => a + p.value, 0);
+  let out = '<svg viewBox="0 0 ' + size + ' ' + size + '" class="donutsvg" ' +
+            'role="img" aria-label="' +
+            escapeText("פילוח הגיוסים הצפויים לפי יחידה") + '">';
+  if (total <= 0) return out + "</svg>";
+
+  if (parts.length === 1) {
+    out += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((rOut + rIn) / 2) +
+           '" fill="none" stroke="' + parts[0].color + '" stroke-width="' +
+           (rOut - rIn) + '"><title>' + escapeText(parts[0].label) +
+           "</title></circle>";
+  } else {
+    // רווח קטן בין הפרוסות, כדי ששתי פרוסות סמוכות לא יתלכדו לכתם אחד
+    const gap = 0.018;
+    let a = -Math.PI / 2;
+    parts.forEach(p => {
+      const sweep = (p.value / total) * Math.PI * 2;
+      const from = a + gap / 2, to = a + sweep - gap / 2;
+      if (to > from) {
+        out += '<path d="' + donutArc(cx, cy, rOut, rIn, from, to) + '" fill="' +
+               p.color + '" class="slice"><title>' +
+               escapeText(p.label + " · " + nf(p.value) + " · " +
+                          pct(p.value / total)) + "</title></path>";
+      }
+      a += sweep;
+    });
+  }
+  out += '<text x="' + cx + '" y="' + (cy - 4) + '" class="dnum">' +
+         escapeText(nf(centerBig)) + "</text>";
+  out += '<text x="' + cx + '" y="' + (cy + 16) + '" class="dcap">' +
+         escapeText(centerSmall) + "</text>";
+  return out + "</svg>";
+}
+
+/* ------------------------------------------------------------------ *
+ *  גיוס לפי יחידה                                                     *
+ *                                                                     *
+ *  מוצג רק כשהקובץ שנטען נשא עמודת יחידה. לכל יחידה רצה בדיוק אותה    *
+ *  זרימה קדימה שרצה על הסך הכול, עם אותו בורר אוכלוסייה ואותו חלון    *
+ *  זמן, ולכן הכרטיס משתנה יחד עם שאר העמוד.                            *
+ *                                                                     *
+ *  סכום השורות יכול להיבדל בכמה מהמספר הראשי: כל שורה מעוגלת בפני     *
+ *  עצמה. ההפרש נאמר מתחת לטבלה ואינו מוסתר.                            *
  * ------------------------------------------------------------------ */
 function renderUnits(counts, days, targetDate) {
   if (!ACTIVE_UNITS) return false;
@@ -2736,49 +3034,107 @@ function renderUnits(counts, days, targetDate) {
   let sumActive = 0, sumHires = 0;
   rows.forEach(r => { sumActive += r.active; sumHires += r.hires; });
 
+  /* כלל ה-5%: יחידה שחלקה קטן מכך מתאחדת ל«אחר», וכך הטבעת נשארת
+     קריאה. גם מעבר לשש יחידות צבועות הן מתאחדות - צבע שביעי לא היה
+     נבדל מקודמיו. */
+  const big = [], small = [];
+  rows.forEach(r => {
+    const share = sumHires ? r.hires / sumHires : 0;
+    if (share >= SLICE_MIN && big.length < SLICE_COLORS.length) big.push(r);
+    else small.push(r);
+  });
+  const colorOf = {};
+  big.forEach((r, i) => { colorOf[r.name] = SLICE_COLORS[i]; });
+  const otherHires = small.reduce((a, r) => a + r.hires, 0);
+  const parts = big.map((r, i) => ({
+    label: r.name, value: r.hires, color: SLICE_COLORS[i]
+  }));
+  if (otherHires > 0) {
+    parts.push({
+      label: OTHER_LABEL + " (" + nf(small.length) + " יחידות)",
+      value: otherHires, color: OTHER_COLOR
+    });
+  }
+
+  $("unitDonut").innerHTML = donutSvg(
+    parts, sumHires, days === null ? "מגויסים צפויים" : "עד התאריך");
+
+  const legend = $("unitLegend");
+  legend.innerHTML = "";
+  parts.forEach(p => {
+    const item = el("div", "lgitem");
+    const dot = el("span", "lgdot");
+    dot.setAttribute("style", "background:" + p.color);
+    item.append(dot, el("span", "lgname", p.label),
+                el("span", "lgval", pct(sumHires ? p.value / sumHires : 0)));
+    legend.append(item);
+  });
+
   const table = $("unitBody");
   table.innerHTML = "";
   const head = el("tr");
-  head.append(el("th", null, "יחידה"), el("th", null, "מועמדים פעילים"),
+  head.append(el("th", null, ""), el("th", null, "יחידה"),
+              el("th", null, "מועמדים פעילים"),
               el("th", null, days === null ? "מגויסים צפויים"
                                            : "מגויסים עד התאריך"),
               el("th", null, "חלק מהגיוסים"));
   table.append(head);
 
-  rows.forEach(r => {
-    const tr = el("tr");
-    tr.append(el("td", "unit", r.name),
+  const topShare = rows.length ? (sumHires ? rows[0].hires / sumHires : 0) : 0;
+  rows.forEach((r, i) => {
+    const share = sumHires ? r.hires / sumHires : 0;
+    const tr = el("tr", i < 3 ? "lead" : "");
+
+    const chipCell = el("td", "dotcell");
+    const dot = el("span", "lgdot");
+    dot.setAttribute("style", "background:" + (colorOf[r.name] || OTHER_COLOR));
+    chipCell.append(dot);
+
+    const shareCell = el("td", "num share");
+    const barWrap = el("span", "minibar");
+    const fill = el("span", "minifill");
+    fill.setAttribute("style",
+      "width:" + (topShare ? (share / topShare) * 100 : 0).toFixed(1) + "%;" +
+      "background:" + (colorOf[r.name] || OTHER_COLOR));
+    barWrap.append(fill);
+    shareCell.append(el("span", "sharenum", pct(share)), barWrap);
+
+    tr.append(chipCell, el("td", "unit", r.name),
               el("td", "num", nf(r.active)),
-              el("td", "num big", nf(r.hires)),
-              el("td", "num", sumHires ? pct(r.hires / sumHires) : "—"));
+              el("td", "num big", nf(r.hires)), shareCell);
     table.append(tr);
   });
 
   const sum = el("tr", "sum");
-  sum.append(el("td", "unit", "סך הכול"), el("td", "num", nf(sumActive)),
-             el("td", "num big", nf(sumHires)), el("td", "num", "100.0%"));
+  sum.append(el("td", "dotcell", ""), el("td", "unit", "סך הכול"),
+             el("td", "num", nf(sumActive)),
+             el("td", "num big", nf(sumHires)),
+             el("td", "num share", "100.0%"));
   table.append(sum);
 
   /* כל שורה מעוגלת בפני עצמה, ולכן סכום השורות יכול להיות קטן במעט
      מהמספר הראשי. אומרים את זה במפורש - מספר שאינו מסתדר עם הכרטיס
      שמעליו נראה כמו תקלה. */
   const whole = unitHires(counts);
-  const gapText = $("unitGap");
   const diff = whole - sumHires;
-  gapText.textContent = diff === 0 ? "" :
+  $("unitGap").textContent = diff === 0 ? "" :
     "סכום השורות הוא " + nf(sumHires) + ", והמספר הראשי הוא " + nf(whole) +
     ". ההפרש, " + nf(Math.abs(diff)) + ", הוא עיגול: כל שורה מעוגלת " +
     "בפני עצמה, ויש כאן " + nf(rows.length) + " שורות.";
 
   setInfo("unitInfo", "גיוס לפי יחידה",
-    ["הטבלה נבנית מעמודת היחידה שבקובץ שנטען. לכל יחידה רצה בדיוק אותה " +
+    ["הכרטיס נבנה מעמודת היחידה שבקובץ שנטען. לכל יחידה רצה בדיוק אותה " +
      "זרימה קדימה שרצה על הסך הכול: כמה מועמדים פעילים יש לה בכל שלב, " +
      "וכמה מהם צפויים להתגייס.",
-     "היא משתנה יחד עם שאר העמוד - בורר האוכלוסייה ותאריך היעד חלים " +
-     "עליה בדיוק כמו על המספר הראשי." +
+     "הטבעת מציגה את חלוקת הגיוסים הצפויים. יחידה שחלקה קטן מ-5% " +
+     "מתאחדת עם השאר תחת «" + OTHER_LABEL + "», כדי שהתמונה תישאר " +
+     "קריאה; בטבלה שלצידה מופיעות כל היחידות, אחת אחת.",
+     "הכרטיס משתנה יחד עם שאר העמוד - בורר האוכלוסייה ותאריך היעד חלים " +
+     "עליו בדיוק כמו על המספר הראשי." +
      (targetDate ? " כאן מוצג מה שנכנס עד " + fmtDay(targetDate) + "." : ""),
      "כל שורה מעוגלת בפני עצמה, ולכן סכום השורות יכול להיבדל בכמה " +
-     "מגויסים מהמספר הראשי שבראש העמוד.",
+     "מגויסים מהמספר הראשי שבראש העמוד. ההפרש, כשהוא קיים, כתוב מתחת " +
+     "לטבלה.",
      "מועמד בלי יחידה בקובץ מופיע כ«" + UNKNOWN_UNIT + "». מועמד שרשום " +
      "בשתי יחידות נספר בשתיהן."]);
   return true;
@@ -2807,17 +3163,28 @@ function chainRow(body, o, i) {
   if (o.chip) head.append(el("span", o.chipCls || "fpct", o.chip));
 
   const track = el("div", "ftrack");
-  const width = ((o.value / (o.max || 1)) * 100).toFixed(2);
+  /* רוחב הפס אינו כמות אלא הסיכוי להתגייס מהשלב הזה: שורת הגיוס
+     מלאה תמיד, וכל שלב שלפניה מוכפל בשיעורי המעבר שנותרו עד הגיוס.
+     בקשה מפורשת של המשתמש. הכמות ממשיכה להופיע כמספר שמימין,
+     והצבעים שבתוך הפס נשארים חלוקת שני הנתיבים באותו שלב. */
+  const fill = o.fill === undefined || o.fill === null
+    ? (o.value / (o.max || 1))
+    : o.fill;
+  const span = Math.max(0, Math.min(1, fill)) * 100;
+  const width = span.toFixed(2);
   if (o.split) {
     const bar = el("div", "fbar split");
     const segNew = el("div", "fseg newpop");
     const segKnown = el("div", "fseg knownpop");
     bar.append(segNew, segKnown);
     track.append(bar);
-    const wNew = ((o.split.new / (o.max || 1)) * 100).toFixed(2);
-    const wKnown = ((o.split.known / (o.max || 1)) * 100).toFixed(2);
+    const both = (o.split.new || 0) + (o.split.known || 0);
+    const shareNew = both > 0 ? (o.split.new || 0) / both : 1;
+    const wNew = (span * shareNew).toFixed(2);
+    const wKnown = (span * (1 - shareNew)).toFixed(2);
     if (o.split.new > 0) segNew.classList.add("on");
     if (o.split.known > 0) segKnown.classList.add("on");
+    if (o.fillTitle) bar.setAttribute("title", o.fillTitle);
     later(() => {
       segNew.style.width = wNew + "%";
       segKnown.style.width = wKnown + "%";
@@ -2825,6 +3192,7 @@ function chainRow(body, o, i) {
   } else {
     const bar = el("div", "fbar");
     if (o.value > 0) bar.classList.add("on");
+    if (o.fillTitle) bar.setAttribute("title", o.fillTitle);
     track.append(bar);
     later(() => { bar.style.width = width + "%"; }, 70 + i * 60);
   }
@@ -2896,32 +3264,58 @@ function renderChain(bodyId, plan, opts) {
     .concat((plan.extra || []).map(x => x.total));
   const max = Math.max.apply(null, all.concat([1]));
 
+  /* רוחב הפס = הסיכוי להתגייס מהשלב. שורת הגיוס מלאה (100%), וכל
+     שלב שלפניה הוא מכפלת שיעורי המעבר שנותרו עד הגיוס. */
+  const last = plan.rows.length - 1;
+  const cum = new Array(plan.rows.length);
+  for (let k = last; k >= 0; k--) {
+    if (k === last) { cum[k] = 1; continue; }
+    const rate = plan.rows[k].rate_to_next;
+    cum[k] = (rate === null || rate === undefined) ? cum[k + 1] : rate * cum[k + 1];
+  }
+  const cumOf = key => {
+    for (let k = 0; k < plan.rows.length; k++) if (plan.rows[k].key === key) return cum[k];
+    return cum[0];
+  };
+  const cumOfLabel = label => {
+    for (let k = 0; k < plan.rows.length; k++) if (plan.rows[k].label === label) return cum[k];
+    return cum[0];
+  };
+  const fillWhy = share =>
+    " רוחב הפס: " + pct(share) + " - זהו הסיכוי להתגייס ממי שנמצא " +
+    "בשלב הזה, לפי שיעורי המעבר של התזרים. שורת הגיוס מלאה תמיד.";
+
   let i = 0;
 
   // שלב שאינו על השרשרת: מוצג ראשון, כנקודת הכניסה
   (plan.extra || []).forEach(x => {
+    const xFill = (x.via_rate || 0) * cumOfLabel(x.via_label);
     chainRow(body, {
       label: x.label, cls: "source", chip: "הוזן", chipCls: "chip",
-      value: x.total, max: max,
+      value: x.total, max: max, fill: xFill,
+      fillTitle: "הסיכוי להתגייס מכאן: " + pct(xFill),
       small: rowFoot(x.per_day, 0, dated, startDate),
       info: "נקודת הכניסה. השלב הזה אינו מופיע בתזרים הליך הגיוס " +
         plan.year + ", ולכן המעבר ממנו ל«" + x.via_label + "» נלקח " +
         "מהמדידה בקבצים: " + pct(x.via_rate) + ". משם והלאה היחסים הם " +
-        "של התזרים."
+        "של התזרים." + fillWhy(xFill)
     }, i++);
   });
 
   const asideAfter = {};
   plan.aside.forEach(a => {
     if (a.before_start) {
+      const aFill = cumOf(a.after);
       chainRow(body, {
         label: a.label, cls: "aside source", chip: "הוזן", chipCls: "chip",
-        value: a.total, max: max,
+        value: a.total, max: max, fill: aFill,
+        fillTitle: "הסיכוי להתגייס מכאן: " + pct(aFill),
         small: rowFoot(a.per_day, 0, dated, startDate),
         info: "נקודת הכניסה. מרכז הערכה הוא תחנת צד ואינו בשרשרת: " +
           "בתזרים " + plan.year + " הוא מקבל " + pct(a.share_of_host) +
           " מ«" + Engine.label(a.after) + "», ומכאן ההמשך נגזר לפי " +
-          "השרשרת. השלבים שלפניו אינם מוצגים - הגזירה היא קדימה בלבד."
+          "השרשרת. השלבים שלפניו אינם מוצגים - הגזירה היא קדימה בלבד." +
+          fillWhy(aFill)
       }, i++);
       return;
     }
@@ -2977,10 +3371,12 @@ function renderChain(bodyId, plan, opts) {
              " יגיעו לכאן " + nf(shownVal(r)) + " מתוך " + nf(r.total) +
              " שיגיעו בסופו של דבר - השאר מאוחרים מהתאריך.";
     }
+    why += fillWhy(cum[idx]);
     chainRow(body, {
       label: r.label, cls: r.is_hire ? "hire" : (r.is_source ? "source" : ""),
       chip: chip, chipCls: chipCls,
-      value: shownVal(r), max: max,
+      value: shownVal(r), max: max, fill: cum[idx],
+      fillTitle: "הסיכוי להתגייס מכאן: " + pct(cum[idx]),
       split: inTime
         ? { new: (r.new_in_time === null ? r.new : r.new_in_time),
             known: r.known_in_time === null ? r.known : r.known_in_time }
@@ -2994,13 +3390,14 @@ function renderChain(bodyId, plan, opts) {
       chainRow(body, {
         label: "↳ " + a.label, cls: "aside", infoTitle: a.label,
         chip: pct(a.share_of_host) + " מ«" + Engine.label(a.after) + "»",
-        value: shownVal(a), max: max,
+        value: shownVal(a), max: max, fill: cumOf(a.after),
+        fillTitle: "הסיכוי להתגייס מכאן: " + pct(cumOf(a.after)),
         small: rowFoot(inTime ? shownVal(a) / plan.span_days : a.per_day,
                        a.days_median, dated, startDate),
         info: "תחנת צד, לא בשרשרת. בתזרים " + plan.year + " היא מקבלת " +
           pct(a.share_of_host) + " מ«" + Engine.label(a.after) + "», וכמעט " +
           "כל מי שמגיע אליה ממשיך הלאה. היא אינה משתתפת בחישוב ואינה " +
-          "תחנת חובה בדרך לגיוס."
+          "תחנת חובה בדרך לגיוס." + fillWhy(cumOf(a.after))
       }, i++);
     });
   });
@@ -3440,6 +3837,24 @@ function renderChart() {
     const all = f.rows.map(r => pick(r).count)
       .concat(f.aside.map(a => pick(a).count));
     const max = Math.max.apply(null, all.concat([1]));
+
+    /* אותו כלל כמו במשפכים שלמעלה: רוחב הפס הוא הסיכוי להתגייס
+       מהשלב, ולכן שורת הגיוס מלאה ואין פס ריק. */
+    const last = f.rows.length - 1;
+    const cum = new Array(f.rows.length);
+    for (let k = last; k >= 0; k--) {
+      if (k === last) { cum[k] = 1; continue; }
+      const nx = pick(f.rows[k + 1]).from_prev;
+      cum[k] = (nx === null || nx === undefined) ? cum[k + 1] : nx * cum[k + 1];
+    }
+    const cumOf = key => {
+      for (let k = 0; k < f.rows.length; k++) if (f.rows[k].key === key) return cum[k];
+      return cum[0];
+    };
+    const fillWhy = share =>
+      " רוחב הפס: " + pct(share) + " - הסיכוי להתגייס ממי שנמצא בשלב הזה. " +
+      "שורת הגיוס מלאה תמיד.";
+
     const asideAfter = {};
     f.aside.forEach(a => {
       if (!asideAfter[a.after]) asideAfter[a.after] = [];
@@ -3462,9 +3877,10 @@ function renderChart() {
       chainRow(body, {
         label: r.label, cls: r.is_hire ? "hire" : (idx === 0 ? "source" : ""),
         chip: c.from_prev ? pct(c.from_prev) : null,
-        value: c.count, max: max,
+        value: c.count, max: max, fill: cum[idx],
+        fillTitle: "הסיכוי להתגייס מכאן: " + pct(cum[idx]),
         small: c.from_first && idx > 0 ? pct(c.from_first) + " מההגשות" : null,
-        info: why, infoTitle: r.label
+        info: why + fillWhy(cum[idx]), infoTitle: r.label
       }, i++);
 
       (asideAfter[r.key] || []).forEach(a => {
@@ -3472,11 +3888,13 @@ function renderChart() {
         chainRow(body, {
           label: "↳ " + a.label, cls: "aside", infoTitle: a.label,
           chip: pct(a.share_of_host),
-          value: ac.count, max: max,
+          value: ac.count, max: max, fill: cumOf(a.after),
+          fillTitle: "הסיכוי להתגייס מכאן: " + pct(cumOf(a.after)),
           small: ac.from_first ? pct(ac.from_first) + " מההגשות" : null,
           info: "תחנת צד, לא בשרשרת. בתרשים " + f.year + " עברו בה " +
             nf(ac.count) + ", שהם " + pct(a.share_of_host) + " מ«" +
-            Engine.label(a.after) + "». היא אינה תחנת חובה בדרך לגיוס."
+            Engine.label(a.after) + "». היא אינה תחנת חובה בדרך לגיוס." +
+            fillWhy(cumOf(a.after))
         }, i++);
       });
     });

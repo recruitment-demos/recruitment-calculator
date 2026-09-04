@@ -71,7 +71,9 @@ const exposed = script + "\n;globalThis.DATA = DATA; globalThis.Engine = Engine;
                 "globalThis.calculate = calculate; globalThis.reset = reset;" +
                 "globalThis.activeCounts = activeCounts;" +
                 "globalThis.applyActiveRows = applyActiveRows;" +
-                "globalThis.setPopulation = setPopulation;";
+                "globalThis.setPopulation = setPopulation;" +
+                "globalThis.snapshotInputs = snapshotInputs;" +
+                "globalThis.restoreInputs = restoreInputs;";
 vm.runInContext(exposed, sandbox, { filename: "index.html" });
 
 /* ---------- תרחישים ---------- */
@@ -1327,18 +1329,50 @@ check("טבלת היחידות נבנית, מסתכמת, ומופיעה רק כ�
 
   const rows = registry.unitBody.children;
   if (rows.length !== 4) return "מספר שורות לא צפוי: " + rows.length;
+  // עמודות: צבע | יחידה | פעילים | מגויסים | חלק
   const cells = r => (rows[r].children || []).map(c => c.textContent);
   const sumRow = cells(3);
-  const a = num(cells(1)[2]), b = num(cells(2)[2]);
-  if (num(sumRow[1]) !== 600) return "סך המועמדים הפעילים שגוי";
-  if (num(sumRow[2]) !== a + b) return "שורת הסך הכול אינה סכום השורות";
+  const a = num(cells(1)[3]), b = num(cells(2)[3]);
+  if (num(sumRow[2]) !== 600) return "סך המועמדים הפעילים שגוי";
+  if (num(sumRow[3]) !== a + b) return "שורת הסך הכול אינה סכום השורות";
+  // הטבעת נבנית מאותם נתונים
+  const svg = registry.unitDonut.innerHTML;
+  if (!/<svg/.test(svg)) return "אין טבעת";
+  if ((svg.match(/<path/g) || []).length !== 2) return "מספר הפרוסות שגוי";
+  if (registry.unitLegend.children.length !== 2) return "אין מקרא לשתי היחידות";
   return null;
 });
 
+check("יחידה קטנה מ-5% מתאחדת ל«אחר»", () => {
+  sandbox.reset();
+  const head = ["מועמד(קוד)", "תהליך נוכחי", "י.ארגונית מחוזית"];
+  const body = [];
+  for (let i = 0; i < 500; i++) body.push([String(i), "יחב\"מ", "מחוז גדול"]);
+  for (let i = 500; i < 510; i++) body.push([String(i), "יחב\"מ", "מחוז קטן א"]);
+  for (let i = 510; i < 520; i++) body.push([String(i), "יחב\"מ", "מחוז קטן ב"]);
+  sandbox.applyActiveRows([head].concat(body));
+  const rows = registry.unitBody.children;
+  if (rows.length !== 5) return "הטבלה חייבת להציג את כל היחידות: " + rows.length;
+  const legend = registry.unitLegend.children.map(c =>
+    (c.children || []).map(x => x.textContent).join(" "));
+  if (legend.length !== 2) return "המקרא חייב להיות מחוז אחד ועוד «אחר»";
+  return /אחר/.test(legend[1]) ? null : "הקטנות לא אוחדו: " + legend.join(" | ");
+});
+
 check("טבלת היחידות משתנה עם בורר האוכלוסייה", () => {
-  const before = num((registry.unitBody.children[3].children || [])[2].textContent);
+  sandbox.reset();
+  const head = ["מועמד(קוד)", "תהליך נוכחי", "י.ארגונית מחוזית"];
+  const body = [];
+  for (let i = 0; i < 400; i++) body.push([String(i), "בבחינה", "מחוז א"]);
+  for (let i = 400; i < 600; i++) body.push([String(i), "קבצים", "מחוז ב"]);
+  sandbox.applyActiveRows([head].concat(body));
+  const sumCell = () => {
+    const rows = registry.unitBody.children;
+    return num((rows[rows.length - 1].children || [])[3].textContent);
+  };
+  const before = sumCell();
   sandbox.setPopulation(true);
-  const after = num((registry.unitBody.children[3].children || [])[2].textContent);
+  const after = sumCell();
   sandbox.setPopulation(false);
   return after < before ? null :
     "«גיוסים חדשים בלבד» חייב לתת פחות גיוסים מאותו מלאי";
@@ -1357,6 +1391,62 @@ check("איפוס מנקה גם את טבלת היחידות", () => {
   sandbox.calculate();
   return registry.unitCard.classList.contains("hidden")
     ? null : "טבלת היחידות נשארה אחרי איפוס";
+});
+
+check("מספרים כטקסט, עם פסיקים ועם רווחים, נקראים", () => {
+  const res = sandbox.activeCounts([
+    ["תהליך נוכחי", "סה\"כ"],
+    ["בבחינה", "2,644"], ["קבצים", " 825 "], ["מרכז הערכה", "781"]
+  ]);
+  if (!res.ok) return "הטבלה לא זוהתה";
+  return res.counts.submissions === 2644 && res.counts.file_check === 825 &&
+         res.counts.assessment === 781
+    ? null : "המספרים לא נקראו: " + JSON.stringify(res.counts);
+});
+
+check("שם עמודה עם רווחים ומירכאות חריגות מזוהה", () => {
+  const res = sandbox.activeCounts([
+    ["  מועמד (קוד)  ", " תהליך נוכחי "],
+    ["1", " בבחינה "], ["2", "יחב״מ"]
+  ]);
+  if (!res.ok) return "העמודות לא זוהו";
+  return res.counts.submissions === 1 && res.counts.yachbam === 1
+    ? null : "הערכים לא נוקו: " + JSON.stringify(res.counts);
+});
+
+check("טעינה שנכשלה מחזירה את השדות בדיוק למצב הקודם", () => {
+  sandbox.reset();
+  clearAll();
+  setVal("submissions", "1234");
+  setVal("target", "400");
+  sandbox.calculate();
+  const snap = sandbox.snapshotInputs();
+  setVal("submissions", "9999");
+  setVal("target", "");
+  sandbox.restoreInputs(snap);
+  if (registry.in_submissions.value !== "1234") return "השלב לא הוחזר";
+  if (registry.in_target.value !== "400") return "היעד לא הוחזר";
+  return shown("results") ? null : "התוצאות לא חזרו";
+});
+
+check("קובץ פגום אינו נוגע בשדות", () => {
+  sandbox.reset();
+  clearAll();
+  setVal("file_check", "500");
+  sandbox.calculate();
+  sandbox.applyActiveRows([["שם", "עיר"], ["דנה", "חיפה"]]);
+  return registry.in_file_check.value === "500"
+    ? null : "שדה השתנה למרות שהקובץ לא נקרא";
+});
+
+check("מסלול השגיאה קיים ומעוצב", () => {
+  if (!/function failImport/.test(script)) return "אין מסלול כישלון";
+  if (!/restoreInputs\(snap\)/.test(script)) return "אין שחזור מצב";
+  if (!/openAlert\(/.test(script)) return "אין חלון שגיאה";
+  if (!/\.modal\.alert \.sheet/.test(html)) return "לחלון השגיאה אין עיצוב";
+  if (!/expandMerges\(sheet\);[\s\S]{0,200}sheet_to_json/.test(script))
+    return "תאים ממוזגים אינם מורחבים לפני הקריאה";
+  return /פורמט הקובץ אינו נתמך/.test(script) ? null : "אין הסבר לפורמט לא נתמך";
 });
 
 check("איפוס מנקה גם את הטעינה", () => {
