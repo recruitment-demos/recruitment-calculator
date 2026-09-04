@@ -393,6 +393,47 @@
     .twofunnels { grid-template-columns: 1fr; gap: 18px; }
   }
 
+  /* ---------- בורר האוכלוסייה ---------- */
+  .segbar {
+    display: inline-flex; background: #eef1f6; border: 1px solid var(--line);
+    border-radius: 999px; padding: 3px; gap: 3px; margin-top: 10px;
+    max-width: 100%; flex-wrap: wrap;
+  }
+  .segbar button {
+    border-radius: 999px; padding: 7px 16px; font-size: 13px;
+    font-weight: 600; background: none; color: var(--muted);
+    transition: background .15s, color .15s, box-shadow .15s;
+  }
+  .segbar button.on {
+    background: #fff; color: var(--brand);
+    box-shadow: 0 1px 4px rgba(9, 30, 66, .16);
+  }
+
+  /* ---------- כפתור צף ליצירת קשר ---------- */
+  .floatbtn {
+    position: fixed; bottom: 20px; inset-inline-end: 20px; z-index: 9999;
+    width: 56px; height: 56px; border-radius: 50%;
+    background: #25d366; box-shadow: 0 6px 18px rgba(9, 30, 66, .28);
+    display: flex; align-items: center; justify-content: center;
+    text-decoration: none; transition: transform .15s, box-shadow .15s;
+  }
+  .floatbtn:hover { transform: scale(1.06); box-shadow: 0 8px 22px rgba(9, 30, 66, .34); }
+  .floatbtn svg { width: 31px; height: 31px; fill: #fff; }
+  .floatbtn .bubble {
+    position: absolute; inset-inline-end: 66px; white-space: nowrap;
+    background: var(--ink); color: #fff; font-size: 12.5px; font-weight: 600;
+    border-radius: 8px; padding: 6px 11px;
+    opacity: 0; pointer-events: none; transition: opacity .15s, transform .15s;
+    transform: translateX(6px);
+  }
+  .floatbtn:hover .bubble, .floatbtn:focus .bubble {
+    opacity: 1; transform: none;
+  }
+  @media (max-width: 680px) {
+    .floatbtn { width: 50px; height: 50px; bottom: 14px; inset-inline-end: 14px; }
+    .floatbtn svg { width: 27px; height: 27px; }
+  }
+
   /* ---------- שורת מאזן קצרה ---------- */
   .tally {
     font-size: 13px; font-weight: 600; color: var(--brand);
@@ -438,6 +479,10 @@
       <button class="info" id="aboutBtn" type="button">ⓘ</button>
     </div>
     <p class="sub">כמה מועמדים צריך בכל שלב, וכמה מהם יתגייסו.</p>
+    <div class="segbar" id="popBar">
+      <button type="button" id="popAll" class="on">כלל הגיוסים</button>
+      <button type="button" id="popNew">גיוסים חדשים בלבד</button>
+    </div>
   </div>
 
   <div class="card">
@@ -533,6 +578,12 @@
       </div>
     </div>
   </div>
+
+  <a class="floatbtn" id="waBtn" href="https://wa.me/97235555333"
+     target="_blank" rel="noopener">
+    <span class="bubble">צור קשר</span>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.61-.92-2.21-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48s1.06 2.88 1.21 3.08c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.22 1.36.19 1.87.12.57-.09 1.76-.72 2.01-1.41.25-.7.25-1.29.17-1.42-.07-.13-.27-.2-.57-.35z"/><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.87 9.87 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2zm0 18.15h-.01c-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.22 8.22 0 0 1-1.26-4.38c0-4.54 3.7-8.23 8.25-8.23 2.2 0 4.27.86 5.83 2.42a8.19 8.19 0 0 1 2.41 5.82c0 4.54-3.7 8.23-8.23 8.23z"/></svg>
+  </a>
 
   <div class="modal" id="infoModal">
     <div class="sheet">
@@ -1190,7 +1241,7 @@ const Engine = (() => {
      ו«אוכלוסייה חדשה» שהיא היחידה שנגזרת מכמות ההגשות. היחסים באים
      מתרשים תזרים 2025 ולא מקבצי הפעילויות, שרישומם חסר.
      ההסבר המלא נמצא ב-recruit_calc/engine.py. */
-  const constrainedPlan = (target, days) => {
+  const constrainedPlan = (target, days, newOnly) => {
     const af = annualFlow();
     if (af === null || target === null || target === undefined) return null;
     if (days === undefined) days = null;
@@ -1199,8 +1250,9 @@ const Engine = (() => {
     if (span === null || span <= 0) return null;
 
     // האוכלוסייה המוכרת יחסית ליעד, עם תקרה. ההסבר המלא ב-engine.py.
-    const ceiling = af.known.hires_per_year * span / year;
-    const proportional = Math.max(0.0, target) * af.known.share_of_hires;
+    const ceiling = newOnly ? 0.0 : af.known.hires_per_year * span / year;
+    const proportional = newOnly
+      ? 0.0 : Math.max(0.0, target) * af.known.share_of_hires;
     const knownHires = Math.min(ceiling, proportional);
     const newHires = Math.max(0.0, target - knownHires);
     const shortfall = false;
@@ -1221,15 +1273,16 @@ const Engine = (() => {
       const kn = row.known_passes ? knownHires : 0.0;
       const newI = roundHalfUp(n);
       const knownI = roundHalfUp(kn);
-      const basePerDay = row.volume / year;
+      const baseVolume = newOnly ? row.new : row.volume;
+      const basePerDay = baseVolume / year;
       const perDay = (newI + knownI) / span;
       return {
         key: row.key, label: row.label, is_hire: isHire,
         total: newI + knownI, new: newI, known: knownI,
         known_passes: row.known_passes,
         rate_to_next: row.rate_to_next, to_next: row.to_next,
-        baseline: row.volume, baseline_new: row.new,
-        baseline_known: row.known,
+        baseline: baseVolume, baseline_new: row.new,
+        baseline_known: newOnly ? 0 : row.known,
         baseline_per_day: roundTo(basePerDay, 3),
         per_day: roundTo(perDay, 3),
         pace: !basePerDay ? null : roundTo(perDay / basePerDay, 3)
@@ -1269,10 +1322,12 @@ const Engine = (() => {
       },
       submissions: top.total,
       baseline_submissions: top.baseline,
-      baseline_hires: af.hires,
+      new_only: !!newOnly,
+      baseline_hires: newOnly ? af.new.hires_per_year : af.hires,
       // שתי הצמיחות מול אותו חלון. ראו את ההסבר ב-engine.py.
       baseline_in_span: roundHalfUp(top.baseline * span / year),
-      baseline_hires_in_span: roundHalfUp(af.hires * span / year),
+      baseline_hires_in_span: roundHalfUp(
+        (newOnly ? af.new.hires_per_year : af.hires) * span / year),
       growth: top.pace,
       target_growth: rows[rows.length - 1].pace,
       rows: rows, aside: aside
@@ -1292,12 +1347,14 @@ const Engine = (() => {
     return { af: af, rows: rows, idx: idx };
   };
 
-  const flowSpan = (days) => {
+  const flowSpan = (days, newOnly) => {
     const af = annualFlow();
     if (af === null) return null;
     const year = af.year_days;
     const span = days === null || days === undefined ? year : days;
     if (span === null || span === undefined || span <= 0) return null;
+    // מצב «אוכלוסייה חדשה בלבד»: אין נתיב מוכר כלל.
+    if (newOnly) return { span: span, known: 0.0 };
     return { span: span, known: af.known.hires_per_year * span / year };
   };
 
@@ -1309,17 +1366,18 @@ const Engine = (() => {
   };
 
   /* איזה חלק מהנפח בשלב הזה הוא האוכלוסייה המוכרת, לפי התרשים. */
-  const knownShare = (k) => {
+  const knownShare = (k, newOnly) => {
     const packed = flowRows();
     if (packed === null) return null;
     if (!Object.prototype.hasOwnProperty.call(packed.idx, k)) return null;
+    if (newOnly) return 0.0;
     const row = packed.rows[packed.idx[k]];
     if (!row.volume) return 0.0;
     return roundTo(row.known / row.volume, 6);
   };
 
   /* שיעור ההמרה המשוקלל מהשלב ועד הגיוס, כולל האוכלוסייה המוכרת. */
-  const blendedRate = (k) => {
+  const blendedRate = (k, newOnly) => {
     const packed = flowRows();
     if (packed === null) return null;
     if (!Object.prototype.hasOwnProperty.call(packed.idx, k)) return null;
@@ -1327,6 +1385,8 @@ const Engine = (() => {
     if (!row.volume) return null;
     let acc = 1.0;
     packed.af.chain.slice(packed.idx[k]).forEach(r => { acc *= r.rate_to_next; });
+    // במשפך של האוכלוסייה החדשה בלבד אין מי שמצטרף ביחס 1:1.
+    if (newOnly) return roundTo(acc, 6);
     return roundTo((row.new * acc + row.known) / row.volume, 6);
   };
 
@@ -1359,11 +1419,11 @@ const Engine = (() => {
     return roundTo(Math.min(1.0, acc), 6);
   };
 
-  const constrainedEntry = (key, count, days) => {
+  const constrainedEntry = (key, count, days, newOnly) => {
     const packed = flowRows();
     if (packed === null || count === null || count === undefined) return null;
     const af = packed.af, rows = packed.rows, idx = packed.idx;
-    const sp = flowSpan(days);
+    const sp = flowSpan(days, newOnly);
     if (sp === null) return null;
 
     let via = null, viaRate = null, viaLabel = null;
@@ -1400,7 +1460,7 @@ const Engine = (() => {
       }
     }
 
-    const shareKnown = knownShare(chainKey) || 0.0;
+    const shareKnown = knownShare(chainKey, newOnly) || 0.0;
     const claim = landed * shareKnown;
     const knownHere = Math.min(claim, sp.known);
     return {
@@ -1415,11 +1475,11 @@ const Engine = (() => {
     };
   };
 
-  const constrainedCombine = (counts, days) => {
+  const constrainedCombine = (counts, days, newOnly) => {
     const packed = flowRows();
     if (packed === null) return null;
     const af = packed.af, rows = packed.rows, idx = packed.idx;
-    const sp = flowSpan(days);
+    const sp = flowSpan(days, newOnly);
     if (sp === null) return null;
     const span = sp.span, knownSpan = sp.known;
 
@@ -1427,7 +1487,7 @@ const Engine = (() => {
     stageKeys().forEach(key => {
       const n = counts[key];
       if (n === null || n === undefined) return;
-      const e = constrainedEntry(key, n, days);
+      const e = constrainedEntry(key, n, days, newOnly);
       if (e !== null) entries.push(e);
     });
     if (!entries.length) return null;
@@ -1581,6 +1641,7 @@ const Engine = (() => {
     return {
       days: days === undefined ? null : days,
       span_days: span, annual: days === null || days === undefined,
+      new_only: !!newOnly,
       year: af.year, source: af.source,
       known: {
         label: af.known.label, hires: hire.known,
@@ -1659,14 +1720,14 @@ const Engine = (() => {
     };
   };
 
-  const constrainedGap = (counts, target, days) => {
-    const plan = constrainedPlan(target, days);
+  const constrainedGap = (counts, target, days, newOnly) => {
+    const plan = constrainedPlan(target, days, newOnly);
     if (plan === null) return null;
     const packed = flowRows();
     const af = packed.af;
-    const sp = flowSpan(days);
+    const sp = flowSpan(days, newOnly);
 
-    const proj = constrainedCombine(counts, days);
+    const proj = constrainedCombine(counts, days, newOnly);
     const have = proj ? proj.hires : 0;
     const gap = target - have;
 
@@ -1684,7 +1745,7 @@ const Engine = (() => {
         key: r.key, label: r.label,
         needed_total: total, have: already,
         required: extra,
-        rate: blendedRate(r.key),
+        rate: blendedRate(r.key, newOnly),
         per_day: roundTo(extra / sp.span, 3)
       };
     });
@@ -1718,10 +1779,10 @@ const Engine = (() => {
     return f ? f.buckets : null;
   };
 
-  const constrainedMatrix = (counts, days) => {
-    const proj = constrainedCombine(counts, days);
+  const constrainedMatrix = (counts, days, newOnly) => {
+    const proj = constrainedCombine(counts, days, newOnly);
     if (proj === null) return null;
-    const sp = flowSpan(days);
+    const sp = flowSpan(days, newOnly);
     const uniform = uniformShares(sp.span);
 
     const blended = (sources, known, key) => {
@@ -1784,10 +1845,10 @@ const Engine = (() => {
     };
   };
 
-  const constrainedPlanMatrix = (target, days) => {
-    const plan = constrainedPlan(target, days);
+  const constrainedPlanMatrix = (target, days, newOnly) => {
+    const plan = constrainedPlan(target, days, newOnly);
     if (plan === null) return null;
-    const sp = flowSpan(days);
+    const sp = flowSpan(days, newOnly);
     const uniform = uniformShares(sp.span);
     const first = plan.rows[0].key;
 
@@ -1848,12 +1909,12 @@ const Engine = (() => {
     };
   };
 
-  const constrainedTimeline = (counts, days) => {
-    const proj = constrainedCombine(counts, days);
+  const constrainedTimeline = (counts, days, newOnly) => {
+    const proj = constrainedCombine(counts, days, newOnly);
     if (proj === null) return null;
     const packed = flowRows();
     const af = packed.af;
-    const sp = flowSpan(days);
+    const sp = flowSpan(days, newOnly);
     const span = sp.span;
 
     const base = DATA.time_buckets.map(b => ({
@@ -2338,7 +2399,7 @@ function renderChain(bodyId, plan, opts) {
  *  כיוון א': כמה צריך כדי לגייס את היעד                                *
  * ------------------------------------------------------------------ */
 function renderConstrained(target, targetDate, days) {
-  const plan = Engine.constrainedPlan(target, days);
+  const plan = Engine.constrainedPlan(target, days, NEW_ONLY);
   if (!plan) return false;
 
   const spanText = plan.annual
@@ -2361,10 +2422,12 @@ function renderConstrained(target, targetDate, days) {
     plan.new,
     "כל השאר. אלה הגיוסים היחידים שנגזרים מכמות ההגשות, בשיעור " +
       pct(plan.new.hire_rate) + " מהגשה לגיוס.",
-    "הגשות דרושות", plan.submissions,
-    "כדי לגייס " + nf(plan.target) + " ב" + spanText + " צריך " +
-      nf(plan.submissions) + " הגשות. זו התשובה הראשית של המחשבון." +
-      (plan.annual ? "" : " בקצב של " + fmtPace(plan.rows[0].per_day) + "."));
+    plan.annual ? "סך הגיוסים" : "גיוסים עד התאריך", plan.target,
+    "התיבה הזו מציגה תמיד מספר גיוסים, בדיוק כמו הכרטיס שלמעלה. " +
+      "כדי לגייס " + nf(plan.target) + " ב" + spanText + " צריך " +
+      nf(plan.submissions) + " הגשות" +
+      (plan.annual ? "." : ", בקצב של " + fmtPace(plan.rows[0].per_day) + ".") +
+      " כמות ההגשות מופיעה בשורה שמתחת למספר הראשי ובשורת ההגשות שבמשפך.");
 
   renderChain("constraintBody", plan, { baseline: true });
 
@@ -2413,7 +2476,7 @@ function renderConstrained(target, targetDate, days) {
  *  אחת - בלעדיה 60,000 הגשות החזירו 1,923 גיוסים במקום כ-3,300.        *
  * ------------------------------------------------------------------ */
 function renderFlow(counts, targetDate, days) {
-  const plan = Engine.constrainedCombine(counts, days);
+  const plan = Engine.constrainedCombine(counts, days, NEW_ONLY);
   if (!plan) return null;
 
   const spanText = plan.annual
@@ -2422,7 +2485,7 @@ function renderFlow(counts, targetDate, days) {
   const entryNames = plan.entries.map(e => "«" + e.label + "»").join(" ו-");
 
   const first = plan.entries[0];
-  const blended = Engine.blendedRate(first.chain_key);
+  const blended = Engine.blendedRate(first.chain_key, NEW_ONLY);
 
   /* כשהוזן תאריך יעד, הכרטיס הזה מציג אך ורק את מה שמספיק להיכנס
      בתוך החלון - בדיוק המספר שבכרטיס הכחול. הצגת סך הגיוסים העתידי
@@ -2454,7 +2517,7 @@ function renderFlow(counts, targetDate, days) {
       (timed ? " מוצג כאן רק מי שמספיק להתגייס תוך " + nf(plan.span_days) +
         " ימים: " + nf(plan.new_in_time) + " מתוך " + nf(plan.new.hires) +
         " שיתגייסו בסופו של דבר." : ""),
-    timed ? "מגויסים עד התאריך" : "סך מגויסים", laneTotal,
+    timed ? "גיוסים עד התאריך" : "סך הגיוסים", laneTotal,
     nf(laneNew.hires) + " מהמשפך  +  " + nf(laneKnown.hires) +
       " מהנתיב המוכר = " + nf(laneTotal) + " גיוסים ב" + spanText + "." +
       (timed ? " זהו בדיוק המספר שבכרטיס שלמעלה, ולא סך הגיוסים העתידי." : "") +
@@ -2500,7 +2563,7 @@ function renderFlow(counts, targetDate, days) {
  *  כמה עוד צריך: היעד פחות מה שכבר בדרך, על אותו תזרים                *
  * ------------------------------------------------------------------ */
 function renderGapPlan(counts, target, targetDate, days) {
-  const plan = Engine.constrainedGap(counts, target, days);
+  const plan = Engine.constrainedGap(counts, target, days, NEW_ONLY);
   const body = $("gapPlanBody");
   body.innerHTML = "";
   if (!plan) return false;
@@ -2689,7 +2752,7 @@ function renderMatrix(m, targetDate, cutoffDays) {
 function renderTimeline(counts, days, targetDate) {
   const body = $("timelineBody");
   body.innerHTML = "";
-  const merged = Engine.constrainedTimeline(counts, days);
+  const merged = Engine.constrainedTimeline(counts, days, NEW_ONLY);
   if (!merged || !merged.total) return false;
 
   const start = todayDay();
@@ -2756,8 +2819,8 @@ function renderChart() {
   const f = Engine.flowFunnel();
   if (!f) return;
 
-  $("chartAllHead").textContent = "כולל " + f.known_label;
-  $("chartNewHead").textContent = "בלי " + f.known_label;
+  $("chartAllHead").textContent = "כלל הגיוסים";
+  $("chartNewHead").textContent = "אוכלוסייה חדשה בלבד";
 
   const draw = (bodyId, pick, withKnown) => {
     const body = $(bodyId);
@@ -2854,6 +2917,21 @@ function revealResults(cards) {
   }
 }
 
+/* ------------------------------------------------------------------ *
+ *  בורר האוכלוסייה                                                     *
+ *  «כלל הגיוסים» הוא ברירת המחדל בכל רענון - בקשה מפורשת. במצב         *
+ *  «גיוסים חדשים בלבד» כל החישוב רץ על המשפך של האוכלוסייה החדשה       *
+ *  בלבד, ביחס 1:31, בלי הנתיב המוכר.                                   *
+ * ------------------------------------------------------------------ */
+let NEW_ONLY = false;
+
+function setPopulation(newOnly) {
+  NEW_ONLY = !!newOnly;
+  $("popAll").classList.toggle("on", !NEW_ONLY);
+  $("popNew").classList.toggle("on", NEW_ONLY);
+  if (!$("results").classList.contains("hidden")) calculate();
+}
+
 /* --- ההרצה הראשית --- */
 function calculate() {
   const { counts, target, targetDate, badDate } = readInputs();
@@ -2891,7 +2969,7 @@ function calculate() {
 
   /* --- כיוון א': רק יעד --- */
   if (!entered.length) {
-    const cp = Engine.constrainedPlan(target, days);
+    const cp = Engine.constrainedPlan(target, days, NEW_ONLY);
     if (cp) {
       /* המספר הראשי הוא היעד עצמו, וכמות ההגשות הדרושה יושבת מתחתיו.
          כך הכרטיס הכחול שווה תמיד לשורת הגיוס שבתחתית המשפך - בשני
@@ -2929,7 +3007,7 @@ function calculate() {
       const planCounts = {};
       DATA.stages.forEach(st => { planCounts[st.key] = null; });
       planCounts[cp.rows[0].key] = cp.submissions;
-      const pm = Engine.constrainedPlanMatrix(target, days);
+      const pm = Engine.constrainedPlanMatrix(target, days, NEW_ONLY);
       if (renderWhen(pm, shownDate)) cards.push("whenCard");
       if (renderMatrix(pm, shownDate, days)) cards.push("matrixCard");
       if (renderTimeline(planCounts, days, shownDate)) cards.push("timelineCard");
@@ -2944,13 +3022,13 @@ function calculate() {
             "בחלון של " + nf(cp.span_days) + " ימים הנתיב הקבוע יכול לספק " +
             nf(cp.known.hires) + " גיוסים בלבד, ולכן דרישת ההגשות גדולה " +
             "מזו של אותו יעד בשנה שלמה (" +
-            nf(Engine.constrainedPlan(target, null).submissions) + ")." });
+            nf(Engine.constrainedPlan(target, null, NEW_ONLY).submissions) + ")." });
         } else {
           const limit = Math.floor(proportional * 365 / cp.known.per_year);
           notes.push({ kind: "flat", text:
             "כמות ההגשות ליעד הזה זהה לזו שבשנה שלמה, ומה שהתאריך משנה " +
             "הוא הקצב: " + fmtPace(cp.rows[0].per_day) + " במקום " +
-            fmtPace(Engine.constrainedPlan(target, null).rows[0].per_day) +
+            fmtPace(Engine.constrainedPlan(target, null, NEW_ONLY).rows[0].per_day) +
             ". הכמות תשתנה רק בחלון קצר מ-" + nf(limit) + " ימים, שבו " +
             "הנתיב הקבוע כבר לא יספיק לחלקו ביעד." });
         }
@@ -3002,7 +3080,7 @@ function calculate() {
        "הכמות שמוזנת בכל שלב היא נפח לאורך החלון, ולא מלאי רגעי."]);
   }
 
-  const m = Engine.constrainedMatrix(counts, days);
+  const m = Engine.constrainedMatrix(counts, days, NEW_ONLY);
   if (renderWhen(m, shownDate)) cards.push("whenCard");
   if (renderMatrix(m, shownDate, days)) cards.push("matrixCard");
   if (renderTimeline(counts, days, shownDate)) cards.push("timelineCard");
@@ -3129,11 +3207,16 @@ function buildAbout() {
      "«תאריך היעד» משנה כמויות ולא רק תאריכים: הוא קובע את אורך החלון, " +
      "ולפיו נחתכת גם התקרה של הנתיב הקבוע. בלי תאריך החלון הוא שנה שלמה.",
      "כמות שמוזנת בשלב מוכפלת בשיעור ההמרה המשוקלל שלו - זה שמגלם " +
-     "בתוכו גם את האוכלוסייה המוכרת."]);
+     "בתוכו גם את האוכלוסייה המוכרת.",
+     "הבורר שמעל השדות קובע על איזה משפך רץ החישוב. «כלל הגיוסים» " +
+     "כולל את שני הנתיבים; «גיוסים חדשים בלבד» מחשב על האוכלוסייה " +
+     "החדשה בלבד, ביחס 1:31, בלי הנתיב המוכר - ולכן הוא דורש יותר " +
+     "הגשות לאותו יעד. ברירת המחדל בכל רענון היא «כלל הגיוסים»."]);
 }
 
 buildInputs();
 buildAbout();
+setPopulation(false);   // «כלל הגיוסים» בכל רענון, בלי זיכרון
 renderChart();
 watchHero();
 ["heroInfo", "constraintInfo", "flowInfo", "gapPlanInfo", "whenInfo",
@@ -3142,6 +3225,8 @@ $("infoClose").addEventListener("click", closeInfo);
 $("infoModal").addEventListener("click", ev => {
   if (ev && ev.target === $("infoModal")) closeInfo();
 });
+$("popAll").addEventListener("click", () => setPopulation(false));
+$("popNew").addEventListener("click", () => setPopulation(true));
 $("calcBtn").addEventListener("click", calculate);
 $("resetBtn").addEventListener("click", reset);
 document.addEventListener("keydown", e => {

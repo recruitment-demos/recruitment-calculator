@@ -950,10 +950,10 @@ check("משפך הליך הגיוס מוצג בשתי עמודות", () => {
   const expected = f.rows.length + f.aside.length;
   if (a.length !== expected) return "עמודה ראשונה: " + a.length + " שורות";
   if (b.length !== expected) return "עמודה שנייה: " + b.length + " שורות";
-  if (!registry.chartAllHead.textContent.includes("כולל"))
-    return "אין כותרת לעמודה הראשונה";
-  if (!registry.chartNewHead.textContent.includes("בלי"))
-    return "אין כותרת לעמודה השנייה";
+  if (registry.chartAllHead.textContent !== "כלל הגיוסים")
+    return "כותרת שגויה בעמודה הראשונה: " + registry.chartAllHead.textContent;
+  if (registry.chartNewHead.textContent !== "אוכלוסייה חדשה בלבד")
+    return "כותרת שגויה בעמודה השנייה: " + registry.chartNewHead.textContent;
   // הכמויות הן התרשים עצמו
   const nums = a.filter(r => !r.classList.contains("aside")).map(r => num(fval(r)));
   if (JSON.stringify(nums) !== JSON.stringify(f.rows.map(r => r.all.count)))
@@ -1064,6 +1064,82 @@ check("במצב יעד המשפך גוזר לאחור בתוך החלון", () =
       return "השרשרת אינה עקבית ב«" + r.label + "»";
   }
   return heroSubs() === plan.submissions ? null : "ההגשות אינן של החלון";
+});
+
+check("התיבה השלישית מציגה תמיד מספר גיוסים", () => {
+  // התקלה שדווחה: ביעד 400 התיבה הציגה «הגשות דרושות 7,283».
+  clearAll();
+  setVal("target", "400");
+  sandbox.calculate();
+  const box = registry.constraintLanes.children[2];
+  if (num(box.children[1].textContent) !== 400)
+    return "מצב יעד: התיבה מציגה " + box.children[1].textContent;
+  if (!allText(box).includes("סך הגיוסים")) return "כותרת התיבה שגויה";
+  // וכמות ההגשות נשארה מתחת למספר הראשי
+  if (heroSubs() !== sandbox.Engine.constrainedPlan(400, null, false).submissions)
+    return "כמות ההגשות נעלמה מהשורה שמתחת למספר";
+
+  setVal("targetDate", inDays(60));
+  sandbox.calculate();
+  const timedBox = registry.constraintLanes.children[2];
+  if (num(timedBox.children[1].textContent) !== 400)
+    return "עם תאריך: התיבה מציגה " + timedBox.children[1].textContent;
+  return allText(timedBox).includes("גיוסים עד התאריך")
+    ? null : "כותרת התיבה עם תאריך שגויה";
+});
+
+check("בורר האוכלוסייה מחשב מחדש על המשפך השני", () => {
+  clearAll();
+  setVal("target", "400");
+  sandbox.calculate();
+  const all = heroSubs();
+  if (all !== sandbox.Engine.constrainedPlan(400, null, false).submissions)
+    return "ברירת המחדל אינה «כלל הגיוסים»";
+  if (!registry.popAll.classList.contains("on")) return "הכפתור אינו מסומן";
+
+  registry.popNew._on.click();
+  const fresh = heroSubs();
+  if (fresh !== sandbox.Engine.constrainedPlan(400, null, true).submissions)
+    return "החישוב לא עבר למשפך של האוכלוסייה החדשה";
+  if (!(fresh > all)) return "המשפך השני אמור לדרוש יותר הגשות";
+  if (!registry.popNew.classList.contains("on")) return "הכפתור לא סומן";
+  // אין אוכלוסייה מוכרת במצב הזה
+  const known = num(registry.constraintLanes.children[0].children[1].textContent);
+  if (known !== 0) return "הנתיב המוכר עדיין מופיע: " + known;
+
+  registry.popAll._on.click();
+  return heroSubs() === all ? null : "החזרה ל«כלל הגיוסים» לא עבדה";
+});
+
+check("הבורר משפיע גם על מצב הזרימה", () => {
+  clearAll();
+  setVal("file_check", "300");
+  sandbox.calculate();
+  const all = num(registry.heroValue.textContent);
+  registry.popNew._on.click();
+  const fresh = num(registry.heroValue.textContent);
+  const counts = {}; stageKeys.forEach(k => { counts[k] = null; });
+  counts.file_check = 300;
+  if (fresh !== sandbox.Engine.constrainedCombine(counts, null, true).hires)
+    return "מצב הזרימה לא עבר למשפך השני";
+  if (!(fresh < all)) return "בלי הנתיב המוכר אמורים להתקבל פחות גיוסים";
+  registry.popAll._on.click();
+  return num(registry.heroValue.textContent) === all ? null : "החזרה נכשלה";
+});
+
+check("כפתור יצירת הקשר צף ומקושר", () => {
+  // כפתור סטטי, ולכן הוא נבדק בעמוד הבנוי עצמו ולא ב-DOM המזויף
+  const m = /<a class="floatbtn"[\s\S]*?<\/a>/.exec(html);
+  if (!m) return "אין כפתור צף בעמוד";
+  const btn = m[0];
+  if (!btn.includes("https://wa.me/97235555333")) return "הקישור שגוי";
+  if (!btn.includes("צור קשר")) return "אין בועית «צור קשר»";
+  if (!btn.includes("<svg")) return "אין אייקון";
+  if (!/\.floatbtn\s*\{[^}]*position:\s*fixed/.test(html))
+    return "הכפתור אינו צף";
+  if (!/\.floatbtn\s*\{[^}]*z-index:\s*9999/.test(html))
+    return "אין z-index";
+  return /\.floatbtn\s*\{[^}]*#25d366/.test(html) ? null : "האייקון אינו ירוק";
 });
 
 check("איפוס מנקה הכל", () => {

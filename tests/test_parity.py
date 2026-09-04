@@ -45,8 +45,10 @@ def build_scenarios(eng):
         scenarios.append({"op": "covered_share", "stage": k})
         scenarios.append({"op": "observed_candidates", "stage": k})
         scenarios.append({"op": "observed_per_day", "stage": k})
-        scenarios.append({"op": "known_share", "stage": k})
-        scenarios.append({"op": "blended_rate", "stage": k})
+        for no in (False, True):
+            scenarios.append({"op": "known_share", "stage": k, "new_only": no})
+        for no in (False, True):
+            scenarios.append({"op": "blended_rate", "stage": k, "new_only": no})
         for d in DAYS + [None]:
             scenarios.append({"op": "capacity", "stage": k, "days": d})
         for c in COUNTS:
@@ -232,6 +234,15 @@ def build_scenarios(eng):
                 scenarios.append({"op": "constrained_gap", "counts": dict(counts),
                                   "target": 4000, "days": d})
 
+    # מצב «אוכלוסייה חדשה בלבד»: אותם תרחישים, בלי הנתיב המוכר
+    constrained = {"constrained_plan", "constrained_combine", "constrained_gap",
+                   "constrained_timeline", "constrained_matrix",
+                   "constrained_plan_matrix", "constrained_entry"}
+    for sc in [x for x in scenarios if x["op"] in constrained]:
+        twin = dict(sc)
+        twin["new_only"] = True
+        scenarios.append(twin)
+
     return scenarios
 
 
@@ -280,27 +291,27 @@ def python_result(eng, sc):
     if op == "spread":
         return eng.spread(sc["total"], sc["buckets"])
     if op == "constrained_plan":
-        return eng.constrained_plan(sc["target"], sc.get("days"))
+        return eng.constrained_plan(sc["target"], sc.get("days"), sc.get("new_only", False))
     if op == "flow_funnel":
         return eng.flow_funnel()
     if op == "reach_share":
         return eng.reach_share(sc["from"], sc["to"], sc["days"])
     if op == "known_share":
-        return eng.known_share(sc["stage"])
+        return eng.known_share(sc["stage"], sc.get("new_only", False))
     if op == "blended_rate":
-        return eng.blended_rate(sc["stage"])
+        return eng.blended_rate(sc["stage"], sc.get("new_only", False))
     if op == "constrained_entry":
-        return eng.constrained_entry(sc["stage"], sc["count"], sc.get("days"))
+        return eng.constrained_entry(sc["stage"], sc["count"], sc.get("days"), sc.get("new_only", False))
     if op == "constrained_combine":
-        return eng.constrained_combine(sc["counts"], sc.get("days"))
+        return eng.constrained_combine(sc["counts"], sc.get("days"), sc.get("new_only", False))
     if op == "constrained_gap":
-        return eng.constrained_gap(sc["counts"], sc["target"], sc.get("days"))
+        return eng.constrained_gap(sc["counts"], sc["target"], sc.get("days"), sc.get("new_only", False))
     if op == "constrained_plan_matrix":
-        return eng.constrained_plan_matrix(sc["target"], sc.get("days"))
+        return eng.constrained_plan_matrix(sc["target"], sc.get("days"), sc.get("new_only", False))
     if op == "constrained_timeline":
-        return eng.constrained_timeline(sc["counts"], sc.get("days"))
+        return eng.constrained_timeline(sc["counts"], sc.get("days"), sc.get("new_only", False))
     if op == "constrained_matrix":
-        return eng.constrained_matrix(sc["counts"], sc.get("days"))
+        return eng.constrained_matrix(sc["counts"], sc.get("days"), sc.get("new_only", False))
     if op == "throughput_plan":
         return eng.throughput_plan(sc["target"], sc.get("days"))
     if op == "manager_plan":

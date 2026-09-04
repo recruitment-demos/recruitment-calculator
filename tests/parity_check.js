@@ -77,27 +77,27 @@ for (const sc of scenarios) {
   } else if (sc.op === "spread") {
     results.push(Engine.spread(sc.total, sc.buckets));
   } else if (sc.op === "constrained_plan") {
-    results.push(Engine.constrainedPlan(sc.target, sc.days));
+    results.push(Engine.constrainedPlan(sc.target, sc.days, sc.new_only));
   } else if (sc.op === "flow_funnel") {
     results.push(Engine.flowFunnel());
   } else if (sc.op === "reach_share") {
     results.push(Engine.reachShare(sc.from, sc.to, sc.days));
   } else if (sc.op === "known_share") {
-    results.push(Engine.knownShare(sc.stage));
+    results.push(Engine.knownShare(sc.stage, sc.new_only));
   } else if (sc.op === "blended_rate") {
-    results.push(Engine.blendedRate(sc.stage));
+    results.push(Engine.blendedRate(sc.stage, sc.new_only));
   } else if (sc.op === "constrained_entry") {
-    results.push(Engine.constrainedEntry(sc.stage, sc.count, sc.days));
+    results.push(Engine.constrainedEntry(sc.stage, sc.count, sc.days, sc.new_only));
   } else if (sc.op === "constrained_combine") {
-    results.push(Engine.constrainedCombine(sc.counts, sc.days));
+    results.push(Engine.constrainedCombine(sc.counts, sc.days, sc.new_only));
   } else if (sc.op === "constrained_gap") {
-    results.push(Engine.constrainedGap(sc.counts, sc.target, sc.days));
+    results.push(Engine.constrainedGap(sc.counts, sc.target, sc.days, sc.new_only));
   } else if (sc.op === "constrained_plan_matrix") {
-    results.push(Engine.constrainedPlanMatrix(sc.target, sc.days));
+    results.push(Engine.constrainedPlanMatrix(sc.target, sc.days, sc.new_only));
   } else if (sc.op === "constrained_timeline") {
-    results.push(Engine.constrainedTimeline(sc.counts, sc.days));
+    results.push(Engine.constrainedTimeline(sc.counts, sc.days, sc.new_only));
   } else if (sc.op === "constrained_matrix") {
-    results.push(Engine.constrainedMatrix(sc.counts, sc.days));
+    results.push(Engine.constrainedMatrix(sc.counts, sc.days, sc.new_only));
   } else if (sc.op === "throughput_plan") {
     results.push(Engine.throughputPlan(sc.target, sc.days));
   } else if (sc.op === "manager_plan") {

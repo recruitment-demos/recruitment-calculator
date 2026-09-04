@@ -954,7 +954,7 @@ class Engine:
         """תזרים 2025 מהתרשים שהתקבל, אם יש."""
         return self.data.get("annual_flow")
 
-    def constrained_plan(self, target_hires, days=None):
+    def constrained_plan(self, target_hires, days=None, new_only=False):
         """המחשבון עם האילוצים: כמה צריך בכל שלב כדי לגייס X בשנה.
 
         זו התשובה הראשית לשאלת התכנון, והיא מחליפה את throughput_plan.
@@ -993,8 +993,10 @@ class Engine:
         # של 400 - וזו היתה תקלה שדווחה. התקרה נשארת: מעל 3,294 גיוסים
         # החלק היחסי חורג מההיקף השנתי, ואז כל התוספת נופלת על
         # האוכלוסייה החדשה.
-        ceiling = af["known"]["hires_per_year"] * span / year
-        proportional = max(0.0, target_hires) * af["known"]["share_of_hires"]
+        ceiling = (0.0 if new_only
+                   else af["known"]["hires_per_year"] * span / year)
+        proportional = (0.0 if new_only else
+                        max(0.0, target_hires) * af["known"]["share_of_hires"])
         known_hires = min(ceiling, proportional)
         new_hires = max(0.0, target_hires - known_hires)
         # יעד שקטן מהנתיב הקבוע אינו קיים עוד: החלק היחסי לעולם אינו
@@ -1016,7 +1018,8 @@ class Engine:
             kn = known_hires if row["known_passes"] else 0.0
             new_i = round_half_up(n)
             known_i = round_half_up(kn)
-            base_per_day = row["volume"] / year
+            base_volume = row["new"] if new_only else row["volume"]
+            base_per_day = base_volume / year
             per_day = (new_i + known_i) / span
             return {
                 "key": row["key"], "label": row["label"],
@@ -1026,9 +1029,9 @@ class Engine:
                 "known_passes": row["known_passes"],
                 "rate_to_next": row["rate_to_next"],
                 "to_next": row["to_next"],
-                "baseline": row["volume"],
+                "baseline": base_volume,
                 "baseline_new": row["new"],
-                "baseline_known": row["known"],
+                "baseline_known": 0 if new_only else row["known"],
                 "baseline_per_day": round_to(base_per_day, 3),
                 "per_day": round_to(per_day, 3),
                 "pace": (None if not base_per_day
@@ -1081,13 +1084,17 @@ class Engine:
             },
             "submissions": top["total"],
             "baseline_submissions": top["baseline"],
-            "baseline_hires": af["hires"],
+            "new_only": new_only,
+            "baseline_hires": (af["new"]["hires_per_year"] if new_only
+                               else af["hires"]),
             # השוואה לשנה מלאה מול חלון קצר היתה משווה תפוחים לתפוזים:
             # 110,892 הגשות ב-119 יום נראו כמו «פי 1.85» מ-59,978 בשנה,
             # בעוד שבפועל זהו קצב של פי 5.67. שתי הצמיחות מחושבות מול
             # אותו חלון: הבסיס מוקטן לפי אורכו.
             "baseline_in_span": round_half_up(top["baseline"] * span / year),
-            "baseline_hires_in_span": round_half_up(af["hires"] * span / year),
+            "baseline_hires_in_span": round_half_up(
+                (af["new"]["hires_per_year"] if new_only else af["hires"])
+                * span / year),
             "growth": top["pace"],
             "target_growth": rows[-1]["pace"],
             "rows": rows,
@@ -1112,7 +1119,7 @@ class Engine:
         rows = list(af["chain"]) + [af["hire_row"]]
         return af, rows, {r["key"]: i for i, r in enumerate(rows)}
 
-    def _flow_span(self, days):
+    def _flow_span(self, days, new_only=False):
         """אורך החלון וכמה גיוסים תורם בו הנתיב המוכר.
 
         הנתיב המוכר קבוע ומתחלק אחיד על פני השנה, ולכן חלון קצר מקבל
@@ -1125,6 +1132,9 @@ class Engine:
         span = year if days is None else days
         if span is None or span <= 0:
             return None, None
+        if new_only:
+            # מצב «אוכלוסייה חדשה בלבד»: אין נתיב מוכר כלל.
+            return span, 0.0
         return span, af["known"]["hires_per_year"] * span / year
 
     def _measured_days(self, from_key, to_key):
@@ -1142,7 +1152,7 @@ class Engine:
                 return f["days"]["median"]
         return None
 
-    def known_share(self, key):
+    def known_share(self, key, new_only=False):
         """איזה חלק מהנפח בשלב הזה הוא האוכלוסייה המוכרת, לפי התרשים.
 
         בבדיקת קבצים עברו ב-2025 30,574 מועמדים, מהם 1,418 מוכרת -
@@ -1154,12 +1164,14 @@ class Engine:
         af, rows, idx = packed
         if key not in idx:
             return None
+        if new_only:
+            return 0.0
         row = rows[idx[key]]
         if not row["volume"]:
             return 0.0
         return round_to(row["known"] / row["volume"], 6)
 
-    def blended_rate(self, key):
+    def blended_rate(self, key, new_only=False):
         """שיעור ההמרה המשוקלל מהשלב ועד הגיוס, כולל האוכלוסייה המוכרת.
 
         זה המספר שעונה על «יש לי 300 בבדיקת קבצים, כמה יתגייסו»:
@@ -1179,6 +1191,9 @@ class Engine:
         acc = 1.0
         for r in af["chain"][idx[key]:]:
             acc *= r["rate_to_next"]
+        if new_only:
+            # במשפך של האוכלוסייה החדשה בלבד אין מי שמצטרף ביחס 1:1.
+            return round_to(acc, 6)
         return round_to((row["new"] * acc + row["known"]) / row["volume"], 6)
 
     def reach_share(self, from_key, to_key, days):
@@ -1220,7 +1235,7 @@ class Engine:
                 acc += share * (days - lo + 1) / (hi - lo + 1)
         return round_to(min(1.0, acc), 6)
 
-    def constrained_entry(self, key, count, days=None):
+    def constrained_entry(self, key, count, days=None, new_only=False):
         """מיפוי כמות שהוזנה בשלב כלשהו אל שרשרת התזרים.
 
         שלושה מקרים, ובכולם נאמר במפורש דרך מה נעשה המיפוי:
@@ -1245,7 +1260,7 @@ class Engine:
         if packed is None or count is None:
             return None
         af, rows, idx = packed
-        span, known_span = self._flow_span(days)
+        span, known_span = self._flow_span(days, new_only)
         if span is None:
             return None
 
@@ -1282,7 +1297,7 @@ class Engine:
                 if chain_key is None:
                     return None
 
-        share_known = self.known_share(chain_key) or 0.0
+        share_known = self.known_share(chain_key, new_only) or 0.0
         claim = landed * share_known
         known_here = min(claim, known_span)
         return {
@@ -1297,7 +1312,7 @@ class Engine:
             "via": via, "via_rate": via_rate, "via_label": via_label,
         }
 
-    def constrained_combine(self, counts, days=None):
+    def constrained_combine(self, counts, days=None, new_only=False):
         """כמה יתגייסו מהכמויות שהוזנו, לפי תזרים הליך הגיוס.
 
         הפלט בנוי כמו זה של constrained_plan - אותן שורות, אותם שני
@@ -1310,7 +1325,7 @@ class Engine:
         if packed is None:
             return None
         af, rows, idx = packed
-        span, known_span = self._flow_span(days)
+        span, known_span = self._flow_span(days, new_only)
         if span is None:
             return None
 
@@ -1319,7 +1334,7 @@ class Engine:
             n = counts.get(key)
             if n is None:
                 continue
-            e = self.constrained_entry(key, n, days)
+            e = self.constrained_entry(key, n, days, new_only)
             if e is not None:
                 entries.append(e)
         if not entries:
@@ -1480,6 +1495,7 @@ class Engine:
 
         return {
             "days": days, "span_days": span, "annual": days is None,
+            "new_only": new_only,
             "year": af["year"], "source": af["source"],
             "known": {
                 "label": af["known"]["label"], "hires": hire["known"],
@@ -1558,7 +1574,7 @@ class Engine:
             "rows": out, "aside": aside,
         }
 
-    def constrained_gap(self, counts, target_hires, days=None):
+    def constrained_gap(self, counts, target_hires, days=None, new_only=False):
         """כמה עוד צריך בכל שלב כדי להגיע ליעד.
 
         השורה בכל שלב היא **הנפח שהתכנון דורש שם, פחות מה שכבר עובר
@@ -1569,13 +1585,13 @@ class Engine:
         שהפיצול בין הנתיבים הפך ליחסי הוא חרג: 30,000 הגשות ועוד
         ההשלמה נתנו 103,450, כמות שמניבה 4,687 גיוסים ולא 4,000.
         """
-        plan = self.constrained_plan(target_hires, days)
+        plan = self.constrained_plan(target_hires, days, new_only)
         if plan is None:
             return None
         af, rows, idx = self._flow_rows()
-        span, known_span = self._flow_span(days)
+        span, known_span = self._flow_span(days, new_only)
 
-        proj = self.constrained_combine(counts, days)
+        proj = self.constrained_combine(counts, days, new_only)
         have = proj["hires"] if proj else 0
         gap = target_hires - have
 
@@ -1596,7 +1612,7 @@ class Engine:
                 "key": r["key"], "label": r["label"],
                 "needed_total": total, "have": already,
                 "required": extra,
-                "rate": self.blended_rate(r["key"]),
+                "rate": self.blended_rate(r["key"], new_only),
                 "per_day": round_to(extra / span, 3),
             })
 
@@ -1636,7 +1652,7 @@ class Engine:
                 return f.get("buckets")
         return None
 
-    def constrained_matrix(self, counts, days=None):
+    def constrained_matrix(self, counts, days=None, new_only=False):
         """טבלה אחת: כמה יגיעו לכל שלב, ומתי, על אותה רשת חלונות זמן.
 
         הכמויות באות מהתזרים ופריסת הזמן מהמדידה. השיעורים של כל
@@ -1646,10 +1662,10 @@ class Engine:
 
         השלב שהוזן אינו מקבל שורה: מי שכבר שם אינו "מגיע" לשם.
         """
-        proj = self.constrained_combine(counts, days)
+        proj = self.constrained_combine(counts, days, new_only)
         if proj is None:
             return None
-        span, known_span = self._flow_span(days)
+        span, known_span = self._flow_span(days, new_only)
         uniform = self._uniform_shares(span)
 
         def blended(sources, known, key):
@@ -1708,7 +1724,7 @@ class Engine:
             "hires": proj["hires"],
         }
 
-    def constrained_plan_matrix(self, target_hires, days=None):
+    def constrained_plan_matrix(self, target_hires, days=None, new_only=False):
         """אותה טבלה, אבל על הכמויות של התכנון עצמו.
 
         במצב יעד אי אפשר לבנות את הטבלאות מהזנת כמות ההגשות שהתכנון
@@ -1716,10 +1732,10 @@ class Engine:
         והטבלה שמתחתיו 2,543 - על אותו שלב, באותו עמוד. כאן הכמויות
         נלקחות מהתכנון עצמו, ולכן הן זהות לחלוטין.
         """
-        plan = self.constrained_plan(target_hires, days)
+        plan = self.constrained_plan(target_hires, days, new_only)
         if plan is None:
             return None
-        span, _ = self._flow_span(days)
+        span, _ = self._flow_span(days, new_only)
         uniform = self._uniform_shares(span)
         first = plan["rows"][0]["key"]
 
@@ -1780,18 +1796,18 @@ class Engine:
             "hires": target_hires,
         }
 
-    def constrained_timeline(self, counts, days=None):
+    def constrained_timeline(self, counts, days=None, new_only=False):
         """מתי יתגייסו: הגיוסים הצפויים מפוזרים על חלונות הזמן.
 
         האוכלוסייה החדשה מתפזרת לפי התפלגות הזמנים שנמדדה לשלב שממנו
         היא נגזרת. האוכלוסייה המוכרת אינה נגזרת משום שלב - היא
         מתחלקת אחיד על פני החלון, ולכן היא מפוזרת לפי אורך כל חלון.
         """
-        proj = self.constrained_combine(counts, days)
+        proj = self.constrained_combine(counts, days, new_only)
         if proj is None:
             return None
         af, rows, idx = self._flow_rows()
-        span, known_span = self._flow_span(days)
+        span, known_span = self._flow_span(days, new_only)
 
         base = [{"key": b["key"], "label": b["label"], "share": 0.0,
                  "hires": 0, "sources": []} for b in self.buckets]

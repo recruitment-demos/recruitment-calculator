@@ -419,6 +419,83 @@ class TestSimulations(unittest.TestCase):
                     where)
 
     # ------------------------------------------------------------------
+    # מצב «אוכלוסייה חדשה בלבד»
+    # ------------------------------------------------------------------
+
+    def test_new_only_drops_the_known_lane_everywhere(self):
+        """במצב הזה אין נתיב מוכר, בשום שלב ובשום חלון."""
+        for target in (100, 400, 4000, 9999):
+            for days in (None, 27, 120, 365):
+                plan = self.eng.constrained_plan(target, days, True)
+                where = f"יעד {target}/{days}"
+                self.assertEqual(plan["known"]["hires"], 0, where)
+                self.assertEqual(plan["new"]["hires"], target, where)
+                for row in plan["rows"]:
+                    self.assertEqual(row["known"], 0, where + " " + row["key"])
+                    self.assertEqual(row["total"], row["new"], where)
+        for key in self.entry_keys:
+            for count in (300, 5000, 60000):
+                flow = self.eng.constrained_combine(
+                    self.counts(key, count), None, True)
+                self.assertEqual(flow["known"]["hires"], 0, key)
+                self.assertEqual(flow["hires"], flow["new"]["hires"], key)
+
+    def test_new_only_always_needs_more_submissions(self):
+        """בלי הנתיב המוכר, אותו יעד דורש יותר הגשות."""
+        for target in (100, 400, 1000, 4000, 9999):
+            for days in (None, 27, 120, 365):
+                a = self.eng.constrained_plan(target, days, False)["submissions"]
+                b = self.eng.constrained_plan(target, days, True)["submissions"]
+                self.assertGreater(b, a, f"יעד {target}/{days}")
+
+    def test_new_only_rate_is_the_chain_product(self):
+        """שיעור ההמרה במצב הזה הוא מכפלת שיעורי המעבר עד הגיוס."""
+        af = self.af
+        acc = 1.0
+        for row in reversed(af["chain"]):
+            acc *= row["rate_to_next"]
+            self.assertAlmostEqual(self.eng.blended_rate(row["key"], True),
+                                   acc, places=5, msg=row["key"])
+            self.assertEqual(self.eng.known_share(row["key"], True), 0.0)
+
+    def test_new_only_keeps_the_round_trip(self):
+        """גם במצב הזה שני הכיוונים הם היפוך מדויק."""
+        for target in (100, 400, 4000, 9999):
+            for days in (None, 27, 120, 365):
+                plan = self.eng.constrained_plan(target, days, True)
+                back = self.eng.constrained_combine(
+                    self.counts("submissions", plan["submissions"]), days, True)
+                self.assertLessEqual(abs(back["hires"] - target), 1,
+                                     f"יעד {target}/{days}: {back['hires']}")
+
+    def test_new_only_reproduces_the_second_column_of_the_chart(self):
+        """הנפחים במצב הזה הם העמודה השנייה של המשפך שבתחתית העמוד."""
+        f = self.eng.flow_funnel()
+        plan = self.eng.constrained_plan(self.af["new"]["hires_per_year"],
+                                         None, True)
+        for row, col in zip(plan["rows"], f["rows"]):
+            self.assertLessEqual(abs(row["total"] - col["new"]["count"]), 2,
+                                 col["key"])
+
+    def test_both_modes_stay_sane(self):
+        """סריקה רחבה: שני המצבים, כל השלבים, כל החלונות."""
+        checked = 0
+        for new_only in (False, True):
+            for key in self.entry_keys:
+                for count in (1, 300, 5000, 60000):
+                    for days in (None, 27, 365):
+                        flow = self.eng.constrained_combine(
+                            self.counts(key, count), days, new_only)
+                        where = f"{key}={count}/{days}/חדשים={new_only}"
+                        self.assertIsNotNone(flow, where)
+                        self.assertLessEqual(flow["hires"], count, where)
+                        self.assertGreaterEqual(flow["hires"], 0, where)
+                        seq = [r["new"] for r in flow["rows"]]
+                        self.assertEqual(seq, sorted(seq, reverse=True), where)
+                        checked += 1
+        self.assertGreater(checked, 150)
+
+    # ------------------------------------------------------------------
     # חפיפה לתרשים
     # ------------------------------------------------------------------
 
