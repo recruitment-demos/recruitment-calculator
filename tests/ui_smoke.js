@@ -123,6 +123,19 @@ const fval = row => {
   const n = (v.children || []).filter(c => c.classList.contains("n"))[0];
   return n ? n.textContent : v.textContent;
 };
+/* רוחב הפס של שורה, באחוזים. הפס מפוצל לשני מקטעים (שני הנתיבים),
+   ולכן הרוחב הוא סכומם. זהו הסיכוי להתגייס מהשלב, ולא הכמות. */
+const fillOf = row => {
+  const track = (row.children || []).filter(c => c.classList.contains("ftrack"))[0];
+  if (!track) return null;
+  const bar = (track.children || [])[0];
+  if (!bar) return null;
+  if (bar.classList.contains("split")) {
+    return (bar.children || []).reduce(
+      (a, seg) => a + (parseFloat(seg.style.width) || 0), 0);
+  }
+  return parseFloat(bar.style.width) || 0;
+};
 const inDays = n => {
   const d = new Date();
   d.setDate(d.getDate() + n);
@@ -763,13 +776,43 @@ check("יעד עם מלאי קיים מציג כמה עוד צריך", () => {
   const plan = sandbox.Engine.constrainedGap(counts, 4000, null);
   const rows = registry.gapPlanBody.children.filter(r => !r.classList.contains("msg"));
   const nums = rows.map(r => num(fval(r)));
-  if (JSON.stringify(nums) !== JSON.stringify(plan.rows.map(r => r.required)))
+  // השורה האחרונה היא שורת הגיוס: כמה גיוסים חסרים, והפס שלה מלא.
+  const want = plan.rows.map(r => r.required).concat([plan.gap]);
+  if (JSON.stringify(nums) !== JSON.stringify(want))
     return "הכמויות אינן תואמות את המנוע";
+  if (!rows[rows.length - 1].classList.contains("hire"))
+    return "אין שורת גיוס בסוף המשפך";
   const missing = rows.filter(r => !hasInfo(r, 20));
   if (missing.length) return missing.length + " שורות בלי מקור";
   // ההשלמה חייבת להיות קטנה מהדרישה המלאה
   const bare = sandbox.Engine.constrainedPlan(4000, null);
   return nums[0] < bare.submissions ? null : "המלאי הקיים לא הקטין את הדרישה";
+});
+
+check("רוחב הפס בכל משפך הוא סיכוי הגיוס, ושורת הגיוס מלאה", () => {
+  const funnels = ["constraintBody", "flowBody", "gapPlanBody",
+                   "chartAllBody", "chartNewBody"];
+  clearAll();
+  setVal("submissions", "30000");
+  setVal("target", "4000");
+  sandbox.calculate();
+  for (let f = 0; f < funnels.length; f++) {
+    const rows = (registry[funnels[f]].children || [])
+      .filter(r => !r.classList.contains("msg"));
+    if (!rows.length) return funnels[f] + ": אין שורות";
+    const w = rows.map(fillOf);
+    if (w.some(x => x === null)) return funnels[f] + ": שורה בלי פס";
+    const last = w[w.length - 1];
+    if (Math.abs(last - 100) > 0.5)
+      return funnels[f] + ": שורת הגיוס אינה מלאה (" + last + "%)";
+    for (let i = 1; i < w.length; i++) {
+      if (w[i] < w[i - 1] - 0.01)
+        return funnels[f] + ": הפס צר יותר ככל שמתקרבים לגיוס";
+    }
+    // פס שהוא הכמות היה נותן לשורה הראשונה - הגדולה שבהן - את המלוא
+    if (w[0] > 50) return funnels[f] + ": הפס הראשון נראה ככמות ולא כסיכוי";
+  }
+  return null;
 });
 
 check("כמה כבר בדרך נאמר במפורש", () => {
@@ -1182,8 +1225,12 @@ check("קובץ מועמדים פעילים ממלא את השדות ומריץ 
     ["11", "סטטוס שלא קיים"]                              // אינו מוכר
   ]));
   if (!res.ok) return "העמודות לא זוהו";
-  const want = { submissions: 2, file_check: 1, online_day: 2,
-                 assessment: 1, yachbam: 3 };
+  // הספירה בקובץ, לפני הנרמול. השדות מקבלים את חלקה בלבד.
+  const raw = { submissions: 2, file_check: 1, online_day: 2,
+                assessment: 1, yachbam: 3 };
+  const share = Number(IMP.attend_share);
+  const want = {};
+  Object.keys(raw).forEach(k => { want[k] = Math.round(raw[k] * share); });
   const wrong = Object.keys(want)
     .filter(k => Number(registry["in_" + k].value) !== want[k]);
   if (wrong.length) return "שדה שלא מולא נכון: " + wrong.join(", ");
@@ -1203,8 +1250,11 @@ check("הכמויות שנטענו הן אותן כמויות שהמחשבון �
   sandbox.applyActiveRows(activeTable([
     ["1", "קבצים"], ["2", "קבצים"], ["3", "קבצים"], ["3", "קבצים"]
   ]));
+  // מה שמוזן לשדה הוא מה שהמחשבון מקבל - גם אחרי הנרמול.
   const counts = {}; stageKeys.forEach(k => { counts[k] = null; });
-  counts.file_check = 3;
+  counts.file_check = Number(registry.in_file_check.value);
+  if (counts.file_check !== Math.round(3 * Number(IMP.attend_share)))
+    return "השדה לא קיבל את הספירה המנורמלת";
   const flow = sandbox.Engine.constrainedCombine(counts, null);
   return num(registry.stickyValue.textContent) === flow.hires
     ? null : "התוצאה אינה תואמת את מה שהוזן";
@@ -1218,6 +1268,39 @@ check("קובץ בלי העמודות הדרושות אינו שובר את הע
   if (!msg.trim()) return "לא נאמר למשתמש שהקובץ אינו מתאים";
   return stageKeys.every(k => registry["in_" + k].value === "")
     ? null : "שדה מולא למרות שהקובץ לא נקרא";
+});
+
+check("טעינה שהתקבלה מוחקת את היעד שהוזן", () => {
+  sandbox.reset();
+  setVal("target", "400");
+  setVal("targetDate", inDays(30));
+  const res = sandbox.applyActiveRows(activeTable([
+    ["1", "בבחינה"], ["2", "קבצים"], ["3", "קבצים"]
+  ]));
+  if (!res.ok || !res.counted) return "הקובץ לא נקרא";
+  if (registry.in_target.value !== "") return "היעד הישן נשאר בשדה";
+  if (!registry.in_targetDate.value) return "תאריך היעד נמחק";
+  const msg = allText(registry.importMsg);
+  return msg.includes("נמחק") ? null : "לא נאמר שהיעד נמחק";
+});
+
+check("הכמות שנטענת מנורמלת, והגולמית נאמרת", () => {
+  const share = Number(IMP.attend_share);
+  if (!(share > 0 && share <= 1)) return "attend_share אינו שיעור תקין";
+  sandbox.reset();
+  const rows = [];
+  for (let i = 0; i < 100; i++) rows.push([String(i), "קבצים"]);
+  const res = sandbox.applyActiveRows(activeTable(rows));
+  if (res.raw.file_check !== 100) return "הספירה הגולמית לא נשמרה";
+  if (res.counts.file_check !== Math.round(100 * share))
+    return "הספירה לא נורמלה";
+  if (Number(registry.in_file_check.value) !== Math.round(100 * share))
+    return "השדה קיבל את הספירה הגולמית";
+  // הקורא עצמו נשאר על מה שכתוב בקובץ
+  const plain = sandbox.activeCounts(activeTable(rows));
+  if (plain.counts.file_check !== 100) return "הקורא נורמל את הספירה";
+  const msg = allText(registry.importMsg);
+  return msg.includes("100") ? null : "הספירה הגולמית לא נאמרה למשתמש";
 });
 
 check("אין מלל באנגלית באזור הטעינה", () => {
@@ -1333,7 +1416,9 @@ check("טבלת היחידות נבנית, מסתכמת, ומופיעה רק כ�
   const cells = r => (rows[r].children || []).map(c => c.textContent);
   const sumRow = cells(3);
   const a = num(cells(1)[3]), b = num(cells(2)[3]);
-  if (num(sumRow[2]) !== 600) return "סך המועמדים הפעילים שגוי";
+  const share3 = Number(IMP.attend_share);
+  const active = Math.round(400 * share3) + Math.round(200 * share3);
+  if (num(sumRow[2]) !== active) return "סך המועמדים הפעילים שגוי";
   if (num(sumRow[3]) !== a + b) return "שורת הסך הכול אינה סכום השורות";
   // הטבעת נבנית מאותם נתונים
   const svg = registry.unitDonut.innerHTML;

@@ -2361,6 +2361,43 @@ IMPORT.ignore.forEach(s => { IGNORE_N[normKey(s)] = true; });
 function stageOf(v) { return MAP_N[normKey(v)] || null; }
 function isIgnored(v) { return !!IGNORE_N[normKey(v)]; }
 
+/* ------------------------------------------------------------------ *
+ *  נרמול הכמות שנטענת                                                 *
+ *                                                                     *
+ *  הקובץ מונה את מי שרשום בשלב, ובכללם מי שעדיין לא ביצע אותו בפועל.  *
+ *  לכן הכמות שנכנסת לשדות אינה הספירה הגולמית אלא חלק ממנה. השיעור    *
+ *  בא מ-DATA.active_import.attend_share ואינו כתוב כאן - הוא הנחת     *
+ *  עבודה, ומחליפים אותו בקובץ הקונפיג ולא בקוד.                        *
+ * ------------------------------------------------------------------ */
+function attendShare() {
+  const v = IMPORT ? Number(IMPORT.attend_share) : 1;
+  return isFinite(v) && v > 0 && v <= 1 ? v : 1;
+}
+
+/* מכפיל את כל הספירות בשיעור, ושומר את הגולמי לצד המנורמל כדי
+   שאפשר יהיה לומר למשתמש משניהם. עיגול בכל שלב בפני עצמו.
+   רץ על הדרך אל השדות ולא בתוך הקורא: activeCounts מחזיר תמיד את
+   מה שכתוב בקובץ, וכך גם בדיקות הקריאה נשארות על הספירה עצמה. */
+function applyAttendShare(res) {
+  const share = attendShare();
+  res.share = share;
+  res.raw = {};
+  DATA.stages.forEach(s => { res.raw[s.key] = res.counts[s.key]; });
+  if (share === 1) return res;
+  DATA.stages.forEach(s => {
+    if (res.counts[s.key] !== null && res.counts[s.key] !== undefined)
+      res.counts[s.key] = Math.round(res.counts[s.key] * share);
+  });
+  Object.keys(res.units || {}).forEach(u => {
+    const c = res.units[u];
+    DATA.stages.forEach(s => {
+      if (c[s.key] !== null && c[s.key] !== undefined)
+        c[s.key] = Math.round(c[s.key] * share);
+    });
+  });
+  return res;
+}
+
 /* ציון התאמה של כותרת לשם עמודה מוכר: זהות מלאה, או שהכותרת
    שבקובץ מתחילה בשם המוכר («מועמד(קוד)» מתחיל ב«מועמד»). לא מספיק
    שהשם מופיע באמצע - «מקור מועמדות» אינו עמודת מועמד. */
@@ -2722,10 +2759,19 @@ function applyActiveRows(table) {
     return res;
   }
 
+  applyAttendShare(res);
+
+  /* טעינה שהתקבלה מוחקת את כל מה שהיה ומעלה את הקובץ במקומו: כל שדות
+     השלבים נכתבים מחדש (גם אלה שאין להם סטטוס בקובץ - הם מתרוקנים),
+     ויעד הגיוס שהוזן קודם נמחק. יעד שנשאר עומד היה הופך את הטעינה
+     לחישוב «כמה עוד צריך» מול יעד ישן, וזו היתה תקלה שדווחה.
+     תאריך היעד נשאר: הוא חלון הזמן שנשאל עליו, ולא נתון מהקובץ. */
   DATA.stages.forEach(s => {
     $("in_" + s.key).value =
       res.counts[s.key] === null ? "" : String(res.counts[s.key]);
   });
+  const hadTarget = txt($("in_target").value);
+  $("in_target").value = "";
 
   const unitNames = Object.keys(res.units);
   ACTIVE_UNITS = unitNames.length ? res.units : null;
@@ -2742,6 +2788,21 @@ function applyActiveRows(table) {
        " שורות בקובץ.") },
     { cls: "detail", text: parts.join("  ·  ") }
   ];
+  if (res.share && res.share < 1) {
+    const shareTxt = Math.round(res.share * 100) + "%";
+    const rawParts = DATA.stages
+      .filter(s => res.raw[s.key] !== null && res.raw[s.key] !== undefined)
+      .map(s => s.label + " " + nf(res.raw[s.key]));
+    lines.push({ cls: "warn", text:
+      "הוזנו " + shareTxt + " מהספירה שבקובץ: מי שרשום בשלב אינו בהכרח " +
+      "מי שיבצע אותו, והמחשבון מניח שרק " + shareTxt + " יבצעו אותו " +
+      "בפועל. הספירה הגולמית: " + rawParts.join("  ·  ") + "." });
+  }
+  if (hadTarget) {
+    lines.push({ cls: "detail", text:
+      "יעד הגיוס שהיה בשדה (" + hadTarget + ") נמחק: הטעינה מחליפה את " +
+      "כל מה שהוזן קודם." });
+  }
   if (res.flipped) {
     lines.push({ cls: "detail", text:
       "הקובץ נקרא לפי שורות: שמות השלבים נמצאו בעמודה ולא בשורת כותרות." });
@@ -3606,12 +3667,20 @@ function renderGapPlan(counts, target, targetDate, days) {
      plan.annual ? "" : "מתחת לכל כמות כתוב הקצב הנדרש בתוך " +
        nf(plan.span_days) + " הימים שנותרו."]);
 
+  /* רוחב הפס כאן הוא אותו דבר שהוא בשאר המשפכים: הסיכוי להתגייס
+     מהשלב, ולא הכמות. שורת הגיוס - כמה גיוסים חסרים - סוגרת את
+     המשפך ומלאה תמיד. קודם הפס היה הכמות חלקי הגדולה שבהן, ואז
+     שורת ההגשות היתה מלאה ושורת הגיוס לא הופיעה כלל. */
   const max = Math.max.apply(null, plan.rows.map(r => r.needed_total || 0).concat([1]));
+  const fillWhy = share =>
+    " רוחב הפס: " + pct(share) + " - זהו הסיכוי להתגייס ממי שנמצא בשלב " +
+    "הזה. שורת הגיוס מלאה תמיד.";
   plan.rows.forEach((r, i) => {
     chainRow(body, {
       label: r.label,
       chip: r.have ? "יש " + nf(r.have) + " מתוך " + nf(r.needed_total) : null,
-      value: r.required, max: max,
+      value: r.required, max: max, fill: r.rate,
+      fillTitle: "הסיכוי להתגייס מכאן: " + pct(r.rate),
       split: { new: r.required, known: 0 },
       small: plan.annual ? null : fmtPace(r.per_day),
       info: "כדי לגייס " + nf(plan.target) + " צריך ש-" + nf(r.needed_total) +
@@ -3619,9 +3688,22 @@ function renderGapPlan(counts, target, targetDate, days) {
         "חסרים " + nf(r.required) + ". שיעור ההמרה המשוקלל מהשלב הזה ועד " +
         "גיוס הוא " + pct(r.rate) + "." +
         (plan.annual ? "" : " בחלון של " + nf(plan.span_days) + " ימים " +
-          "התוספת היא " + fmtPace(r.per_day) + ".")
+          "התוספת היא " + fmtPace(r.per_day) + ".") + fillWhy(r.rate)
     }, i);
   });
+  chainRow(body, {
+    label: DATA.hire_label, cls: "hire",
+    chip: "יש " + nf(plan.have) + " מתוך " + nf(plan.target),
+    value: plan.gap, max: max, fill: 1,
+    fillTitle: "שורת הגיוס מלאה תמיד",
+    split: { new: plan.gap, known: 0 },
+    small: plan.annual ? null : fmtPace(plan.gap / plan.span_days),
+    info: "היעד הוא " + nf(plan.target) + " גיוסים, ומה שכבר בדרך צפוי " +
+      "להניב " + nf(plan.have) + " - ולכן חסרים " + nf(plan.gap) + ". " +
+      "השורות שמעל אומרות כמה עוד צריך בכל שלב כדי להשלים אותם." +
+      (plan.annual ? "" : " בחלון של " + nf(plan.span_days) + " ימים זהו " +
+        fmtPace(plan.gap / plan.span_days) + ".") + fillWhy(1)
+  }, plan.rows.length);
   return true;
 }
 
@@ -4255,6 +4337,16 @@ function buildAbout() {
      "ומשם והלאה רץ בדיוק אותו חישוב.",
      "הקובץ נקרא בדפדפן שלך בלבד. הוא אינו נשלח לשום מקום, אינו נשמר, " +
      "ואינו הופך לחלק מנתוני המחשבון.",
+     "טעינה שהתקבלה מחליפה את כל מה שהוזן: כל שדות השלבים נכתבים " +
+     "מחדש - גם אלה שאין להם סטטוס בקובץ, והם מתרוקנים - ויעד הגיוס " +
+     "נמחק. תאריך היעד נשאר, מפני שהוא חלון הזמן שנשאל עליו ולא נתון " +
+     "מהקובץ. טעינה שנכשלה אינה משנה דבר: הכל חוזר בדיוק למצב שהיה, " +
+     "ונפתח חלון שמסביר מה קרה.",
+     "הכמות שנכנסת לשדות אינה הספירה הגולמית אלא " +
+     Math.round(attendShare() * 100) + "% ממנה. הקובץ מונה את מי " +
+     "שרשום בשלב, ובכללם מי שעדיין לא ביצע אותו בפועל; זו הנחת עבודה " +
+     "עד שיימדד השיעור האמיתי. הספירה הגולמית נאמרת מתחת לכפתור, " +
+     "לצד המנורמלת.",
      "הקובץ יכול להיות בכל מבנה. המחשבון מחפש בו שני שדות בלבד: " +
      "«" + IMPORT.columns.status[0] + "» - השלב שבו נמצא המועמד - " +
      "ו«" + IMPORT.columns.candidate[0] + "», שמשמש לניכוי כפילויות. " +
