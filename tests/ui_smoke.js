@@ -1237,19 +1237,15 @@ check("הבורר משפיע גם על מצב הזרימה", () => {
   return num(registry.heroValue.textContent) === all ? null : "החזרה נכשלה";
 });
 
-check("כפתור יצירת הקשר צף ומקושר", () => {
-  // כפתור סטטי, ולכן הוא נבדק בעמוד הבנוי עצמו ולא ב-DOM המזויף
-  const m = /<a class="floatbtn"[\s\S]*?<\/a>/.exec(html);
-  if (!m) return "אין כפתור צף בעמוד";
-  const btn = m[0];
-  if (!btn.includes("https://wa.me/97235555333")) return "הקישור שגוי";
-  if (!btn.includes("צור קשר")) return "אין בועית «צור קשר»";
-  if (!btn.includes("<svg")) return "אין אייקון";
-  if (!/\.floatbtn\s*\{[^}]*position:\s*fixed/.test(html))
-    return "הכפתור אינו צף";
-  if (!/\.floatbtn\s*\{[^}]*z-index:\s*9999/.test(html))
-    return "אין z-index";
-  return /\.floatbtn\s*\{[^}]*#25d366/.test(html) ? null : "האייקון אינו ירוק";
+check("אין כפתור צף בפינת המסך", () => {
+  /* כפתור יצירת הקשר הצף הוסר ב-2026-09-06 לפי בקשה מפורשת. הבדיקה
+     הפוכה מקודמתה בכוונה: היא אוכפת שהוא לא יחזור בטעות, לא בתגית,
+     לא בעיצוב ולא בקישור החוצה. */
+  if (/floatbtn/.test(html)) return "נשאר כפתור צף בעמוד";
+  if (/wa\.me/.test(html)) return "נשאר קישור החוצה לוואטסאפ";
+  if (html.includes("צור קשר")) return "נשארה בועית «צור קשר»";
+  if (/#25d366/.test(html)) return "נשאר הצבע של הכפתור שהוסר";
+  return null;
 });
 
 /* ---------- טעינת קובץ המועמדים הפעילים ---------- */
@@ -1832,6 +1828,52 @@ check("מפתח שנדחה נמחק, והשדות חוזרים", () => {
   if (sandbox.savedKey()) return "המפתח שנדחה נשאר בדפדפן";
   return allText(registry.infoText).includes("מפתח")
     ? null : "לא הוסבר שהמפתח נדחה";
+});
+
+/* מחפש כפתור פעולה בתוך גוף החלון לפי הכיתוב שלו. */
+const btnIn = (node, label) => {
+  if ((node.tagName === "button") && (node.textContent || "").includes(label))
+    return node;
+  for (const c of (node.children || [])) {
+    const hit = btnIn(c, label);
+    if (hit) return hit;
+  }
+  return null;
+};
+
+check("חלון «המפתח אינו תקף» מציע להזין מפתח אישי במקום", () => {
+  /* התקלה שדווחה: החלון אמר שהמפתח נדחה והשאיר את המשתמש בלי דרך
+     ברורה להזין אחר. הכפתור פותח את חלון המפתח ישירות, והתמונה
+     שנבחרה נטענת מאליה אחרי השמירה - בלי לבחור אותה שוב. */
+  sandbox.reset();
+  clearAll();
+  setVal("file_check", "500");
+  sandbox.calculate();
+  sandbox.saveKey("מפתח-לבדיקה");
+  replies = [{ status: 403, body: "{}" }];
+  sandbox.loadActiveImage(imgFile(dataUrl));
+  const go = btnIn(registry.infoText, "הזנת מפתח אישי");
+  if (!go) return "אין בחלון השגיאה כפתור להזנת מפתח אישי";
+  if (registry.keyModal.classList.contains("open"))
+    return "חלון המפתח נפתח בלי לחיצה";
+  go._on.click();
+  if (registry.infoModal.classList.contains("open"))
+    return "חלון השגיאה נשאר פתוח";
+  if (!registry.keyModal.classList.contains("open"))
+    return "הכפתור לא פתח את חלון המפתח";
+  sent.length = 0;
+  registry.keyInput.value = "מפתח-אחר";
+  replies = [{ status: 200, body: csvReply(csvOf(
+    activeTable([["1", "קבצים"], ["2", "קבצים"], ["3", "קבצים"]]))) }];
+  sandbox.confirmKey();
+  if (sandbox.savedKey() !== "מפתח-אחר")
+    return "המפתח האישי לא נשמר בדפדפן";
+  if (sent.length !== 1) return "אותה תמונה לא נטענה אחרי הזנת המפתח";
+  const want = Math.round(3 * Number(IMP.attend_share));
+  if (Number(registry.in_file_check.value) !== want)
+    return "השדות לא התמלאו מהתמונה";
+  sandbox.forgetKey();
+  return null;
 });
 
 check("כל כישלון מקבל הסבר משלו", () => {
