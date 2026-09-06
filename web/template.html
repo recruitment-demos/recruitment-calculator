@@ -118,6 +118,9 @@
   }
   .import button.load:hover { background: var(--brand-soft); }
   .import input[type="file"] { display: none; }
+  /* הכפתור השני, «טען נתונים מתמונה», נראה כמו הראשון בכוונה: שתי
+     דרכים צדדיות שוות לאותו דבר - מילוי אותם שדות. */
+  .import button.load[disabled] { opacity: .5; cursor: default; }
   .impmsg { margin-top: 9px; font-size: 12.5px; line-height: 1.6; }
   .impmsg .head { font-weight: 600; color: var(--ink); }
   .impmsg .detail { color: var(--muted); }
@@ -488,6 +491,17 @@
   }
   .modal.alert .sheet p:first-of-type { color: var(--ink); font-weight: 500; }
 
+  /* חלון המפתח: אותו חלון, עם שדה קלט. */
+  #keyInput {
+    width: 100%; padding: 11px 12px; border: 1px solid var(--line);
+    border-radius: 10px; font-size: 14px; font-family: inherit;
+    background: #fbfcfe; color: var(--ink); box-sizing: border-box;
+    direction: ltr; text-align: left;
+  }
+  #keyInput:focus { outline: none; border-color: var(--brand); background: #fff; }
+  #keyModal .row { margin-top: 14px; }
+  #keyModal .row button { font-size: 13px; padding: 10px 16px; }
+
   /* ---------- שני משפכים זה לצד זה ---------- */
   .twofunnels { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; }
   .halffunnel { min-width: 0; }
@@ -625,9 +639,12 @@
       <div class="importhead">
         <button class="load" id="importBtn" type="button">טען נתונים מקובץ מועמדים פעילים</button>
         <button class="info" id="importInfo" type="button">ⓘ</button>
+        <button class="load" id="imageBtn" type="button">טען נתונים מתמונה</button>
+        <button class="info" id="imageInfo" type="button">ⓘ</button>
       </div>
       <input id="importFile" type="file"
              accept=".xlsx,.xlsm,.xlsb,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" />
+      <input id="imageFile" type="file" />
       <div class="impmsg" id="importMsg"></div>
     </div>
   </div>
@@ -744,6 +761,25 @@
         <button class="x" id="infoClose" type="button">✕</button>
       </div>
       <div id="infoText"></div>
+    </div>
+  </div>
+
+  <!-- מפתח הגישה לזיהוי התמונה. הוא נשמר בדפדפן של המשתמש בלבד ואינו
+       חלק מהעמוד: העמוד מתפרסם באופן ציבורי, ומפתח שהיה כתוב בו היה
+       גלוי לכל מי שנכנס אליו. -->
+  <div class="modal" id="keyModal">
+    <div class="sheet">
+      <div class="sheethead">
+        <h3 id="keyTitle">מפתח הגישה לזיהוי התמונה</h3>
+        <button class="x" id="keyClose" type="button">✕</button>
+      </div>
+      <div id="keyText"></div>
+      <input id="keyInput" type="password" autocomplete="off" spellcheck="false" />
+      <div class="row">
+        <button class="primary" id="keySave" type="button">שמור והמשך</button>
+        <button class="ghost" id="keyForget" type="button">מחק את המפתח</button>
+        <button class="ghost" id="keyCancel" type="button">ביטול</button>
+      </div>
     </div>
   </div>
 
@@ -2979,6 +3015,365 @@ function loadActiveFile(file) {
 }
 
 /* ------------------------------------------------------------------ *
+ *  טעינה מתמונה                                                       *
+ *                                                                     *
+ *  אותה דרך צדדית, בכניסה אחרת. התמונה נשלחת לשירות הזיהוי, שמחזיר    *
+ *  את הטבלה שבה כטקסט מופרד בפסיקים, והטקסט הזה נקרא בדיוק באותו      *
+ *  קורא שקורא קובץ אקסל - scanLayout, activeCounts, applyActiveRows.  *
+ *  אין כאן שום חישוב משלה, ואין מסלול חישוב שני.                       *
+ *                                                                     *
+ *  זו הדרך היחידה בעמוד שיוצאת החוצה: קובץ אקסל נקרא בדפדפן ואינו     *
+ *  נשלח לשום מקום, אבל תמונה חייבת להישלח כדי שיזהו אותה. הדבר נאמר   *
+ *  למשתמש במפורש ב-ⓘ ובשורה שמתחת לכפתור.                             *
+ *                                                                     *
+ *  כל ההגדרות - כתובת, מודל, ניסוח הבקשה, סוגי הקבצים והמגבלה -       *
+ *  יושבות ב-config/params.json תחת active_import.image, ולא כאן.       *
+ * ------------------------------------------------------------------ */
+const IMAGE = IMPORT && IMPORT.image ? IMPORT.image : null;
+
+/* המפתח נשמר בזיכרון המקומי של הדפדפן ותו לא. הוא אינו כתוב בעמוד:
+   העמוד מתפרסם באופן ציבורי, ומפתח שהיה מוטמע בו היה גלוי לכל מי
+   שנכנס אליו או פותח את הקוד שלו. דפדפן שחוסם אחסון מקומי אינו
+   מפיל דבר - פשוט מבקשים את המפתח שוב. */
+function keyStore() {
+  try { return (typeof window !== "undefined" && window.localStorage) || null; }
+  catch (e) { return null; }
+}
+function savedKey() {
+  const s = keyStore();
+  if (!s || !IMAGE) return "";
+  try { return txt(s.getItem(IMAGE.key_store)); } catch (e) { return ""; }
+}
+function saveKey(v) {
+  const s = keyStore();
+  if (!s || !IMAGE) return;
+  try { s.setItem(IMAGE.key_store, txt(v)); } catch (e) { /* אין אחסון */ }
+}
+function forgetKey() {
+  const s = keyStore();
+  if (!s || !IMAGE) return;
+  try { s.removeItem(IMAGE.key_store); } catch (e) { /* אין אחסון */ }
+}
+
+/* ---------- חלון המפתח ---------- */
+let KEY_NEXT = null;   // מה לעשות אחרי שנשמר מפתח
+
+function openKey(after) {
+  KEY_NEXT = after || null;
+  const has = !!savedKey();
+  $("keyTitle").textContent = has
+    ? "החלפת מפתח הגישה" : "מפתח הגישה לזיהוי התמונה";
+  const body = $("keyText");
+  body.innerHTML = "";
+  paras([
+    "כדי לקרוא טבלה מתוך תמונה, התמונה נשלחת לשירות זיהוי חיצוני, " +
+    "והוא דורש מפתח גישה.",
+    "המפתח נשמר בדפדפן הזה בלבד, במחשב הזה. הוא אינו נכתב לתוך העמוד, " +
+    "אינו נשלח לשום מקום מלבד שירות הזיהוי עצמו, ומי שיפתח את העמוד " +
+    "במחשב אחר יתבקש להזין אותו מחדש.",
+    "אפשר להמשיך לעבוד בלעדיו: ההזנה הידנית וטעינת קובץ האקסל אינן " +
+    "נוגעות בו כלל."
+  ]).forEach(t => body.append(el("p", null, t)));
+  $("keyInput").value = "";
+  $("keyForget").style.display = has ? "" : "none";
+  $("keyModal").classList.add("open");
+}
+
+function closeKey() {
+  $("keyModal").classList.remove("open");
+  KEY_NEXT = null;
+}
+
+/* שמירה והמשך: אותה טעינה שנעצרה ממשיכה מאליה, כדי שלא יצטרכו
+   לבחור את התמונה פעם שנייה. */
+function confirmKey() {
+  const v = txt($("keyInput").value);
+  if (!v) return;
+  saveKey(v);
+  const next = KEY_NEXT;
+  closeKey();
+  if (next) next();
+}
+
+/* ---------- קריאת הטקסט שחזר ---------- */
+/* המודל מתבקש להחזיר טבלה נקייה, אבל מודלים עוטפים לפעמים בסימוני
+   קוד. הסימונים נחתכים לפני הקריאה במקום להפיל את הטעינה. */
+function stripFence(s) {
+  let t = txt(s);
+  const m = /^```[^\n]*\n([\s\S]*?)\n?```$/.exec(t);
+  if (m) t = m[1];
+  return t.trim();
+}
+
+/* טקסט מופרד בפסיקים אל טבלה, בדיוק בצורה שהקורא של האקסל מקבל:
+   מערך של שורות, כל שורה מערך של תאים. מירכאות כפולות עוטפות תא
+   שיש בו פסיק, ומירכאה כפולה בתוך תא נכתבת פעמיים. */
+function parseCsv(text) {
+  const src = String(text === null || text === undefined ? "" : text);
+  const rows = [];
+  let row = [], cell = "", quoted = false, started = false;
+  const endCell = () => { row.push(cell); cell = ""; };
+  const endRow = () => { endCell(); rows.push(row); row = []; started = false; };
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    if (quoted) {
+      if (c !== '"') { cell += c; continue; }
+      if (src[i + 1] === '"') { cell += '"'; i++; continue; }
+      quoted = false;
+    } else if (c === '"' && cell === "") { quoted = true; started = true; }
+    else if (c === ",") { endCell(); started = true; }
+    else if (c === "\n") { endRow(); }
+    else if (c !== "\r") { cell += c; started = true; }
+  }
+  if (cell !== "" || row.length || started) endRow();
+  // שורה שכולה ריקה אינה שורה. כך גם הקורא של האקסל מקבל את הטבלה.
+  return rows.filter(r => r.some(v => txt(v) !== ""));
+}
+
+/* הטקסט שבתשובה. המבנה נבדק ולא מונח: תשובה חסומה או ריקה מחזירה "". */
+function replyText(body) {
+  let out = "";
+  const cands = (body && body.candidates) || [];
+  cands.forEach(c => {
+    const parts = (c && c.content && c.content.parts) || [];
+    parts.forEach(p => { if (p && typeof p.text === "string") out += p.text; });
+  });
+  return out;
+}
+
+/* ---------- הבקשה עצמה ---------- */
+/* רשימת המודלים היא רשימת עדיפויות: מודל שאינו זמין למפתח שהוזן
+   מפנה לבא אחריו, במקום להיכשל על שם שהשתנה בצד השירות. */
+function imageModels() {
+  const list = (IMAGE && IMAGE.models) || [];
+  return list.filter(m => txt(m));
+}
+
+function askImage(key, mime, data, index, ok, bad) {
+  const models = imageModels();
+  if (index >= models.length) { bad("model", ""); return; }
+  if (typeof fetch !== "function") { bad("net", ""); return; }
+  const url = String(IMAGE.endpoint).replace("{model}", models[index]);
+  const payload = {
+    contents: [{ parts: [
+      { text: IMAGE.prompt },
+      { inline_data: { mime_type: mime, data: data } }
+    ] }],
+    generationConfig: { temperature: 0 }
+  };
+  // המפתח נשלח בכותרת ולא בכתובת: כתובות נשמרות ביומנים ובהיסטוריה.
+  fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+    body: JSON.stringify(payload)
+  }).then(r => r.text().then(t => ({ status: r.status, text: t })))
+    .then(res => {
+      if (res.status === 200) {
+        let body = null;
+        try { body = JSON.parse(res.text); } catch (e) { body = null; }
+        const out = stripFence(replyText(body));
+        if (!out) { bad("empty", ""); return; }
+        ok(out);
+        return;
+      }
+      if (res.status === 401 || res.status === 403) { bad("key", res.text); return; }
+      if (res.status === 429) { bad("quota", res.text); return; }
+      // שם מודל שאינו קיים למפתח הזה - ממשיכים לבא אחריו ברשימה.
+      if ((res.status === 404 || res.status === 400) &&
+          index + 1 < models.length) {
+        askImage(key, mime, data, index + 1, ok, bad);
+        return;
+      }
+      bad("http", res.text);
+    })
+    .catch(() => bad("net", ""));
+}
+
+/* ---------- הכניסה ---------- */
+let IMAGE_BUSY = false;
+
+function imageFail(snap, short, title, lines) {
+  imageIdle();
+  failImport(snap, short, title, lines);
+}
+
+function imageIdle() {
+  IMAGE_BUSY = false;
+  const b = $("imageBtn");
+  if (b && b.removeAttribute) b.removeAttribute("disabled");
+}
+
+function loadActiveImage(file) {
+  if (!file || IMAGE_BUSY) return;
+  const snap = snapshotInputs();
+  if (!IMAGE) {
+    imageFail(snap, "טעינה מתמונה אינה מוגדרת בעמוד הזה.",
+      "אי אפשר לקרוא תמונה",
+      ["הגדרות הזיהוי חסרות בעמוד הזה, ולכן אין דרך לקרוא ממנו תמונה.",
+       "אפשר להזין את המספרים ידנית או לטעון קובץ - שתי הדרכים לא השתנו."]);
+    return;
+  }
+  if (typeof fetch !== "function" || typeof FileReader !== "function") {
+    imageFail(snap, "הדפדפן אינו תומך בטעינה מתמונה.",
+      "הדפדפן אינו תומך בזה",
+      ["הדפדפן הזה אינו יודע לשלוח את התמונה לזיהוי, ולכן אי אפשר " +
+       "לקרוא ממנה טבלה.",
+       "טעינה מקובץ אקסל וההזנה הידנית עובדות בו כרגיל."]);
+    return;
+  }
+  const cap = Number(IMAGE.max_mb) || 0;
+  if (cap && file.size > cap * 1024 * 1024) {
+    imageFail(snap, "התמונה גדולה מדי.",
+      "התמונה גדולה מדי",
+      ["התמונה שנבחרה שוקלת יותר מהגבול שאפשר לשלוח לזיהוי.",
+       "צילום מסך של הטבלה בלבד, או שמירה של התמונה באיכות נמוכה יותר, " +
+       "כמעט תמיד פותרים את זה."]);
+    return;
+  }
+  const key = savedKey();
+  if (!key) { openKey(() => loadActiveImage(file)); return; }
+
+  IMAGE_BUSY = true;
+  const btn = $("imageBtn");
+  if (btn && btn.setAttribute) btn.setAttribute("disabled", "disabled");
+  importMsg([{ cls: "detail", text:
+    "שולח את התמונה לזיהוי. זה לוקח כמה שניות..." }]);
+
+  const reader = new FileReader();
+  reader.onerror = () => {
+    imageFail(snap, "לא הצלחתי לקרוא את התמונה.", "התמונה לא נקראה",
+      ["הדפדפן לא הצליח לפתוח את הקובץ שנבחר. זה קורה כשהוא נמחק או " +
+       "הועבר אחרי הבחירה.",
+       "השדות הוחזרו בדיוק למצב שהיו בו לפני הניסיון."]);
+  };
+  reader.onload = ev => {
+    const url = String((ev && ev.target && ev.target.result) || "");
+    const cut = url.indexOf(",");
+    const head = cut > 0 ? url.slice(0, cut) : "";
+    const data = cut > 0 ? url.slice(cut + 1) : "";
+    const mime = (/^data:([^;,]+)/.exec(head) || [])[1] || file.type || "image/png";
+    if (!data) {
+      imageFail(snap, "התמונה ריקה.", "התמונה ריקה",
+        ["הקובץ שנבחר נפתח אבל אין בו תוכן.",
+         "השדות הוחזרו בדיוק למצב שהיו בו לפני הניסיון."]);
+      return;
+    }
+    askImage(key, mime, data, 0,
+      out => { imageIdle(); applyImageText(out, snap); },
+      (kind, detail) => imageError(kind, detail, snap));
+  };
+  try {
+    reader.readAsDataURL(file);
+  } catch (err) {
+    imageFail(snap, "לא הצלחתי לקרוא את התמונה.", "התמונה לא נקראה",
+      ["הדפדפן לא הצליח לפתוח את הקובץ שנבחר.",
+       "השדות הוחזרו בדיוק למצב שהיו בו לפני הניסיון."]);
+  }
+}
+
+/* הטבלה שחזרה נכנסת לאותו קורא בדיוק. כישלון קריאה מוצג כמו כישלון
+   של קובץ, עם התוספת שכאן מדובר בזיהוי מתמונה ולא בקובץ שגוי. */
+function applyImageText(text, snap) {
+  const clean = stripFence(text);
+  if (normKey(clean) === normKey(IMAGE.no_table)) {
+    imageFail(snap, "לא נמצאה טבלה בתמונה.", "לא נמצאה טבלה בתמונה",
+      ["הזיהוי לא מצא בתמונה טבלה של מועמדים או של שלבים.",
+       "צילום מסך שבו הטבלה נראית במלואה, עם שורת הכותרות, נקרא הרבה " +
+       "יותר טוב מצילום חלקי או מתמונה מוטה.",
+       "השדות הוחזרו בדיוק למצב שהיו בו לפני הניסיון."]);
+    return null;
+  }
+  const table = parseCsv(clean);
+  if (!table.length) {
+    imageFail(snap, "לא התקבלה טבלה מהזיהוי.", "לא התקבלה טבלה",
+      ["הזיהוי החזיר תשובה שאינה טבלה, ולכן אין ממה למלא את השדות.",
+       "כדאי לנסות שוב עם צילום ברור יותר של הטבלה.",
+       "השדות הוחזרו בדיוק למצב שהיו בו לפני הניסיון."]);
+    return null;
+  }
+  // נבדק לפני שנוגעים בשדות: כישלון כאן אינו משאיר את העמוד באמצע.
+  const probe = activeCounts(table);
+  if (!probe.ok || !probe.counted) {
+    imageFail(snap,
+      probe.ok ? "לא זוהה בתמונה אף שלב שהמחשבון מכיר."
+               : "לא נמצאה בתמונה עמודה של שלב המועמד.",
+      "הטבלה שבתמונה אינה מתאימה",
+      [probe.ok
+        ? "הטבלה נקראה מהתמונה, אבל אין בה אף שורה בשלב שהמחשבון מכיר."
+        : "הטבלה נקראה מהתמונה, אבל לא נמצא בה שדה עם שלב המועמד - " +
+          "עמודה כמו «" + IMPORT.columns.status[0] + "», או טבלת ריכוז " +
+          "שבה שמות השלבים הם הכותרות.",
+       "התמונה צריכה לכלול את שורת הכותרות ואת השלב של כל מועמד. " +
+       "אם הטבלה רחבה, צילום של עמודת השלב לבדה מספיק.",
+       "השדות הוחזרו בדיוק למצב שהיו בו לפני הניסיון."]);
+    return null;
+  }
+  const res = applyActiveRows(table);
+  if (!res || !res.ok || !res.counted) { restoreInputs(snap); return res; }
+  // אותה שורת סיכום של קובץ, ולפניה מאיפה זה בא ומה יצא החוצה.
+  importMsg([{ cls: "head", text: "נקרא מתמונה." },
+             { cls: "warn", text:
+               "התמונה נשלחה לשירות זיהוי חיצוני כדי לקרוא ממנה את " +
+               "הטבלה, ומה שנקרא ממנה הוא מה שהוזן לשדות. כדאי לעבור " +
+               "על המספרים." }]
+            .concat(IMPORT_LINES));
+  return res;
+}
+
+/* כל כישלון בבקשה מקבל הסבר משלו. תשובה גנרית אינה מאפשרת למשתמש
+   לדעת אם להחליף מפתח, לחכות, או לצלם מחדש. */
+function imageError(kind, detail, snap) {
+  if (kind === "key") {
+    forgetKey();
+    imageFail(snap, "מפתח הגישה אינו תקף.", "מפתח הגישה אינו תקף",
+      ["שירות הזיהוי דחה את המפתח שנשמר בדפדפן. הוא נמחק, וכדי לנסות " +
+       "שוב צריך להזין מפתח תקף.",
+       "זה קורה כשהמפתח הועתק חלקית, כשהוא בוטל, או כששירות הזיהוי " +
+       "אינו מאושר לחשבון שהנפיק אותו.",
+       "השדות הוחזרו בדיוק למצב שהיו בו לפני הניסיון."]);
+    return;
+  }
+  if (kind === "quota") {
+    imageFail(snap, "חרגת ממכסת השימוש.", "חרגת ממכסת השימוש",
+      ["שירות הזיהוי חסם את הבקשה מפני שנעשו בו יותר מדי קריאות בזמן " +
+       "קצר, או שנגמרה המכסה של המפתח.",
+       "המתנה של כמה דקות בדרך כלל מספיקה.",
+       "השדות הוחזרו בדיוק למצב שהיו בו לפני הניסיון."]);
+    return;
+  }
+  if (kind === "net") {
+    imageFail(snap, "אין חיבור לשירות הזיהוי.", "אין חיבור לשירות הזיהוי",
+      ["לא הצלחתי להגיע לשירות הזיהוי. זה קורה בלי חיבור לרשת, או " +
+       "כשרשת הארגון חוסמת את הפנייה החוצה.",
+       "כל שאר המחשבון עובד בלי חיבור: ההזנה הידנית וטעינת קובץ האקסל " +
+       "רצות אצלך בדפדפן בלבד.",
+       "השדות הוחזרו בדיוק למצב שהיו בו לפני הניסיון."]);
+    return;
+  }
+  if (kind === "empty") {
+    imageFail(snap, "הזיהוי החזיר תשובה ריקה.", "הזיהוי החזיר תשובה ריקה",
+      ["שירות הזיהוי ענה בלי תוכן. זה קורה כשהתמונה אינה קריאה או " +
+       "כשהיא נחסמה בצד השירות.",
+       "כדאי לנסות שוב עם צילום ברור יותר של הטבלה.",
+       "השדות הוחזרו בדיוק למצב שהיו בו לפני הניסיון."]);
+    return;
+  }
+  if (kind === "model") {
+    imageFail(snap, "אף מודל זיהוי אינו זמין למפתח הזה.",
+      "מודל הזיהוי אינו זמין",
+      ["אף אחד ממודלי הזיהוי שהעמוד מכיר אינו זמין למפתח שהוזן.",
+       "זה נפתר בהחלפת רשימת המודלים בקובץ ההגדרות של המחשבון.",
+       "השדות הוחזרו בדיוק למצב שהיו בו לפני הניסיון."]);
+    return;
+  }
+  imageFail(snap, "שירות הזיהוי החזיר שגיאה.", "שירות הזיהוי החזיר שגיאה",
+    ["הבקשה הגיעה לשירות הזיהוי והוא דחה אותה. זה יכול לקרות בגלל " +
+     "סוג תמונה שאינו נתמך, תמונה גדולה מדי, או הגבלה בצד השירות.",
+     "נתמכות תמונות בפורמטים המקובלים - צילום מסך רגיל תמיד מתאים.",
+     "השדות הוחזרו בדיוק למצב שהיו בו לפני הניסיון."]);
+}
+
+/* ------------------------------------------------------------------ *
  *  גיוס לפי יחידה                                                     *
  *                                                                     *
  *  מוצג רק כשהקובץ שנטען נשא עמודת יחידה. לכל יחידה רצה בדיוק אותה    *
@@ -4235,6 +4630,7 @@ function reset() {
   $("in_target").value = "";
   $("in_targetDate").value = "";
   $("importFile").value = "";
+  $("imageFile").value = "";
   importMsg([]);
   ACTIVE_UNITS = null;
   $("results").classList.add("hidden");
@@ -4367,6 +4763,27 @@ function buildAbout() {
      "סטטוס שאינו מופיע ברשימות האלה אינו נספר, ונאמר עליו במפורש " +
      "מתחת לכפתור."]);
 
+  setInfo("imageInfo", "טעינה מתמונה",
+    ["אותה טעינה, בכניסה אחרת: במקום קובץ בוחרים תמונה של הטבלה - " +
+     "צילום מסך או צילום של המסך - והשדות מתמלאים ממנה. משם והלאה רץ " +
+     "בדיוק אותו חישוב, בלי שום הבדל.",
+     "זו הדרך היחידה במחשבון שיוצאת החוצה, וצריך לדעת את זה: קובץ " +
+     "אקסל נקרא אצלך בדפדפן ואינו נשלח לשום מקום, אבל תמונה נשלחת " +
+     "לשירות זיהוי חיצוני כדי שיקרא ממנה את הטבלה. אין לשלוח תמונה " +
+     "שיש בה פרטים מזהים של מועמדים - צילום של עמודת השלב, או של " +
+     "טבלת ריכוז, מספיק לחלוטין.",
+     "בפעם הראשונה מתבקש מפתח גישה לשירות הזיהוי. הוא נשמר בדפדפן " +
+     "הזה בלבד ואינו חלק מהעמוד: העמוד מתפרסם באופן ציבורי, ומפתח " +
+     "שהיה כתוב בו היה גלוי לכל. במחשב אחר יתבקש מפתח מחדש, ואפשר " +
+     "למחוק אותו בכל רגע מאותו חלון.",
+     "מה שחוזר מהזיהוי אינו נכנס לשדות כמו שהוא: הוא נקרא בדיוק באותו " +
+     "קורא שקורא קובץ, עם אותו מיפוי סטטוסים, אותו ניכוי כפילויות " +
+     "ואותו נרמול של " + Math.round(attendShare() * 100) + "%. תמונה " +
+     "שלא נמצאה בה טבלה מוכרת אינה משנה דבר - הכל חוזר למצב שהיה, " +
+     "ונפתח חלון שמסביר מה קרה.",
+     "זיהוי מתמונה אינו מדויק כמו קריאת קובץ. אחרי טעינה כדאי לעבור " +
+     "על המספרים שבשדות, ובקובץ שקיים ממילא עדיף לבחור בטעינה מקובץ."]);
+
   setInfo("inputInfo", "מה להזין",
     ["ממלאים «יעד גיוס» בלבד - ומקבלים כמה צריך בכל שלב כדי להגיע אליו.",
      "ממלאים שלב - ומקבלים כמה יתגייסו ממנו. אפשר להזין כמה שלבים.",
@@ -4388,7 +4805,7 @@ renderChart();
 watchHero();
 ["heroInfo", "constraintInfo", "flowInfo", "gapPlanInfo", "whenInfo",
  "matrixInfo", "timelineInfo", "inputInfo", "chartInfo",
- "importInfo", "unitInfo"].forEach(attachInfo);
+ "importInfo", "imageInfo", "unitInfo"].forEach(attachInfo);
 $("infoClose").addEventListener("click", closeInfo);
 $("infoModal").addEventListener("click", ev => {
   if (ev && ev.target === $("infoModal")) closeInfo();
@@ -4402,8 +4819,35 @@ $("importFile").addEventListener("change", ev => {
   const picked = ev && ev.target && ev.target.files ? ev.target.files[0] : null;
   loadActiveFile(picked);
 });
+
+/* סוגי התמונה באים מהקונפיג ולא מהקוד, כמו כל שאר הגדרות הטעינה. */
+if (IMAGE && IMAGE.accept) $("imageFile").setAttribute("accept", IMAGE.accept);
+$("imageBtn").addEventListener("click", () => {
+  if (!IMAGE_BUSY) $("imageFile").click();
+});
+$("imageFile").addEventListener("change", ev => {
+  const picked = ev && ev.target && ev.target.files ? ev.target.files[0] : null;
+  // אותה תמונה שנבחרת פעמיים ברצף אינה מייצרת אירוע בלי איפוס השדה.
+  if (ev && ev.target) ev.target.value = "";
+  loadActiveImage(picked);
+});
+$("keySave").addEventListener("click", confirmKey);
+$("keyCancel").addEventListener("click", closeKey);
+$("keyClose").addEventListener("click", closeKey);
+$("keyForget").addEventListener("click", () => {
+  forgetKey();
+  closeKey();
+  importMsg([{ cls: "detail", text: "מפתח הגישה נמחק מהדפדפן." }]);
+});
+$("keyInput").addEventListener("keydown", e => {
+  if (e && e.key === "Enter") { e.stopPropagation(); confirmKey(); }
+});
+$("keyModal").addEventListener("click", ev => {
+  if (ev && ev.target === $("keyModal")) closeKey();
+});
+
 document.addEventListener("keydown", e => {
-  if (e.key === "Escape") closeInfo();
+  if (e.key === "Escape") { closeInfo(); closeKey(); }
   else if (e.key === "Enter") calculate();
 });
 </script>

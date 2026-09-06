@@ -35,6 +35,7 @@ function makeEl(tag) {
       }
     },
     setAttribute(k, v) { this.attributes[k] = v; },
+    removeAttribute(k) { delete this.attributes[k]; },
     append(...kids) { kids.forEach(k => this.children.push(k)); },
     addEventListener(type, fn) { (this._on ||= {})[type] = fn; },
     get textContent() { return this._text; },
@@ -62,6 +63,56 @@ const document = {
 };
 
 const sandbox = { document, console, Math, Number, JSON, Object, Array, Error };
+
+/* ---------- מה שהדפדפן נותן ומסביבת הבדיקה חסר ----------
+   טעינה מתמונה יוצאת החוצה, ולכן הבדיקה מחזיקה שלושה זיופים: אחסון
+   מקומי, קורא קבצים ושליחה. השליחה מסונכרנת - «הבטחה» שמריצה את
+   ההמשך מיד - כדי שהבדיקה תישאר בדיקה אחת ולא תרוץ אחרי הזמן. */
+const store = {
+  _m: {},
+  getItem(k) { return Object.prototype.hasOwnProperty.call(this._m, k) ? this._m[k] : null; },
+  setItem(k, v) { this._m[k] = String(v); },
+  removeItem(k) { delete this._m[k]; }
+};
+sandbox.localStorage = store;
+
+sandbox.FileReader = function () {
+  this.onload = null;
+  this.onerror = null;
+  this.readAsDataURL = file => {
+    if (file && file._fail) { if (this.onerror) this.onerror(); return; }
+    if (this.onload) this.onload({ target: { result: (file && file._url) || "" } });
+  };
+};
+
+function sync(v) {
+  return {
+    then(f) {
+      try {
+        const out = f(v);
+        return out && typeof out.then === "function" ? out : sync(out);
+      } catch (e) { return failed(e); }
+    },
+    catch() { return this; }
+  };
+}
+function failed(e) {
+  return { then() { return this; }, catch(f) { f(e); return sync(undefined); } };
+}
+
+/* מה שהזיוף החזיר בפועל, כדי לבדוק מה נשלח ולאן. */
+const sent = [];
+let replies = [];
+sandbox.fetch = (url, opts) => {
+  sent.push({ url: url, opts: opts });
+  const r = replies.length > 1 ? replies.shift() : replies[0];
+  if (!r) return failed(new Error("אין תשובה מוכנה"));
+  if (r.throw) return failed(new Error("נפילת רשת"));
+  return sync({ status: r.status, text: () => sync(r.body) });
+};
+const csvReply = body => JSON.stringify(
+  { candidates: [{ content: { parts: [{ text: body }] } }] });
+
 sandbox.window = sandbox;
 vm.createContext(sandbox);
 
@@ -73,7 +124,16 @@ const exposed = script + "\n;globalThis.DATA = DATA; globalThis.Engine = Engine;
                 "globalThis.applyActiveRows = applyActiveRows;" +
                 "globalThis.setPopulation = setPopulation;" +
                 "globalThis.snapshotInputs = snapshotInputs;" +
-                "globalThis.restoreInputs = restoreInputs;";
+                "globalThis.restoreInputs = restoreInputs;" +
+                "globalThis.parseCsv = parseCsv;" +
+                "globalThis.loadActiveImage = loadActiveImage;" +
+                "globalThis.applyImageText = applyImageText;" +
+                "globalThis.imageError = imageError;" +
+                "globalThis.savedKey = savedKey;" +
+                "globalThis.saveKey = saveKey;" +
+                "globalThis.forgetKey = forgetKey;" +
+                "globalThis.openKey = openKey;" +
+                "globalThis.confirmKey = confirmKey;";
 vm.runInContext(exposed, sandbox, { filename: "index.html" });
 
 /* ---------- תרחישים ---------- */
@@ -1570,6 +1630,277 @@ check("איפוס מנקה הכל", () => {
   if (!cleared || shown("results")) return "האיפוס לא ניקה הכל";
   return registry.in_target.value === "" && registry.in_targetDate.value === ""
     ? null : "היעד או התאריך לא נוקו";
+});
+
+/* ---------- טעינה מתמונה ----------
+   הכניסה השנייה לאותו קורא. מה שנבדק כאן הוא בעיקר שהיא באמת אותו
+   קורא, שמפתח הגישה אינו נכנס לעמוד, ושכל כישלון מחזיר את המצב. */
+const IMG = IMP && IMP.image;
+const imgFile = (url, extra) =>
+  Object.assign({ size: 1000, type: "image/png", _url: url }, extra || {});
+const dataUrl = "data:image/png;base64,QUJD";
+const csvOf = table => table
+  .map(r => r.map(c => {
+    const v = c === null || c === undefined ? "" : String(c);
+    return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  }).join(","))
+  .join("\n");
+
+check("ההגדרות של הטעינה מתמונה באות מהנתונים ולא מהקוד", () => {
+  if (!IMG) return "אין image בהגדרות הטעינה";
+  if (!IMG.endpoint || !IMG.prompt) return "חסרה כתובת או ניסוח בקשה";
+  if (!(IMG.models || []).length) return "אין רשימת מודלים";
+  const tpl = fs.readFileSync(path.join(ROOT, "web", "template.html"), "utf8");
+  if (tpl.includes(IMG.endpoint.slice(8, 40)))
+    return "כתובת השירות כתובה בקוד הממשק";
+  const inCode = (IMG.models || []).find(m => tpl.includes(m));
+  if (inCode) return "שם מודל כתוב בקוד הממשק: " + inCode;
+  return tpl.includes(IMG.prompt.slice(0, 30))
+    ? "ניסוח הבקשה כתוב בקוד הממשק" : null;
+});
+
+check("מפתח הגישה אינו נכנס לעמוד הבנוי", () => {
+  // העמוד מתפרסם באופן ציבורי. מפתח שהיה כתוב בו היה גלוי לכל.
+  const suspects = /\b(AIza[0-9A-Za-z_\-]{20,}|AQ\.[0-9A-Za-z_\-]{20,})\b/;
+  const m = suspects.exec(html);
+  if (m) return "נראה שמפתח הוטמע בעמוד: " + m[0].slice(0, 12);
+  if (!/localStorage/.test(script)) return "המפתח אינו נשמר בדפדפן";
+  const other = fs.readFileSync(path.join(ROOT, "מחשבון גיוס.html"), "utf8");
+  return suspects.test(other) ? "מפתח הוטמע בקובץ העצמאי" : null;
+});
+
+check("המפתח נשמר בדפדפן ונמחק ממנו", () => {
+  sandbox.forgetKey();
+  if (sandbox.savedKey()) return "המפתח לא נמחק";
+  sandbox.saveKey("מפתח-לבדיקה");
+  if (sandbox.savedKey() !== "מפתח-לבדיקה") return "המפתח לא נשמר";
+  if (store.getItem(IMG.key_store) !== "מפתח-לבדיקה")
+    return "המפתח לא נשמר תחת השם שבהגדרות";
+  sandbox.forgetKey();
+  return sandbox.savedKey() === "" ? null : "המחיקה לא עבדה";
+});
+
+check("בלי מפתח נפתח חלון ההזנה, והטעינה ממשיכה אחריו", () => {
+  sandbox.reset();
+  sandbox.forgetKey();
+  sent.length = 0;
+  replies = [{ status: 200, body: csvReply(csvOf(
+    activeTable([["1", "בבחינה"], ["2", "קבצים"], ["3", "קבצים"]]))) }];
+  sandbox.loadActiveImage(imgFile(dataUrl));
+  if (sent.length) return "נשלחה בקשה בלי מפתח";
+  if (!registry.keyModal.classList.contains("open"))
+    return "חלון המפתח לא נפתח";
+  // המשתמש מדביק מפתח ומאשר - והתמונה שנבחרה ממשיכה מאליה
+  registry.keyInput.value = "מפתח-לבדיקה";
+  sandbox.confirmKey();
+  if (registry.keyModal.classList.contains("open"))
+    return "חלון המפתח נשאר פתוח";
+  if (sent.length !== 1) return "הטעינה לא המשיכה אחרי הזנת המפתח";
+  return Number(registry.in_file_check.value) ===
+         Math.round(2 * Number(IMP.attend_share))
+    ? null : "השדות לא התמלאו: " + registry.in_file_check.value;
+});
+
+check("תמונה ממלאת בדיוק את אותם שדות כמו קובץ", () => {
+  const table = activeTable([
+    ["1", "בבחינה"], ["2", "בבחינה"], ["3", "קבצים"],
+    ["4", "מרכז הערכה"], ["5", "יחב\"מ"]
+  ]);
+  sandbox.reset();
+  sandbox.applyActiveRows(table);
+  const viaFile = stageKeys.map(k => registry["in_" + k].value).join("|");
+
+  sandbox.reset();
+  sandbox.saveKey("מפתח-לבדיקה");
+  sent.length = 0;
+  replies = [{ status: 200, body: csvReply(csvOf(table)) }];
+  sandbox.loadActiveImage(imgFile(dataUrl));
+  const viaImage = stageKeys.map(k => registry["in_" + k].value).join("|");
+  if (viaImage !== viaFile)
+    return "שתי הדרכים נתנו שדות שונים: " + viaImage + " מול " + viaFile;
+  if (!shown("results")) return "החישוב לא רץ אחרי הטעינה מתמונה";
+  const msg = allText(registry.importMsg);
+  if (!msg.includes("מתמונה")) return "לא נאמר שהמקור הוא תמונה";
+  return msg.includes("שירות זיהוי") ? null : "לא נאמר שהתמונה נשלחה החוצה";
+});
+
+check("המפתח נשלח בכותרת ולא בכתובת", () => {
+  // כתובות נשמרות ביומני שרת, בהיסטוריית הדפדפן וב-referer.
+  if (!sent.length) return "לא נשלחה בקשה";
+  const last = sent[sent.length - 1];
+  if (String(last.url).includes("מפתח-לבדיקה"))
+    return "המפתח נשלח בתוך הכתובת";
+  const head = (last.opts && last.opts.headers) || {};
+  const carried = Object.keys(head).some(k => head[k] === "מפתח-לבדיקה");
+  if (!carried) return "המפתח לא נשלח בכותרת";
+  const body = JSON.parse(last.opts.body);
+  const parts = body.contents[0].parts;
+  if (!parts.some(p => p.inline_data && p.inline_data.data === "QUJD"))
+    return "התמונה עצמה לא נשלחה";
+  return parts.some(p => p.text === IMG.prompt) ? null : "הבקשה לא נשלחה";
+});
+
+check("מודל שאינו זמין מפנה לבא אחריו ברשימה", () => {
+  if ((IMG.models || []).length < 2) return "צריך יותר ממודל אחד ברשימה";
+  sandbox.reset();
+  sandbox.saveKey("מפתח-לבדיקה");
+  sent.length = 0;
+  replies = [
+    { status: 404, body: "{}" },
+    { status: 200, body: csvReply(csvOf(activeTable([["1", "קבצים"]]))) }
+  ];
+  sandbox.loadActiveImage(imgFile(dataUrl));
+  if (sent.length !== 2) return "לא נעשה ניסיון במודל הבא: " + sent.length;
+  if (sent[0].url === sent[1].url) return "אותו מודל נוסה פעמיים";
+  return Number(registry.in_file_check.value) > 0
+    ? null : "הניסיון השני לא מילא את השדות";
+});
+
+check("טקסט מופרד בפסיקים הופך לאותה טבלה", () => {
+  const rows = sandbox.parseCsv(
+    'מועמד(קוד),תהליך נוכחי,יחידה\n1,בבחינה,"מחוז א, צפון"\n2,קבצים,\n');
+  if (rows.length !== 3) return "מספר שורות שגוי: " + rows.length;
+  if (rows[1][2] !== "מחוז א, צפון") return "פסיק בתוך תא שבר את השורה";
+  if (rows[2][2] !== "") return "תא ריק לא נשמר";
+  const quoted = sandbox.parseCsv('שלב\n"יחב""מ"');
+  return quoted[1][0] === 'יחב"מ' ? null : "מירכאות כפולות לא פוענחו";
+});
+
+check("סימוני קוד סביב הטבלה אינם מפילים את הקריאה", () => {
+  sandbox.reset();
+  sandbox.saveKey("מפתח-לבדיקה");
+  const body = "```csv\n" + csvOf(activeTable([["1", "קבצים"], ["2", "קבצים"]])) +
+               "\n```";
+  replies = [{ status: 200, body: csvReply(body) }];
+  sandbox.loadActiveImage(imgFile(dataUrl));
+  return Number(registry.in_file_check.value) ===
+         Math.round(2 * Number(IMP.attend_share))
+    ? null : "הטבלה לא נקראה מתוך סימוני הקוד";
+});
+
+check("תמונה בלי טבלה אינה נוגעת בשדות", () => {
+  sandbox.reset();
+  clearAll();
+  setVal("file_check", "500");
+  setVal("target", "400");
+  sandbox.calculate();
+  sandbox.saveKey("מפתח-לבדיקה");
+  replies = [{ status: 200, body: csvReply(IMG.no_table) }];
+  sandbox.loadActiveImage(imgFile(dataUrl));
+  if (registry.in_file_check.value !== "500") return "שדה השתנה";
+  if (registry.in_target.value !== "400") return "היעד השתנה";
+  if (!registry.infoModal.classList.contains("alert"))
+    return "לא נפתח חלון שגיאה";
+  return allText(registry.infoTitle).includes("טבלה")
+    ? null : "השגיאה לא הסבירה מה קרה";
+});
+
+check("תמונה שאין בה שלב מוכר אינה נוגעת בשדות", () => {
+  sandbox.reset();
+  clearAll();
+  setVal("file_check", "500");
+  sandbox.calculate();
+  sandbox.saveKey("מפתח-לבדיקה");
+  replies = [{ status: 200, body: csvReply("שם,עיר\nדנה,חיפה") }];
+  sandbox.loadActiveImage(imgFile(dataUrl));
+  return registry.in_file_check.value === "500"
+    ? null : "שדה השתנה למרות שהטבלה לא התאימה";
+});
+
+check("מפתח שנדחה נמחק, והשדות חוזרים", () => {
+  sandbox.reset();
+  clearAll();
+  setVal("file_check", "500");
+  sandbox.calculate();
+  sandbox.saveKey("מפתח-לבדיקה");
+  replies = [{ status: 403, body: "{}" }];
+  sandbox.loadActiveImage(imgFile(dataUrl));
+  if (registry.in_file_check.value !== "500") return "שדה השתנה";
+  if (sandbox.savedKey()) return "המפתח שנדחה נשאר בדפדפן";
+  return allText(registry.infoText).includes("מפתח")
+    ? null : "לא הוסבר שהמפתח נדחה";
+});
+
+check("כל כישלון מקבל הסבר משלו", () => {
+  const kinds = ["key", "quota", "net", "empty", "model", "http"];
+  const seen = {};
+  clearAll();
+  setVal("file_check", "500");
+  sandbox.calculate();
+  for (const kind of kinds) {
+    sandbox.saveKey("מפתח-לבדיקה");
+    const snap = sandbox.snapshotInputs();
+    sandbox.imageError(kind, "", snap);
+    const t = allText(registry.infoTitle);
+    if (!t) return "אין כותרת לשגיאה " + kind;
+    if (seen[t]) return "שתי שגיאות עם אותו הסבר: " + kind + " ו" + seen[t];
+    seen[t] = kind;
+    if (registry.in_file_check.value !== "500")
+      return "השדות לא הוחזרו אחרי " + kind;
+  }
+  sandbox.forgetKey();
+  return null;
+});
+
+check("נפילת רשת אינה משאירה את העמוד באמצע", () => {
+  sandbox.reset();
+  clearAll();
+  setVal("file_check", "500");
+  sandbox.calculate();
+  sandbox.saveKey("מפתח-לבדיקה");
+  replies = [{ throw: true }];
+  sandbox.loadActiveImage(imgFile(dataUrl));
+  if (registry.in_file_check.value !== "500") return "שדה השתנה";
+  if (registry.imageBtn.attributes.disabled)
+    return "הכפתור נשאר חסום אחרי כישלון";
+  return allText(registry.infoText).includes("חיבור")
+    ? null : "לא הוסבר שאין חיבור";
+});
+
+check("תמונה גדולה מדי נעצרת לפני השליחה", () => {
+  sandbox.reset();
+  sandbox.saveKey("מפתח-לבדיקה");
+  sent.length = 0;
+  replies = [{ status: 200, body: csvReply("") }];
+  const big = imgFile(dataUrl, { size: (Number(IMG.max_mb) + 1) * 1024 * 1024 });
+  sandbox.loadActiveImage(big);
+  if (sent.length) return "תמונה גדולה מדי נשלחה בכל זאת";
+  return allText(registry.infoTitle).includes("גדולה")
+    ? null : "לא נאמר שהתמונה גדולה מדי";
+});
+
+check("קובץ שלא נקרא אינו נשלח", () => {
+  sandbox.reset();
+  sandbox.saveKey("מפתח-לבדיקה");
+  sent.length = 0;
+  sandbox.loadActiveImage(imgFile(dataUrl, { _fail: true }));
+  if (sent.length) return "נשלחה בקשה למרות שהקובץ לא נקרא";
+  sandbox.forgetKey();
+  return allText(registry.infoTitle) ? null : "לא נפתח חלון שגיאה";
+});
+
+check("אין מלל באנגלית באזור התמונה", () => {
+  sandbox.reset();
+  sandbox.forgetKey();
+  sandbox.openKey(null);
+  const t = infoOf(at("imageInfo")) + " " + allText(at("keyText")) + " " +
+            at("keyTitle").textContent + " " + at("imageBtn").textContent;
+  const m = /[A-Za-z]+/.exec(t);
+  if (m) return "אנגלית באזור התמונה: " + m[0];
+  const btns = /<button class="load" id="imageBtn"[^>]*>([^<]*)</.exec(html);
+  if (!btns) return "אין כפתור טעינה מתמונה";
+  return /[A-Za-z]/.test(btns[1]) ? "אנגלית בכפתור" : null;
+});
+
+check("איפוס מנקה גם את הטעינה מתמונה", () => {
+  sandbox.saveKey("מפתח-לבדיקה");
+  replies = [{ status: 200, body: csvReply(csvOf(activeTable([["1", "קבצים"]]))) }];
+  sandbox.loadActiveImage(imgFile(dataUrl));
+  sandbox.reset();
+  sandbox.forgetKey();
+  return allText(registry.importMsg).trim() === "" &&
+         registry.imageFile.value === ""
+    ? null : "האיפוס השאיר את סיכום הטעינה מתמונה";
 });
 
 if (fails.length) {
