@@ -1695,7 +1695,7 @@ check("בלי שמזינים דבר, נעשה שימוש במפתח שבמחשב
     return "נפתח חלון מפתח למרות שיש מפתח במחשבון";
   if (sent.length !== 1) return "לא נשלחה בקשה: " + sent.length;
   const head = (sent[0].opts && sent[0].opts.headers) || {};
-  if (!Object.keys(head).some(k => head[k] === IMG.key))
+  if (!Object.keys(head).some(k => String(head[k]).includes(IMG.key)))
     return "הבקשה לא נשאה את המפתח שבמחשבון";
   return Number(registry.in_file_check.value) ===
          Math.round(2 * Number(IMP.attend_share))
@@ -1740,13 +1740,58 @@ check("המפתח נשלח בכותרת ולא בכתובת", () => {
   if (String(last.url).includes("מפתח-לבדיקה"))
     return "המפתח נשלח בתוך הכתובת";
   const head = (last.opts && last.opts.headers) || {};
-  const carried = Object.keys(head).some(k => head[k] === "מפתח-לבדיקה");
+  // אסימון נושא נושא קידומת לפני המפתח, ולכן «מכיל» ולא «שווה».
+  const carried = Object.keys(head).some(
+    k => String(head[k]).includes("מפתח-לבדיקה"));
   if (!carried) return "המפתח לא נשלח בכותרת";
   const body = JSON.parse(last.opts.body);
   const parts = body.contents[0].parts;
   if (!parts.some(p => p.inline_data && p.inline_data.data === "QUJD"))
     return "התמונה עצמה לא נשלחה";
   return parts.some(p => p.text === IMG.prompt) ? null : "הבקשה לא נשלחה";
+});
+
+check("צורת האישור נבחרת לפי צורת המפתח, ושתיהן מהקונפיג", () => {
+  /* גוגל שינתה את פורמט המפתחות, ואישור בפורמט החדש נשלח כאסימון
+     נושא ולא ככותרת מפתח. שתי הצורות נתמכות כדי שהחלפת מפתח לא
+     תדרוש שינוי קוד, והבחירה נעשית לפי המפתח עצמו. */
+  const A = IMG.auth;
+  if (!A) return "אין הגדרות אישור בקונפיג";
+  if (!A.api_key_header || !A.bearer_header) return "חסרה כותרת";
+  if (!(A.api_key_prefixes || []).length) return "אין קידומת למפתח API";
+
+  const tpl = fs.readFileSync(path.join(ROOT, "web", "template.html"), "utf8");
+  for (const v of [A.api_key_header, A.bearer_header, A.bearer_prefix.trim()]
+                  .concat(A.api_key_prefixes))
+    if (tpl.includes(v)) return "כתוב בקוד הממשק ולא בקונפיג: " + v;
+
+  const classic = A.api_key_prefixes[0] + "בדיקה";
+  const other = "אישור-מסוג-אחר";
+  const h1 = sandbox.keyHeaders(classic);
+  if (h1[A.api_key_header] !== classic)
+    return "מפתח API לא נשלח בכותרת המפתח";
+  if (h1[A.bearer_header]) return "מפתח API נשלח גם כאסימון נושא";
+  const h2 = sandbox.keyHeaders(other);
+  if (h2[A.bearer_header] !== A.bearer_prefix + other)
+    return "אישור אחר לא נשלח כאסימון נושא";
+  return h2[A.api_key_header] ? "אישור אחר נשלח גם ככותרת מפתח" : null;
+});
+
+check("אישור בפורמט החדש יוצא בכותרת הנכונה בבקשה עצמה", () => {
+  sandbox.reset();
+  sandbox.saveKey("אישור-מסוג-אחר");
+  sent.length = 0;
+  replies = [{ status: 200, body: csvReply(csvOf(
+    activeTable([["1", "קבצים"]]))) }];
+  sandbox.loadActiveImage(imgFile(dataUrl));
+  if (!sent.length) return "לא נשלחה בקשה";
+  const head = (sent[0].opts && sent[0].opts.headers) || {};
+  if (String(sent[0].url).includes("אישור-מסוג-אחר"))
+    return "האישור נשלח בתוך הכתובת";
+  if (head[IMG.auth.bearer_header] !== IMG.auth.bearer_prefix + "אישור-מסוג-אחר")
+    return "האישור לא נשלח כאסימון נושא";
+  sandbox.forgetKey();
+  return null;
 });
 
 check("מודל שאינו זמין מפנה לבא אחריו ברשימה", () => {

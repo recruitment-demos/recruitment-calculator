@@ -3141,6 +3141,24 @@ function imageModels() {
   return list.filter(m => txt(m));
 }
 
+/* שתי צורות אישור, והבחירה לפי צורת המפתח עצמו ולא לפי הגדרה שמישהו
+   צריך לזכור להפוך: מפתח שמתחיל באחת מהקידומות שבקונפיג נשלח ככותרת
+   מפתח, וכל אישור אחר נשלח כאסימון נושא. כך מפתח API קלאסי ואישור
+   בפורמט חדש עובדים שניהם, ומפתח אישי שמשתמש מזין עובד בלי שיצטרך
+   לדעת מאיזה סוג הוא. שמות הכותרות והקידומות בקונפיג, לא כאן. */
+function keyHeaders(key) {
+  const a = (IMAGE && IMAGE.auth) || {};
+  const k = txt(key);
+  const pre = a.api_key_prefixes || [];
+  const isApiKey = pre.some(p => k.indexOf(p) === 0);
+  const out = {};
+  if (isApiKey && a.api_key_header) out[a.api_key_header] = k;
+  // בלי txt על הקידומת: הרווח שבסופה הוא חלק מהפורמט, ו-txt גוזם אותו.
+  else if (a.bearer_header) out[a.bearer_header] = String(a.bearer_prefix || "") + k;
+  else if (a.api_key_header) out[a.api_key_header] = k;
+  return out;
+}
+
 function askImage(key, mime, data, index, ok, bad) {
   const models = imageModels();
   if (index >= models.length) { bad("model", ""); return; }
@@ -3154,9 +3172,12 @@ function askImage(key, mime, data, index, ok, bad) {
     generationConfig: { temperature: 0 }
   };
   // המפתח נשלח בכותרת ולא בכתובת: כתובות נשמרות ביומנים ובהיסטוריה.
+  const auth = keyHeaders(key);
+  const headers = { "Content-Type": "application/json" };
+  Object.keys(auth).forEach(h => { headers[h] = auth[h]; });
   fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+    headers: headers,
     body: JSON.stringify(payload)
   }).then(r => r.text().then(t => ({ status: r.status, text: t })))
     .then(res => {
