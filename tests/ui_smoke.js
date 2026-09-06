@@ -133,7 +133,8 @@ const exposed = script + "\n;globalThis.DATA = DATA; globalThis.Engine = Engine;
                 "globalThis.saveKey = saveKey;" +
                 "globalThis.forgetKey = forgetKey;" +
                 "globalThis.openKey = openKey;" +
-                "globalThis.confirmKey = confirmKey;";
+                "globalThis.confirmKey = confirmKey;" +
+                "globalThis.activeKey = activeKey;";
 vm.runInContext(exposed, sandbox, { filename: "index.html" });
 
 /* ---------- תרחישים ---------- */
@@ -1659,14 +1660,20 @@ check("ההגדרות של הטעינה מתמונה באות מהנתונים �
     ? "ניסוח הבקשה כתוב בקוד הממשק" : null;
 });
 
-check("מפתח הגישה אינו נכנס לעמוד הבנוי", () => {
-  // העמוד מתפרסם באופן ציבורי. מפתח שהיה כתוב בו היה גלוי לכל.
-  const suspects = /\b(AIza[0-9A-Za-z_\-]{20,}|AQ\.[0-9A-Za-z_\-]{20,})\b/;
-  const m = suspects.exec(html);
-  if (m) return "נראה שמפתח הוטמע בעמוד: " + m[0].slice(0, 12);
-  if (!/localStorage/.test(script)) return "המפתח אינו נשמר בדפדפן";
+check("המפתח המשותף בא מהקונפיג ולא מהקוד", () => {
+  /* המפתח מוטמע בעמוד בכוונה, כדי שהטעינה מתמונה תעבוד בלחיצה אחת
+     בלי שיזינו דבר. החלטה מפורשת של המשתמש מ-2026-09-06, אחרי
+     שהוצג לו שהעמוד ציבורי: הוא הנפיק אותו בחשבון נפרד וריק
+     שהחשיפה בו אינה מזיקה. מה שנאכף כאן הוא שהוא מגיע מהקונפיג,
+     כדי שהחלפתו תהיה החלפת קובץ ולא עריכת קוד. */
+  if (!IMG.key) return "אין מפתח משותף בהגדרות";
+  if (!html.includes(IMG.key)) return "המפתח לא הוטמע בעמוד";
   const other = fs.readFileSync(path.join(ROOT, "מחשבון גיוס.html"), "utf8");
-  return suspects.test(other) ? "מפתח הוטמע בקובץ העצמאי" : null;
+  if (!other.includes(IMG.key)) return "המפתח לא הוטמע בקובץ העצמאי";
+  const tpl = fs.readFileSync(path.join(ROOT, "web", "template.html"), "utf8");
+  if (tpl.includes(IMG.key)) return "המפתח כתוב בקוד הממשק ולא בקונפיג";
+  return /localStorage/.test(script)
+    ? null : "אין מסלול למפתח אישי ששמור בדפדפן";
 });
 
 check("המפתח נשמר בדפדפן ונמחק ממנו", () => {
@@ -1680,25 +1687,31 @@ check("המפתח נשמר בדפדפן ונמחק ממנו", () => {
   return sandbox.savedKey() === "" ? null : "המחיקה לא עבדה";
 });
 
-check("בלי מפתח נפתח חלון ההזנה, והטעינה ממשיכה אחריו", () => {
+check("בלי שמזינים דבר, נעשה שימוש במפתח שבמחשבון", () => {
+  // בקשה מפורשת: מי שמעלה תמונה אינו מזין כלום.
   sandbox.reset();
   sandbox.forgetKey();
   sent.length = 0;
   replies = [{ status: 200, body: csvReply(csvOf(
     activeTable([["1", "בבחינה"], ["2", "קבצים"], ["3", "קבצים"]]))) }];
   sandbox.loadActiveImage(imgFile(dataUrl));
-  if (sent.length) return "נשלחה בקשה בלי מפתח";
-  if (!registry.keyModal.classList.contains("open"))
-    return "חלון המפתח לא נפתח";
-  // המשתמש מדביק מפתח ומאשר - והתמונה שנבחרה ממשיכה מאליה
-  registry.keyInput.value = "מפתח-לבדיקה";
-  sandbox.confirmKey();
   if (registry.keyModal.classList.contains("open"))
-    return "חלון המפתח נשאר פתוח";
-  if (sent.length !== 1) return "הטעינה לא המשיכה אחרי הזנת המפתח";
+    return "נפתח חלון מפתח למרות שיש מפתח במחשבון";
+  if (sent.length !== 1) return "לא נשלחה בקשה: " + sent.length;
+  const head = (sent[0].opts && sent[0].opts.headers) || {};
+  if (!Object.keys(head).some(k => head[k] === IMG.key))
+    return "הבקשה לא נשאה את המפתח שבמחשבון";
   return Number(registry.in_file_check.value) ===
          Math.round(2 * Number(IMP.attend_share))
     ? null : "השדות לא התמלאו: " + registry.in_file_check.value;
+});
+
+check("מפתח אישי גובר על זה שבמחשבון", () => {
+  sandbox.saveKey("מפתח-לבדיקה");
+  if (sandbox.activeKey() !== "מפתח-לבדיקה") return "המפתח האישי לא גבר";
+  sandbox.forgetKey();
+  return sandbox.activeKey() === IMG.key
+    ? null : "בלי מפתח אישי לא חוזרים למפתח שבמחשבון";
 });
 
 check("תמונה ממלאת בדיוק את אותם שדות כמו קובץ", () => {
@@ -1890,6 +1903,36 @@ check("אין מלל באנגלית באזור התמונה", () => {
   const btns = /<button class="load" id="imageBtn"[^>]*>([^<]*)</.exec(html);
   if (!btns) return "אין כפתור טעינה מתמונה";
   return /[A-Za-z]/.test(btns[1]) ? "אנגלית בכפתור" : null;
+});
+
+check("מפתח המחשבון שנדחה מוביל לבקשת מפתח אישי", () => {
+  /* נשאר אחרון בקבוצה בכוונה: מרגע שהמפתח המשותף נדחה הוא אינו
+     מנוסה שוב בפעילות הזו, ובדיקות שאחריו היו מקבלות מצב אחר. */
+  sandbox.reset();
+  sandbox.forgetKey();
+  clearAll();
+  setVal("file_check", "500");
+  sandbox.calculate();
+  replies = [{ status: 403, body: "{}" }];
+  sandbox.loadActiveImage(imgFile(dataUrl));
+  if (registry.in_file_check.value !== "500") return "שדה השתנה";
+  const said = allText(registry.infoText);
+  if (!said.includes("מחשבון")) return "לא הוסבר שהמפתח שבמחשבון נדחה";
+  // מכאן והלאה מבקשים מפתח אישי במקום לשלוח שוב את מה שנדחה
+  if (sandbox.activeKey() !== "") return "המפתח שנדחה עדיין בשימוש";
+  sent.length = 0;
+  sandbox.loadActiveImage(imgFile(dataUrl));
+  if (sent.length) return "נשלחה בקשה נוספת עם המפתח שנדחה";
+  if (!registry.keyModal.classList.contains("open"))
+    return "לא נפתח חלון להזנת מפתח אישי";
+  registry.keyInput.value = "מפתח-לבדיקה";
+  replies = [{ status: 200, body: csvReply(csvOf(
+    activeTable([["1", "קבצים"], ["2", "קבצים"]]))) }];
+  sandbox.confirmKey();
+  if (sent.length !== 1) return "הטעינה לא המשיכה אחרי הזנת המפתח";
+  return Number(registry.in_file_check.value) ===
+         Math.round(2 * Number(IMP.attend_share))
+    ? null : "השדות לא התמלאו אחרי המפתח האישי";
 });
 
 check("איפוס מנקה גם את הטעינה מתמונה", () => {
