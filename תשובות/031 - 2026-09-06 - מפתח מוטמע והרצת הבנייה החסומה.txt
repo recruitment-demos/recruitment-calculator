@@ -61,3 +61,19 @@
 ===========
 המפתח מהחשבון הראשון, זה שנתת אתמול, לא נכנס לשום קובץ ולא נדחף
 לשום מקום. אם אינך משתמש בו - כדאי למחוק אותו.
+
+עדכון: ה-push אכן נחסם
+======================
+הקומיט נוצר מקומית (488b580) אבל גיטהאב דחה את הדחיפה:
+
+  GCP API Key Bound to a Service Account
+  config/params.json:198
+
+קישור האישור החד-פעמי:
+https://github.com/recruitment-demos/recruitment-calculator/security/secret-scanning/unblock-secret/3IwYsls4B42ekFNJcMw6TILnay0
+
+נכנסים אליו, בוחרים שהחשיפה מכוונת, ואז ה-push עובר.
+
+שים לב לניסוח של גיטהאב: הוא זיהה את המפתח כמפתח שקשור לחשבון
+שירות (Service Account), ולא כמפתח Gemini פשוט. כדאי לוודא שלחשבון
+השירות הזה באמת אין גישה לשום דבר.
